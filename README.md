@@ -2,6 +2,20 @@
 
 ## Quick Start
 
+### Git hooks (Milestone 1)
+
+This repository ships hooks under `.githooks/` that enforce `team.json`, block committing `target/` output, validate commit messages (`feat` / `fix` / merge / `init:`), check `feat/*` branch naming, and run **`mvn test`** for all five services before each push.
+
+Enable them once per clone (from the repo root):
+
+```bash
+git config core.hooksPath .githooks
+```
+
+Git for Windows runs these with **sh**; keep hooks executable (`chmod +x .githooks/*` on Unix, or re-add with `git update-index --chmod=+x`).
+
+To skip the test gate on a push when needed: `SKIP_TESTS=1 git push` or `NO_VERIFY=1 git push`.
+
 ### Prerequisites
 - Java 25+
 - Maven (included as `./mvnw` or `./mvnw.cmd`)

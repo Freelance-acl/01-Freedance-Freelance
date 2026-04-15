@@ -1,0 +1,103 @@
+#!/bin/sh
+# Branch naming (feat/* per Milestone 1 + team conventions) and mvn test for all modules.
+
+set -e
+ROOT=$(git rev-parse --show-toplevel)
+cd "$ROOT" || exit 1
+
+validate_feat_branch() {
+  b=$1
+  case "$b" in
+    feat/docker/*)
+      rest=${b#feat/docker/}
+      if [ -z "$rest" ]; then
+        echo "pre-push: feat/docker/<id> must include an id segment." >&2
+        return 1
+      fi
+      case "$rest" in
+        */*)
+          echo "pre-push: feat/docker must be exactly feat/docker/<id>, got: $b" >&2
+          return 1
+        ;;
+      esac
+      return 0
+    ;;
+  esac
+
+  case "$b" in
+    feat/*) ;;
+    *) return 0 ;;
+  esac
+
+  nf=$(printf '%s' "$b" | awk -F/ '{print NF}')
+  svc=$(printf '%s' "$b" | cut -d/ -f2)
+
+  if [ "$nf" -eq 2 ]; then
+    case "$svc" in
+      user|job|proposal|contract|wallet|user-service|job-service|proposal-service|contract-service|wallet-service)
+        echo "pre-push: note — grader expects feat/<service>/S#-F#/<studentId> for feature credit; pushing service-only branch: $b" >&2
+        return 0
+      ;;
+    esac
+    echo "pre-push: invalid feat/<service> branch (second segment must be a known service name): $b" >&2
+    return 1
+  fi
+
+  if [ "$nf" -eq 4 ]; then
+    if printf '%s' "$b" | grep -Eq '^feat/(user|job|proposal|contract|wallet)/S[1-5]-F[1-9]/[^/]+$'; then
+      return 0
+    fi
+    echo "pre-push: feat branch with 4 segments must match feat/(user|job|proposal|contract|wallet)/S#-F#/<id>, got: $b" >&2
+    return 1
+  fi
+
+  echo "pre-push: unsupported feat/ branch (use feat/<service>, feat/<svc>/S#-F#/<id>, or feat/docker/<id>): $b" >&2
+  return 1
+}
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [ -z "$local_ref" ] && continue
+
+  case "$local_sha" in
+    0000000000000000000000000000000000000000) continue ;;
+  esac
+
+  case "$local_ref" in
+    refs/heads/*) ;;
+    *) continue ;;
+  esac
+
+  branch=${local_ref#refs/heads/}
+
+  case "$branch" in
+    main|master) ;;
+    *)
+      validate_feat_branch "$branch" || exit 1
+    ;;
+  esac
+done
+
+if [ "$SKIP_TESTS" = "1" ] || [ "$NO_VERIFY" = "1" ]; then
+  echo "pre-push: skipping mvn test (SKIP_TESTS=1 or NO_VERIFY=1)." >&2
+  exit 0
+fi
+
+MVN_CMD=""
+if [ -x "$ROOT/mvnw" ]; then
+  MVN_CMD="$ROOT/mvnw"
+elif [ -f "$ROOT/mvnw" ]; then
+  MVN_CMD="sh $ROOT/mvnw"
+elif command -v mvn >/dev/null 2>&1; then
+  MVN_CMD="mvn"
+else
+  echo "pre-push: neither ./mvnw nor mvn found; cannot run tests." >&2
+  exit 1
+fi
+
+echo "pre-push: running tests for all modules..." >&2
+$MVN_CMD -q test || {
+  echo "pre-push: mvn test failed." >&2
+  exit 1
+}
+
+exit 0

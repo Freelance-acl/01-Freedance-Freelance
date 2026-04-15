@@ -1,0 +1,32 @@
+#!/bin/sh
+# Enforce Milestone 1 commit message format; allow merge, revert, and init setup.
+
+MSG_FILE=${1:-}
+if [ -z "$MSG_FILE" ] || [ ! -f "$MSG_FILE" ]; then
+  echo "commit-msg: missing message file." >&2
+  exit 1
+fi
+
+MSG=$(cat "$MSG_FILE")
+FIRST=$(printf '%s\n' "$MSG" | sed -n '1p' | tr -d '\015')
+
+case "$FIRST" in
+  Merge\ *) exit 0 ;;
+  Revert\ *) exit 0 ;;
+esac
+
+case "$FIRST" in
+  init:\ project\ setup\ by\ *) exit 0 ;;
+esac
+
+if echo "$FIRST" | grep -Eq '^(feat|fix)\((user-service|job-service|proposal-service|contract-service|wallet-service)\): .+ \([^)]+\)$'; then
+  exit 0
+fi
+
+echo "commit-msg: message must match milestone format:" >&2
+echo "  feat(<service>): <description> (<studentId>)" >&2
+echo "  fix(<service>): <description> (<studentId>)" >&2
+echo "Services: user-service, job-service, proposal-service, contract-service, wallet-service" >&2
+echo "Also allowed: Merge ... / Revert ... / init: project setup by (...)" >&2
+echo "First line was: $FIRST" >&2
+exit 1
