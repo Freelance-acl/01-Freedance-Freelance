@@ -6,7 +6,7 @@
 
 This repository ships hooks under `.githooks/` that enforce `team.json`, block committing `target/` output, validate commit messages (`feat` / `fix` / merge / `init:`), check `feat/*` branch naming, and run **`mvn test`** for all five services before each push.
 
-Enable them once per clone (from the repo root):
+First-time **`./setup.bash`** runs `git config core.hooksPath .githooks` for this clone. You can also set it yourself from the repo root:
 
 ```bash
 git config core.hooksPath .githooks
@@ -29,8 +29,9 @@ To skip the test gate on a push when needed: `SKIP_TESTS=1 git push` or `NO_VERI
 # Copy environment configuration (do this once)
 cp .env.example .env
 
-# Then run setup
+# Then run setup (either script enables Git hooks for this clone)
 ./setup.bash
+# or: sh ./setup.sh
 ```
 This runs:
 - `./mvnw.cmd clean install` - Install packages
