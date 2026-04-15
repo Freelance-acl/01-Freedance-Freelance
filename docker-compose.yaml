@@ -1,0 +1,110 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: freelance-db
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: freelancedb
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=en_US.UTF-8"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - freelance-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  user-service:
+    build: ./user-service
+    ports:
+      - "8081:8080"
+    environment:
+      PORT: 8080
+      SERVICE_NAME: "user-service"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - freelance-network
+
+  job-service:
+    build: ./job-service
+    ports:
+      - "8082:8080"
+    environment:
+      PORT: 8080
+      SERVICE_NAME: "job-service"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      user-service:
+        condition: service_started
+    networks:
+      - freelance-network
+
+  proposal-service:
+    build: ./proposal-service
+    ports:
+      - "8083:8080"
+    environment:
+      PORT: 8080
+      SERVICE_NAME: "proposal-service"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      user-service:
+        condition: service_started
+      job-service:
+        condition: service_started
+    networks:
+      - freelance-network
+
+  contract-service:
+    build: ./contract-service
+    ports:
+      - "8084:8080"
+    environment:
+      PORT: 8080
+      SERVICE_NAME: "contract-service"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      user-service:
+        condition: service_started
+      job-service:
+        condition: service_started
+      proposal-service:
+        condition: service_started
+    networks:
+      - freelance-network
+
+  wallet-service:
+    build: ./wallet-service
+    ports:
+      - "8085:8080"
+    environment:
+      PORT: 8080
+      SERVICE_NAME: "wallet-service"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      user-service:
+        condition: service_started
+    networks:
+      - freelance-network
+
+volumes:
+  pgdata:
+
+networks:
+  freelance-network:
+    driver: bridge
