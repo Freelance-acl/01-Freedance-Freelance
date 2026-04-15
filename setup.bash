@@ -1,11 +1,6 @@
 # INSTALL PACKAGES
 ./mvnw.cmd clean install
 
-# TO BUILD PROJECT
+# TO BUILD PROJECT -> creates .jar file
 ./mvnw.cmd package -DskipTests
 
-# TO START RUNNING
-docker-compose up -d
-
-# TO STOP RUNNING
-# docker-compose down
