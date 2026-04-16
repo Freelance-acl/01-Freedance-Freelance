@@ -18,6 +18,7 @@ To skip the test gate on a push when needed: `SKIP_TESTS=1 git push` or `NO_VERI
 
 ### Prerequisites
 - Java 25+
+- **Maven uses `JAVA_HOME` for compilation**, not only the `java` on your `PATH`. If `./mvnw.cmd` fails with **release version 25 not supported**, your `JAVA_HOME` is an older JDK while the POM targets Java 25. On PowerShell from the repo root, run **`. .\scripts\use-jdk25.ps1`** once per session (or set `JAVA_HOME` permanently to your JDK 25 install, e.g. `C:\Program Files\Java\jdk-25`).
 - Maven (included as `./mvnw` or `./mvnw.cmd`)
 - Docker & Docker Compose
 - PostgreSQL (runs in Docker container)
