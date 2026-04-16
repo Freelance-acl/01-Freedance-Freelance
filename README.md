@@ -2,8 +2,23 @@
 
 ## Quick Start
 
+### Git hooks (Milestone 1)
+
+This repository ships hooks under `.githooks/` that enforce `team.json`, block committing `target/` output, validate commit messages (`feat` / `fix` / merge / `init:`), check `feat/*` branch naming, and run **`mvn test`** for all five services before each push.
+
+First-time **`./setup.bash`** runs `git config core.hooksPath .githooks` for this clone. You can also set it yourself from the repo root:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+Git for Windows runs these with **sh**; keep hooks executable (`chmod +x .githooks/*` on Unix, or re-add with `git update-index --chmod=+x`).
+
+To skip the test gate on a push when needed: `SKIP_TESTS=1 git push` or `NO_VERIFY=1 git push`.
+
 ### Prerequisites
 - Java 25+
+- **Maven uses `JAVA_HOME` for compilation**, not only the `java` on your `PATH`. If `./mvnw.cmd` fails with **release version 25 not supported**, your `JAVA_HOME` is an older JDK while the POM targets Java 25. On PowerShell from the repo root, run **`. .\scripts\use-jdk25.ps1`** once per session (or set `JAVA_HOME` permanently to your JDK 25 install, e.g. `C:\Program Files\Java\jdk-25`).
 - Maven (included as `./mvnw` or `./mvnw.cmd`)
 - Docker & Docker Compose
 - PostgreSQL (runs in Docker container)
@@ -15,8 +30,9 @@
 # Copy environment configuration (do this once)
 cp .env.example .env
 
-# Then run setup
+# Then run setup (either script enables Git hooks for this clone)
 ./setup.bash
+# or: sh ./setup.sh
 ```
 This runs:
 - `./mvnw.cmd clean install` - Install packages
@@ -30,10 +46,28 @@ This runs:
 - `./mvnw.cmd package -DskipTests` - Rebuild all modules
 - `docker-compose up -d --build` - Start all services + PostgreSQL in Docker
 
+`docker-compose.yaml` sets **`SPRING_DATASOURCE_URL`** (and credentials) on each app service so JDBC uses the hostname **`postgres`** on the Compose network. `application.properties` still uses **`localhost`** for running **`./mvnw spring-boot:run`** on your machine.
+
+Each service **Dockerfile** is **multi-stage**: it runs `./mvnw package -DskipTests` in a **JDK** layer, then ships a **JRE-only** runtime (`eclipse-temurin:25.0.2_10-jre-noble` on Ubuntu Noble—smaller than carrying the JDK). `JAVA_TOOL_OPTIONS` enables **container CPU/memory awareness** and a faster RNG init. You do **not** need a local `target/*.jar` before `docker compose build`.
+
 #### 3. Stop the Application
 ```bash
 docker-compose down
 ```
+
+#### Dev with hot reload (Docker)
+
+The default compose stack runs a **fat JAR** in a JRE image, so the JVM does not watch your source tree. For **Spring Boot DevTools** restarts while containers are running, use the dev overlay (bind-mounted module + `./mvnw spring-boot:run` + shared Maven cache):
+
+```bash
+docker compose -f docker-compose.dev.yml up --build
+```
+
+Use the same host ports as the table below (8081–8085, Postgres 5432). **Do not run** `docker compose up` and `docker compose -f docker-compose.dev.yml up` at the same time if both publish Postgres on **5432**.
+
+After you change `.java` (or resources under `src/main/resources`), trigger a compile so `target/classes` updates—your IDE build or `./mvnw compile` inside the mounted service directory—then DevTools restarts the app in the container.
+
+For hot reload **without** Docker, run `./mvnw spring-boot:run` from a service module with `SPRING_PROFILES_ACTIVE=dev` and Postgres reachable at `localhost:5432`.
 
 ---
 
@@ -50,7 +84,17 @@ docker-compose down
 
 ---
 
+## Automated tests (JUnit 5)
+
+Each service includes **`spring-boot-starter-test`**, **H2** (test scope), `src/test/resources/application-test.properties`, and a base class **`…/support/AbstractIntegrationTest`** (`@SpringBootTest` + `@ActiveProfiles("test")`) so full-context tests run against an in-memory DB without Docker. Add `@WebMvcTest` for controller slices. From the repo root: `./mvnw test`.
+
+---
+
 ## API Endpoints
+
+Milestone 1 health checks: **`GET …/health`** returns **`OK`** (HTTP 200). The **`/api/...`** prefix is **not** hard-coded on controllers: each module sets **`server.servlet.context-path`** once in `application.properties` (and the same line in `application-test.properties`). Controllers extend **`BaseApiController`** with **`@RequestMapping("/")`** and only declare paths like **`/health`**.
+
+**Why not “strip `-service`” for the path?** That turns `user-service` into `user`, not **`users`**, and `wallet-service` into **`wallet`**, not **`payouts`**. The milestone uses **resource-style** path segments (`/api/users`, `/api/payouts`, …), which are not the same as the Maven artifact id. A single property per service avoids wrong singular/plural guesses.
 
 ### User Service
 **Base URL:** `http://localhost:8081/api/users`
@@ -79,14 +123,9 @@ docker-compose down
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/health2` | GET | Health check (v2) |
-| `/health` | GET | Health check (from alternative controller) |
+| `/health` | GET | Health check |
 
-**Packages:**
-- `com.team01.freelance.proposal.controllers.HealthController` (uses `/health2`)
-- `com.team01.freelance.proposalservice.controllers.HealthController` (uses `/health`)
-
-**Note:** There are two HealthController classes in different packages. The active one depends on which package Spring Boot's component scan finds first (typically the one closest to the main application class).
+**Package:** `com.team01.freelance.proposal.controllers.HealthController`
 
 ---
 
@@ -98,22 +137,18 @@ docker-compose down
 | `/` | GET | Welcome message |
 | `/health` | GET | Health check |
 
-**Packages:**
-- `com.team01.freelance.contract.controllers.HealthController` (has both endpoints)
-- `com.team01.freelance.contractservice.controllers.HealthController` (health only)
+**Package:** `com.team01.freelance.contract.controllers.HealthController` (also exposes `GET /` as a welcome string)
 
 ---
 
-### Wallet Service / Payouts Service
+### Wallet Service
 **Base URL:** `http://localhost:8085/api/payouts`
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/health` | GET | Health check |
 
-**Packages:**
-- `com.team01.freelance.wallet.controllers.HealthController`
-- `com.team01.freelance.walletservice.controllers.HealthController`
+**Package:** `com.team01.freelance.wallet.controllers.HealthController`
 
 ---
 
@@ -131,8 +166,6 @@ curl http://localhost:8082/api/jobs/health
 
 ### Test Proposal Service
 ```bash
-curl http://localhost:8083/api/proposals/health2
-# or
 curl http://localhost:8083/api/proposals/health
 ```
 
@@ -140,7 +173,7 @@ curl http://localhost:8083/api/proposals/health
 ```bash
 curl http://localhost:8084/api/contracts/health
 # or
-curl http://localhost:8084/api/contracts
+curl http://localhost:8084/api/contracts/
 ```
 
 ### Test Wallet Service
@@ -178,8 +211,8 @@ docker ps
 docker logs freelance-db
 ```
 
-### Duplicate Controllers
-Note: Some services have multiple HealthController classes in different packages. Only one will be active (the one in the main package scan path). To clean this up, delete or consolidate duplicate controllers.
+### Duplicate controllers
+If you introduce a second `HealthController` (or overlapping `@RequestMapping`) under another package, Spring may fail at startup or map only one handler. Keep a single health controller per service under `…/<domain>/controllers/`.
 
 ---
 

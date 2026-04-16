@@ -1,0 +1,134 @@
+#!/bin/sh
+# Branch naming (feat/* per Milestone 1 + team conventions) and mvn test for all modules.
+
+set -e
+ROOT=$(git rev-parse --show-toplevel)
+cd "$ROOT" || exit 1
+
+validate_feat_branch() {
+  b=$1
+  case "$b" in
+    feat/docker/*)
+      rest=${b#feat/docker/}
+      if [ -z "$rest" ]; then
+        echo "pre-push: feat/docker/<id> must include an id segment." >&2
+        return 1
+      fi
+      case "$rest" in
+        */*)
+          echo "pre-push: feat/docker must be exactly feat/docker/<id>, got: $b" >&2
+          return 1
+        ;;
+      esac
+      return 0
+    ;;
+  esac
+
+  case "$b" in
+    feat/*) ;;
+    *) return 0 ;;
+  esac
+
+  nf=$(printf '%s' "$b" | awk -F/ '{print NF}')
+  svc=$(printf '%s' "$b" | cut -d/ -f2)
+
+  if [ "$nf" -eq 2 ]; then
+    case "$svc" in
+      user|job|proposal|contract|wallet|user-service|job-service|proposal-service|contract-service|wallet-service)
+        echo "pre-push: note — grader expects feat/<service>/S#-F#/<studentId> for feature credit; pushing service-only branch: $b" >&2
+        return 0
+      ;;
+    esac
+    echo "pre-push: invalid feat/<service> branch (second segment must be a known service name): $b" >&2
+    return 1
+  fi
+
+  if [ "$nf" -eq 4 ]; then
+    if printf '%s' "$b" | grep -Eq '^feat/(user|job|proposal|contract|wallet)/S[1-5]-F[1-9]/[^/]+$'; then
+      return 0
+    fi
+    echo "pre-push: feat branch with 4 segments must match feat/(user|job|proposal|contract|wallet)/S#-F#/<id>, got: $b" >&2
+    return 1
+  fi
+
+  echo "pre-push: unsupported feat/ branch (use feat/<service>, feat/<svc>/S#-F#/<id>, or feat/docker/<id>): $b" >&2
+  return 1
+}
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [ -z "$local_ref" ] && continue
+
+  case "$local_sha" in
+    0000000000000000000000000000000000000000) continue ;;
+  esac
+
+  case "$local_ref" in
+    refs/heads/*) ;;
+    *) continue ;;
+  esac
+
+  branch=${local_ref#refs/heads/}
+
+  case "$branch" in
+    main|master) ;;
+    *)
+      validate_feat_branch "$branch" || exit 1
+    ;;
+  esac
+done
+
+if [ "$SKIP_TESTS" = "1" ] || [ "$NO_VERIFY" = "1" ]; then
+  echo "pre-push: skipping mvn test (SKIP_TESTS=1 or NO_VERIFY=1)." >&2
+  exit 0
+fi
+
+# Maven uses JAVA_HOME for javac. PATH may point at Java 25 while JAVA_HOME is still JDK 20,
+# which breaks --release 25. Prefer JDK 25 when JAVA_HOME is missing or not 25.
+prefer_java25_for_maven() {
+  maj=""
+  if [ -n "${JAVA_HOME}" ] && [ -x "${JAVA_HOME}/bin/javac" ]; then
+    maj=$("${JAVA_HOME}/bin/javac" -version 2>&1 | tr -d '\015' | awk 'NR==1{split($2,a,".");print a[1]}')
+  fi
+  if [ "$maj" = "25" ]; then
+    return 0
+  fi
+  for p in \
+    "/c/Program Files/Java/jdk-25" \
+    "/c/Program Files/Java/jdk-25.0.2" \
+    "/c/Program Files/Eclipse Adoptium/jdk-25.0.2.10-hotspot" \
+    "/usr/lib/jvm/java-25-openjdk-amd64" \
+    "/usr/lib/jvm/temurin-25-jdk-amd64"
+  do
+    [ -x "$p/bin/javac" ] || continue
+    v=$("$p/bin/javac" -version 2>&1 | tr -d '\015' | awk 'NR==1{split($2,a,".");print a[1]}')
+    if [ "$v" = "25" ]; then
+      export JAVA_HOME="$p"
+      export PATH="$JAVA_HOME/bin:$PATH"
+      echo "pre-push: JAVA_HOME -> $JAVA_HOME (JDK 25 for Maven)." >&2
+      return 0
+    fi
+  done
+  echo "pre-push: warning: JDK 25 not detected in JAVA_HOME or common paths; mvn may fail with release 25 not supported." >&2
+}
+
+prefer_java25_for_maven
+
+MVN_CMD=""
+if [ -x "$ROOT/mvnw" ]; then
+  MVN_CMD="$ROOT/mvnw"
+elif [ -f "$ROOT/mvnw" ]; then
+  MVN_CMD="sh $ROOT/mvnw"
+elif command -v mvn >/dev/null 2>&1; then
+  MVN_CMD="mvn"
+else
+  echo "pre-push: neither ./mvnw nor mvn found; cannot run tests." >&2
+  exit 1
+fi
+
+echo "pre-push: running tests for all modules..." >&2
+$MVN_CMD -q test || {
+  echo "pre-push: mvn test failed." >&2
+  exit 1
+}
+
+exit 0

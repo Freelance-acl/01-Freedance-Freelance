@@ -1,10 +1,9 @@
 package com.team01.freelance.job;
 
+import com.team01.freelance.job.support.AbstractIntegrationTest;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
 
-@SpringBootTest
-class JobServiceApplicationTests {
+class JobServiceApplicationTests extends AbstractIntegrationTest {
 
     @Test
     void contextLoads() {

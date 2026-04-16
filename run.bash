@@ -2,7 +2,7 @@
 
 docker-compose up -d --build
 
-# try go to http://localhost:8081/api/users/health or http://localhost:8082/api/jobs/health
+# try http://localhost:8081/api/users/health or http://localhost:8082/api/jobs/health
 
 # Service          InternalPort     DockerPort
 # user-service     8080                8081

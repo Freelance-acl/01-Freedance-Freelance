@@ -1,0 +1,8 @@
+# Dev: JDK only — source is bind-mounted; CMD runs spring-boot:run for DevTools restarts on classpath changes.
+FROM eclipse-temurin:25.0.2_10-jdk-noble
+RUN apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends unzip \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /workspace
+ENV JAVA_TOOL_OPTIONS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
+CMD ["sh", "-c", "set -e && sed -i 's/\\r$//' mvnw && chmod +x mvnw && exec ./mvnw spring-boot:run"]

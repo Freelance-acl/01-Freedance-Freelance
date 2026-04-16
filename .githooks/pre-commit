@@ -1,0 +1,41 @@
+#!/bin/sh
+# Fast checks before commit: team.json roster, no Maven build output staged.
+
+set -e
+ROOT=$(git rev-parse --show-toplevel)
+cd "$ROOT" || exit 1
+
+HOOK_DIR="$ROOT/.githooks"
+
+PY=""
+if command -v python3 >/dev/null 2>&1; then
+  PY=python3
+elif command -v python >/dev/null 2>&1; then
+  PY=python
+else
+  echo "pre-commit: python3 or python not found; cannot validate team.json." >&2
+  exit 1
+fi
+
+STAGED=$(git diff --cached --name-only)
+if [ -n "$STAGED" ]; then
+  BAD=$(echo "$STAGED" | grep -E '(^|/)target/' || true)
+  if [ -n "$BAD" ]; then
+    echo "pre-commit: do not commit Maven build output under target/. Staged paths:" >&2
+    echo "$BAD" >&2
+    exit 1
+  fi
+fi
+
+if ! echo "$STAGED" | grep -qx 'team.json' && [ ! -f "$ROOT/team.json" ]; then
+  echo "pre-commit: team.json is missing at repository root (required by milestone)." >&2
+  exit 1
+fi
+
+if echo "$STAGED" | grep -qx 'team.json'; then
+  git show :team.json | "$PY" "$HOOK_DIR/validate_team_json.py" || exit 1
+else
+  "$PY" "$HOOK_DIR/validate_team_json.py" < "$ROOT/team.json" || exit 1
+fi
+
+exit 0
