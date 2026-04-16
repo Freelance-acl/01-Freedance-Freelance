@@ -2,16 +2,13 @@ package com.team01.freelance.proposal.controllers;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/proposals")
-public class HealthController {
+public class HealthController extends BaseApiController {
 
-    @GetMapping("/health2")
+    @GetMapping("/health")
     public ResponseEntity<String> health() {
         return ResponseEntity.ok("OK");
     }
 }
-

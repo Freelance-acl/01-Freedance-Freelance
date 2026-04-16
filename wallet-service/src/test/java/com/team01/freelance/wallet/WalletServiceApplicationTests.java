@@ -1,10 +1,9 @@
 package com.team01.freelance.wallet;
 
+import com.team01.freelance.wallet.support.AbstractIntegrationTest;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
 
-@SpringBootTest
-class WalletServiceApplicationTests {
+class WalletServiceApplicationTests extends AbstractIntegrationTest {
 
     @Test
     void contextLoads() {
