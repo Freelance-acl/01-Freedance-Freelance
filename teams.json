@@ -1,37 +1,62 @@
-[ 
-  {"studentId":"13000892",
-    "name":"Youssef Magdy",
-    "githubUsername":"youssefmmagdy",
-    "service":"wallet-service"
-  },
-  {"studentId":"16001371",
-    "name":"Youssef Hipa",
-    "githubUsername":"youssefhipa",
-    "service":"wallet-service"
-  },
-  {"studentId":"16001922",
-    "name":"Amr Khaled Arafa",
-    "githubUsername":"amrkhaled04",
-    "service":"wallet-service"
-  },
+[
   {"studentId":"22001235",
-    "name":"Marwan Hosny",
+    "name":"Marawan Hosny",
     "githubUsername":"marwanhosny99",
-    "service":"wallet-service"
+    "service":"user-service"
+  },
+  {"studentId":"22001251",
+    "name":"Seif Hesham",
+    "githubUsername":"seifheshammm",
+    "service":"user-service"
+  },
+  {"studentId":"16001357",
+    "name":"Omar Taha",
+    "githubUsername":"omartaha7507",
+    "service":"user-service"
   },
   {"studentId":"13000900",
     "name":"Mohamed Wael",
     "githubUsername":"mohamedwaelw2s",
-    "service":"wallet-service"
+    "service":"job-service"
   },
-  {"studentId":"13001047",
-    "name":"Yousef Abdelmegeed",
-    "githubUsername":"yousef-megeed",
-    "service":"wallet-service"
+  {"studentId":"22001344",
+    "name":"Ziad wessam",
+    "githubUsername":"ziadwess2003",
+    "service":"job-service"
+  },
+  {"studentId":"22001409",
+    "name":"Hamza Elewa",
+    "githubUsername":"HamzaElewa",
+    "service":"job-service"
   },
   {"studentId":"19002350",
     "name":"Abdelrahman Tamer",
     "githubUsername":"AbdelrahmanTamer21",
+    "service":"proposal-service"
+  },
+  {"studentId":"13001047",
+    "name":"Yousef Abdelmegeed",
+    "githubUsername":"yousef-megeed",
+    "service":"proposal-service"
+  },
+  {"studentId":"16001922",
+    "name":"Amr Khaled Arafa",
+    "githubUsername":"amrkhaled04",
+    "service":"contract-service"
+  },
+  {"studentId":"16001371",
+    "name":"Youssef Hipa",
+    "githubUsername":"youssefhipa",
+    "service":"contract-service"
+  },
+  {"studentId":"16001922",
+    "name":"Khaled ِAmr",
+    "githubUsername":"",
+    "service":"contract-service"
+  },
+  {"studentId":"13000892",
+    "name":"Youssef Magdy",
+    "githubUsername":"youssefmmagdy",
     "service":"wallet-service"
   },
   {"studentId":"19001224",
@@ -39,14 +64,9 @@
     "githubUsername":"Abdalrahman-Ashraf",
     "service":"wallet-service"
   },
-  {"studentId":"22001344",
-    "name":"Ziad wessam",
-    "githubUsername":"ziadwess2003",
-    "service":"wallet-service"
-  },
-  {"studentId":"22001409",
-    "name":"Hamza Elewa",
-    "githubUsername":"HamzaElewa",
+  {"studentId":"19001586",
+    "name":"Saba Farihi",
+    "githubUsername":"sabaa-frh",
     "service":"wallet-service"
   }
 ]
