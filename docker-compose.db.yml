@@ -1,8 +1,6 @@
-version: '3.8'
-
 services:
   # PostgreSQL Database Service
-  postgres:
+  freelance-db:
     image: postgres:15-alpine
     container_name: freelance-db
     ports:

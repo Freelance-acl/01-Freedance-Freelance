@@ -1,4 +1,4 @@
-package com.team01.freelance.user.controllers;
+package com.team01.freelance.user.controller;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
