@@ -39,11 +39,20 @@ public class UserSkillController {
         return ResponseEntity.ok(userSkillService.createUserSkill(userSkill));
     }
 
+    /**
+     * Updates a user skill by ID.
+     *
+     * @param id the user skill ID
+     * @param userSkill the update payload
+     * @return 200 with updated user skill, or 404 if not found
+     */
     @PutMapping("/{id}")
     public ResponseEntity<UserSkill> updateUserSkill(@PathVariable Long id, @RequestBody UserSkill userSkill) {
-        return userSkillService.updateUserSkill(id, userSkill)
-                .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
+        try {
+            return ResponseEntity.ok(userSkillService.updateUserSkill(id, userSkill));
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
+        }
     }
 
     @DeleteMapping("/{id}")

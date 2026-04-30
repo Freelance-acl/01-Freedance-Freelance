@@ -1,7 +1,12 @@
 package com.team01.freelance.wallet.service;
 
+import com.team01.freelance.wallet.model.Payout;
 import com.team01.freelance.wallet.model.PayoutPromo;
+import com.team01.freelance.wallet.model.PromoCode;
 import com.team01.freelance.wallet.repository.PayoutPromoRepository;
+import com.team01.freelance.wallet.repository.PayoutRepository;
+import com.team01.freelance.wallet.repository.PromoCodeRepository;
+import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
@@ -19,6 +24,12 @@ class PayoutPromoServiceTest {
     @Mock
     private PayoutPromoRepository payoutPromoRepository;
 
+    @Mock
+    private PayoutRepository payoutRepository;
+
+    @Mock
+    private PromoCodeRepository promoCodeRepository;
+
     @InjectMocks
     private PayoutPromoService payoutPromoService;
 
@@ -28,7 +39,7 @@ class PayoutPromoServiceTest {
     }
 
     @Test
-    void updatePayoutPromo_ShouldMergeNonNullFields() {
+    void updatePayoutPromo_ShouldMergeNonNullFieldsAndFetchRelationships() {
         // Arrange
         Long id = 1L;
         PayoutPromo existing = new PayoutPromo();
@@ -37,20 +48,53 @@ class PayoutPromoServiceTest {
 
         PayoutPromo incoming = new PayoutPromo();
         incoming.setDiscountApplied(25.0);
+        
+        Payout payout = new Payout();
+        payout.setId(10L);
+        incoming.setPayout(payout);
+        
+        PromoCode promoCode = new PromoCode();
+        promoCode.setId(20L);
+        incoming.setPromoCode(promoCode);
 
         when(payoutPromoRepository.findById(id)).thenReturn(Optional.of(existing));
+        when(payoutRepository.findById(10L)).thenReturn(Optional.of(payout));
+        when(promoCodeRepository.findById(20L)).thenReturn(Optional.of(promoCode));
         when(payoutPromoRepository.save(any(PayoutPromo.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // Act
-        Optional<PayoutPromo> result = payoutPromoService.updatePayoutPromo(id, incoming);
+        PayoutPromo result = payoutPromoService.updatePayoutPromo(id, incoming);
 
         // Assert
-        assertTrue(result.isPresent());
-        PayoutPromo updated = result.get();
+        assertNotNull(result);
+        PayoutPromo updated = result;
         assertEquals(id, updated.getId());
-        assertEquals(25.0, updated.getDiscountApplied()); // Updated
+        assertEquals(25.0, updated.getDiscountApplied());
+        assertEquals(payout, updated.getPayout());
+        assertEquals(promoCode, updated.getPromoCode());
         
         verify(payoutPromoRepository).findById(id);
+        verify(payoutRepository).findById(10L);
+        verify(promoCodeRepository).findById(20L);
         verify(payoutPromoRepository).save(updated);
+    }
+
+    @Test
+    void updatePayoutPromo_ShouldThrowExceptionIfPayoutNotFound() {
+        // Arrange
+        Long id = 1L;
+        PayoutPromo existing = new PayoutPromo();
+        existing.setId(id);
+
+        PayoutPromo incoming = new PayoutPromo();
+        Payout payout = new Payout();
+        payout.setId(10L);
+        incoming.setPayout(payout);
+
+        when(payoutPromoRepository.findById(id)).thenReturn(Optional.of(existing));
+        when(payoutRepository.findById(10L)).thenReturn(Optional.empty());
+
+        // Act & Assert
+        assertThrows(EntityNotFoundException.class, () -> payoutPromoService.updatePayoutPromo(id, incoming));
     }
 }

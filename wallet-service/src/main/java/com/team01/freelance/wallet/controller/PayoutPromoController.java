@@ -39,11 +39,20 @@ public class PayoutPromoController {
         return ResponseEntity.ok(payoutPromoService.createPayoutPromo(payoutPromo));
     }
 
+    /**
+     * Updates a payout promo by ID.
+     *
+     * @param id the payout promo ID
+     * @param payoutPromo the update payload
+     * @return 200 with updated payout promo, or 404 if not found
+     */
     @PutMapping("/{id}")
     public ResponseEntity<PayoutPromo> updatePayoutPromo(@PathVariable Long id, @RequestBody PayoutPromo payoutPromo) {
-        return payoutPromoService.updatePayoutPromo(id, payoutPromo)
-                .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
+        try {
+            return ResponseEntity.ok(payoutPromoService.updatePayoutPromo(id, payoutPromo));
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
+        }
     }
 
     @DeleteMapping("/{id}")

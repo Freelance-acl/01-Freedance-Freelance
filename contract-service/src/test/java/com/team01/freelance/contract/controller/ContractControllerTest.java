@@ -67,12 +67,22 @@ class ContractControllerTest {
     @Test
     void updateReturnsOk() throws Exception {
         Contract contract = new Contract();
-        when(contractService.updateContract(eq(1L), any(Contract.class))).thenReturn(Optional.of(contract));
+        when(contractService.updateContract(eq(1L), any(Contract.class))).thenReturn(contract);
 
         mockMvc.perform(put("/api/contracts/{id}", 1L)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void updateReturnsNotFound() throws Exception {
+        when(contractService.updateContract(eq(1L), any(Contract.class))).thenThrow(new RuntimeException("Not found"));
+
+        mockMvc.perform(put("/api/contracts/{id}", 1L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isNotFound());
     }
 
     @Test

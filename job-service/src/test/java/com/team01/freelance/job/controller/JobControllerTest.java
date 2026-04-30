@@ -67,7 +67,7 @@ class JobControllerTest {
     @Test
     void updateReturnsOk() throws Exception {
         Job job = new Job();
-        when(jobService.updateJob(eq(1L), any(Job.class))).thenReturn(Optional.of(job));
+        when(jobService.updateJob(eq(1L), any(Job.class))).thenReturn(job);
 
         mockMvc.perform(put("/api/jobs/{id}", 1L)
                         .contentType(MediaType.APPLICATION_JSON)

@@ -39,11 +39,20 @@ public class PayoutController {
         return ResponseEntity.ok(payoutService.createPayout(payout));
     }
 
+    /**
+     * Updates a payout by ID.
+     *
+     * @param id the payout ID
+     * @param payout the update payload
+     * @return 200 with updated payout, or 404 if not found
+     */
     @PutMapping("/{id}")
     public ResponseEntity<Payout> updatePayout(@PathVariable Long id, @RequestBody Payout payout) {
-        return payoutService.updatePayout(id, payout)
-                .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
+        try {
+            return ResponseEntity.ok(payoutService.updatePayout(id, payout));
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
+        }
     }
 
     @DeleteMapping("/{id}")

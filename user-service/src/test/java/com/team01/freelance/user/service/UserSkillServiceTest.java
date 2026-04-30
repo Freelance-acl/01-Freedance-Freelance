@@ -1,8 +1,11 @@
 package com.team01.freelance.user.service;
 
 import com.team01.freelance.user.model.ProficiencyLevel;
+import com.team01.freelance.user.model.User;
 import com.team01.freelance.user.model.UserSkill;
+import com.team01.freelance.user.repository.UserRepository;
 import com.team01.freelance.user.repository.UserSkillRepository;
+import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
@@ -19,6 +22,9 @@ class UserSkillServiceTest {
 
     @Mock
     private UserSkillRepository userSkillRepository;
+
+    @Mock
+    private UserRepository userRepository;
 
     @InjectMocks
     private UserSkillService userSkillService;
@@ -49,11 +55,10 @@ class UserSkillServiceTest {
         when(userSkillRepository.save(any(UserSkill.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // Act
-        Optional<UserSkill> result = userSkillService.updateUserSkill(id, incoming);
+        UserSkill updated = userSkillService.updateUserSkill(id, incoming);
 
         // Assert
-        assertTrue(result.isPresent());
-        UserSkill updated = result.get();
+        assertNotNull(updated);
         assertEquals(id, updated.getId());
         assertEquals("Java", updated.getSkillName()); // Preserved
         assertEquals("Programming", updated.getCategory()); // Preserved
@@ -66,18 +71,51 @@ class UserSkillServiceTest {
     }
 
     @Test
-    void updateUserSkill_ReturnEmptyIfNotFound() {
+    void updateUserSkill_ThrowExceptionIfNotFound() {
         // Arrange
         Long id = 1L;
         UserSkill incoming = new UserSkill();
         when(userSkillRepository.findById(id)).thenReturn(Optional.empty());
 
+        // Act & Assert
+        assertThrows(EntityNotFoundException.class, () -> userSkillService.updateUserSkill(id, incoming));
+        verify(userSkillRepository).findById(id);
+        verify(userSkillRepository, never()).save(any());
+    }
+
+    @Test
+    void createUserSkill_ShouldValidateUser() {
+        // Arrange
+        UserSkill skill = new UserSkill();
+        User user = new User();
+        user.setId(10L);
+        skill.setUser(user);
+
+        when(userRepository.findById(10L)).thenReturn(Optional.of(user));
+        when(userSkillRepository.save(skill)).thenReturn(skill);
+
         // Act
-        Optional<UserSkill> result = userSkillService.updateUserSkill(id, incoming);
+        UserSkill result = userSkillService.createUserSkill(skill);
 
         // Assert
-        assertFalse(result.isPresent());
-        verify(userSkillRepository).findById(id);
+        assertNotNull(result);
+        verify(userRepository).findById(10L);
+        verify(userSkillRepository).save(skill);
+    }
+
+    @Test
+    void createUserSkill_ShouldThrowIfUserNotFound() {
+        // Arrange
+        UserSkill skill = new UserSkill();
+        User user = new User();
+        user.setId(10L);
+        skill.setUser(user);
+
+        when(userRepository.findById(10L)).thenReturn(Optional.empty());
+
+        // Act & Assert
+        assertThrows(EntityNotFoundException.class, () -> userSkillService.createUserSkill(skill));
+        verify(userRepository).findById(10L);
         verify(userSkillRepository, never()).save(any());
     }
 }

@@ -172,6 +172,9 @@ public class Job {
 
     public void setJobAttachments(List<JobAttachment> jobAttachments) {
         this.jobAttachments = jobAttachments;
+        if (this.jobAttachments != null) {
+            this.jobAttachments.forEach(attachment -> attachment.setJob(this));
+        }
     }
 }
 

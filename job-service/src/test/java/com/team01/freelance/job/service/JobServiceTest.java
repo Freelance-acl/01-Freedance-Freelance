@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.Optional;
 
@@ -17,6 +18,9 @@ class JobServiceTest {
 
     @Mock
     private JobRepository jobRepository;
+
+    @Mock
+    private JdbcTemplate jdbcTemplate;
 
     @InjectMocks
     private JobService jobService;
@@ -32,6 +36,7 @@ class JobServiceTest {
         Long jobId = 1L;
         Job existingJob = new Job();
         existingJob.setId(jobId);
+        existingJob.setClientId(10L);
         existingJob.setBudgetMin(100.0);
         existingJob.setBudgetMax(200.0);
 
@@ -39,6 +44,7 @@ class JobServiceTest {
         updateDetails.setBudgetMin(300.0); // 300 > 200
 
         when(jobRepository.findById(jobId)).thenReturn(Optional.of(existingJob));
+        when(jdbcTemplate.queryForObject(anyString(), eq(Boolean.class), any())).thenReturn(true);
 
         // Act & Assert
         assertThrows(IllegalArgumentException.class, () -> {
@@ -54,6 +60,7 @@ class JobServiceTest {
         Long jobId = 1L;
         Job existingJob = new Job();
         existingJob.setId(jobId);
+        existingJob.setClientId(10L);
         existingJob.setBudgetMin(100.0);
         existingJob.setBudgetMax(200.0);
 
@@ -63,14 +70,15 @@ class JobServiceTest {
 
         when(jobRepository.findById(jobId)).thenReturn(Optional.of(existingJob));
         when(jobRepository.save(existingJob)).thenReturn(existingJob);
+        when(jdbcTemplate.queryForObject(anyString(), eq(Boolean.class), any())).thenReturn(true);
 
         // Act
-        Optional<Job> result = jobService.updateJob(jobId, updateDetails);
+        Job result = jobService.updateJob(jobId, updateDetails);
 
         // Assert
-        assertTrue(result.isPresent());
-        assertEquals(150.0, result.get().getBudgetMin());
-        assertEquals(250.0, result.get().getBudgetMax());
+        assertNotNull(result);
+        assertEquals(150.0, result.getBudgetMin());
+        assertEquals(250.0, result.getBudgetMax());
         verify(jobRepository, times(1)).save(existingJob);
     }
 }

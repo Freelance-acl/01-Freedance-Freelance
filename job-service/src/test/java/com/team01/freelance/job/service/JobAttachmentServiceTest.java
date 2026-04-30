@@ -1,8 +1,11 @@
 package com.team01.freelance.job.service;
 
+import com.team01.freelance.job.model.Job;
 import com.team01.freelance.job.model.JobAttachment;
 import com.team01.freelance.job.model.JobAttachmentType;
 import com.team01.freelance.job.repository.JobAttachmentRepository;
+import com.team01.freelance.job.repository.JobRepository;
+import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
@@ -20,6 +23,9 @@ class JobAttachmentServiceTest {
 
     @Mock
     private JobAttachmentRepository jobAttachmentRepository;
+
+    @Mock
+    private JobRepository jobRepository;
 
     @InjectMocks
     private JobAttachmentService jobAttachmentService;
@@ -44,16 +50,15 @@ class JobAttachmentServiceTest {
         incoming.setFileUrl("http://new.url");
         // type, expiryDate, verified are null in incoming
 
-        when(jobAttachmentRepository.existsById(id)).thenReturn(true);
         when(jobAttachmentRepository.findById(id)).thenReturn(Optional.of(existing));
         when(jobAttachmentRepository.save(any(JobAttachment.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // Act
-        Optional<JobAttachment> result = jobAttachmentService.updateJobAttachment(id, incoming);
+        JobAttachment result = jobAttachmentService.updateJobAttachment(id, incoming);
 
         // Assert
-        assertTrue(result.isPresent());
-        JobAttachment updated = result.get();
+        assertNotNull(result);
+        JobAttachment updated = result;
         assertEquals(id, updated.getId());
         assertEquals("http://new.url", updated.getFileUrl()); // Updated
         assertEquals(JobAttachmentType.BRIEF, updated.getType()); // Preserved
@@ -65,29 +70,78 @@ class JobAttachmentServiceTest {
     }
 
     @Test
-    void updateJobAttachment_NowMergesInsteadOfOverwriting() {
-        // This test verifies the NEW behavior
-        
+    void updateJobAttachment_ShouldValidateJobIfProvided() {
+        // Arrange
         Long id = 1L;
         JobAttachment existing = new JobAttachment();
         existing.setId(id);
-        existing.setType(JobAttachmentType.BRIEF);
-        existing.setFileUrl("http://old.url");
-
+        
         JobAttachment incoming = new JobAttachment();
-        incoming.setFileUrl("http://new.url");
-        // other fields are null
+        Job job = new Job();
+        job.setId(100L);
+        incoming.setJob(job);
 
         when(jobAttachmentRepository.findById(id)).thenReturn(Optional.of(existing));
-        when(jobAttachmentRepository.save(any(JobAttachment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(jobRepository.findById(100L)).thenReturn(Optional.of(job));
+        when(jobAttachmentRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
         // Act
-        Optional<JobAttachment> result = jobAttachmentService.updateJobAttachment(id, incoming);
+        JobAttachment result = jobAttachmentService.updateJobAttachment(id, incoming);
 
         // Assert
-        assertTrue(result.isPresent());
-        JobAttachment updated = result.get();
-        assertEquals("http://new.url", updated.getFileUrl());
-        assertEquals(JobAttachmentType.BRIEF, updated.getType()); // No longer null
+        assertNotNull(result);
+        verify(jobRepository).findById(100L);
+    }
+
+    @Test
+    void updateJobAttachment_ShouldThrowIfJobNotFound() {
+        // Arrange
+        Long id = 1L;
+        JobAttachment existing = new JobAttachment();
+        existing.setId(id);
+        
+        JobAttachment incoming = new JobAttachment();
+        Job job = new Job();
+        job.setId(100L);
+        incoming.setJob(job);
+
+        when(jobAttachmentRepository.findById(id)).thenReturn(Optional.of(existing));
+        when(jobRepository.findById(100L)).thenReturn(Optional.empty());
+
+        // Act & Assert
+        assertThrows(EntityNotFoundException.class, () -> jobAttachmentService.updateJobAttachment(id, incoming));
+    }
+
+    @Test
+    void createJobAttachment_ShouldValidateJob() {
+        // Arrange
+        JobAttachment attachment = new JobAttachment();
+        Job job = new Job();
+        job.setId(100L);
+        attachment.setJob(job);
+
+        when(jobRepository.findById(100L)).thenReturn(Optional.of(job));
+        when(jobAttachmentRepository.save(attachment)).thenReturn(attachment);
+
+        // Act
+        JobAttachment result = jobAttachmentService.createJobAttachment(attachment);
+
+        // Assert
+        assertNotNull(result);
+        verify(jobRepository).findById(100L);
+    }
+
+    @Test
+    void createJobAttachment_ShouldThrowIfJobNotFound() {
+        // Arrange
+        JobAttachment attachment = new JobAttachment();
+        Job job = new Job();
+        job.setId(100L);
+        attachment.setJob(job);
+
+        when(jobRepository.findById(100L)).thenReturn(Optional.empty());
+
+        // Act & Assert
+        assertThrows(EntityNotFoundException.class, () -> jobAttachmentService.createJobAttachment(attachment));
     }
 }

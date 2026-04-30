@@ -39,11 +39,20 @@ public class JobAttachmentController {
         return ResponseEntity.ok(jobAttachmentService.createJobAttachment(jobAttachment));
     }
 
+    /**
+     * Updates a job attachment by ID.
+     *
+     * @param id the job attachment ID
+     * @param jobAttachment the update payload
+     * @return 200 with updated job attachment, or 404 if not found
+     */
     @PutMapping("/{id}")
     public ResponseEntity<JobAttachment> updateJobAttachment(@PathVariable Long id, @RequestBody JobAttachment jobAttachment) {
-        return jobAttachmentService.updateJobAttachment(id, jobAttachment)
-                .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
+        try {
+            return ResponseEntity.ok(jobAttachmentService.updateJobAttachment(id, jobAttachment));
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
+        }
     }
 
     @DeleteMapping("/{id}")

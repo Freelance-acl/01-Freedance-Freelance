@@ -39,11 +39,20 @@ public class JobController {
         return ResponseEntity.ok(jobService.createJob(job));
     }
 
+    /**
+     * Updates a job by ID.
+     *
+     * @param id the job ID
+     * @param job the update payload
+     * @return 200 with updated job, or 404 if not found
+     */
     @PutMapping("/{id}")
     public ResponseEntity<Job> updateJob(@PathVariable Long id, @RequestBody Job job) {
-        return jobService.updateJob(id, job)
-                .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
+        try {
+            return ResponseEntity.ok(jobService.updateJob(id, job));
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
+        }
     }
 
     @DeleteMapping("/{id}")

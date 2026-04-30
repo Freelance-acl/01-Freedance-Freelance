@@ -39,11 +39,20 @@ public class PromoCodeController {
         return ResponseEntity.ok(promoCodeService.createPromoCode(promoCode));
     }
 
+    /**
+     * Updates a promo code by ID.
+     *
+     * @param id the promo code ID
+     * @param promoCode the update payload
+     * @return 200 with updated promo code, or 404 if not found
+     */
     @PutMapping("/{id}")
     public ResponseEntity<PromoCode> updatePromoCode(@PathVariable Long id, @RequestBody PromoCode promoCode) {
-        return promoCodeService.updatePromoCode(id, promoCode)
-                .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
+        try {
+            return ResponseEntity.ok(promoCodeService.updatePromoCode(id, promoCode));
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
+        }
     }
 
     @DeleteMapping("/{id}")

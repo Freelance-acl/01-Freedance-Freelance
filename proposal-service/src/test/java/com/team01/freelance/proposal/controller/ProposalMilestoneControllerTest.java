@@ -67,7 +67,7 @@ class ProposalMilestoneControllerTest {
     @Test
     void updateReturnsOk() throws Exception {
         ProposalMilestone proposalMilestone = new ProposalMilestone();
-        when(proposalMilestoneService.updateProposalMilestone(eq(1L), any(ProposalMilestone.class))).thenReturn(Optional.of(proposalMilestone));
+        when(proposalMilestoneService.updateProposalMilestone(eq(1L), any(ProposalMilestone.class))).thenReturn(proposalMilestone);
 
         mockMvc.perform(put("/api/proposal-milestones/{id}", 1L)
                         .contentType(MediaType.APPLICATION_JSON)

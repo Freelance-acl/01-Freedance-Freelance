@@ -67,7 +67,7 @@ class ProposalControllerTest {
     @Test
     void updateReturnsOk() throws Exception {
         Proposal proposal = new Proposal();
-        when(proposalService.updateProposal(eq(1L), any(Proposal.class))).thenReturn(Optional.of(proposal));
+        when(proposalService.updateProposal(eq(1L), any(Proposal.class))).thenReturn(proposal);
 
         mockMvc.perform(put("/api/proposals/{id}", 1L)
                         .contentType(MediaType.APPLICATION_JSON)

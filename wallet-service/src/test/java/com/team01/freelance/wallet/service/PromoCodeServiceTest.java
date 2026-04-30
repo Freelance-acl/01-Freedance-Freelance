@@ -49,11 +49,11 @@ class PromoCodeServiceTest {
         when(promoCodeRepository.save(any(PromoCode.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // Act
-        Optional<PromoCode> result = promoCodeService.updatePromoCode(id, incoming);
+        PromoCode result = promoCodeService.updatePromoCode(id, incoming);
 
         // Assert
-        assertTrue(result.isPresent());
-        PromoCode updated = result.get();
+        assertNotNull(result);
+        PromoCode updated = result;
         assertEquals(id, updated.getId());
         assertEquals("NEWCODE", updated.getCode()); // Updated
         assertEquals(20.0, updated.getDiscountValue()); // Updated

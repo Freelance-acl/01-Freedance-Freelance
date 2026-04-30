@@ -21,6 +21,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class UserControllerTest {
@@ -67,7 +68,7 @@ class UserControllerTest {
     @Test
     void updateReturnsOk() throws Exception {
         User user = new User();
-        when(userService.updateUser(eq(1L), any(User.class))).thenReturn(Optional.of(user));
+        when(userService.updateUser(eq(1L), any(User.class))).thenReturn(user);
 
         mockMvc.perform(put("/api/users/{id}", 1L)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -81,6 +82,20 @@ class UserControllerTest {
 
         mockMvc.perform(delete("/api/users/{id}", 1L))
                 .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void getByIdReturnsOkAndDoesNotExposePassword() throws Exception {
+        User user = new User();
+        user.setId(1L);
+        user.setName("John Doe");
+        user.setPassword("secret123");
+        when(userService.getUserById(1L)).thenReturn(Optional.of(user));
+
+        mockMvc.perform(get("/api/users/{id}", 1L))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("John Doe"))
+                .andExpect(jsonPath("$.password").doesNotExist());
     }
 
     @Test

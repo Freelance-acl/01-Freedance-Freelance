@@ -39,11 +39,20 @@ public class ProposalController {
         return ResponseEntity.ok(proposalService.createProposal(proposal));
     }
 
+    /**
+     * Updates a proposal by ID.
+     *
+     * @param id the proposal ID
+     * @param proposal the update payload
+     * @return 200 with updated proposal, or 404 if not found
+     */
     @PutMapping("/{id}")
     public ResponseEntity<Proposal> updateProposal(@PathVariable Long id, @RequestBody Proposal proposal) {
-        return proposalService.updateProposal(id, proposal)
-                .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
+        try {
+            return ResponseEntity.ok(proposalService.updateProposal(id, proposal));
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
+        }
     }
 
     @DeleteMapping("/{id}")

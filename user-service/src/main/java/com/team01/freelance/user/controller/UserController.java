@@ -39,11 +39,20 @@ public class UserController {
         return ResponseEntity.ok(userService.createUser(user));
     }
 
+    /**
+     * Updates a user by ID.
+     *
+     * @param id the user ID
+     * @param user the update payload
+     * @return 200 with updated user, or 404 if not found
+     */
     @PutMapping("/{id}")
     public ResponseEntity<User> updateUser(@PathVariable Long id, @RequestBody User user) {
-        return userService.updateUser(id, user)
-                .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
+        try {
+            return ResponseEntity.ok(userService.updateUser(id, user));
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
+        }
     }
 
     @DeleteMapping("/{id}")

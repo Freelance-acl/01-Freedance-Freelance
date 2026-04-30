@@ -26,32 +26,25 @@ public class UserService {
         return userRepository.save(user);
     }
 
-    public Optional<User> updateUser(Long id, User userDetails) {
+    /**
+     * Updates an existing user and throws if it does not exist.
+     *
+     * @param id The ID of the user to update
+     * @param userDetails The object containing updated fields
+     * @return The updated user
+     * @throws RuntimeException if the user is not found
+     */
+    public User updateUser(Long id, User userDetails) {
         return userRepository.findById(id).map(existingUser -> {
-            if (userDetails.getName() != null) {
                 existingUser.setName(userDetails.getName());
-            }
-            if (userDetails.getEmail() != null) {
                 existingUser.setEmail(userDetails.getEmail());
-            }
-            if (userDetails.getPassword() != null) {
                 existingUser.setPassword(userDetails.getPassword());
-            }
-            if (userDetails.getPhone() != null) {
                 existingUser.setPhone(userDetails.getPhone());
-            }
-            if (userDetails.getRole() != null) {
                 existingUser.setRole(userDetails.getRole());
-            }
-            if (userDetails.getStatus() != null) {
                 existingUser.setStatus(userDetails.getStatus());
-            }
-            if (userDetails.getPreferences() != null) {
                 existingUser.setPreferences(userDetails.getPreferences());
-            }
-            // UserSkills and CreatedAt are usually not updated this way
             return userRepository.save(existingUser);
-        });
+        }).orElseThrow(() -> new RuntimeException("User not found with id: " + id));
     }
 
     public boolean deleteUserById(Long id) {

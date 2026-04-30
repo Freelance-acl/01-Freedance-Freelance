@@ -67,7 +67,7 @@ class PromoCodeControllerTest {
     @Test
     void updateReturnsOk() throws Exception {
         PromoCode promoCode = new PromoCode();
-        when(promoCodeService.updatePromoCode(eq(1L), any(PromoCode.class))).thenReturn(Optional.of(promoCode));
+        when(promoCodeService.updatePromoCode(eq(1L), any(PromoCode.class))).thenReturn(promoCode);
 
         mockMvc.perform(put("/api/promo-codes/{id}", 1L)
                         .contentType(MediaType.APPLICATION_JSON)

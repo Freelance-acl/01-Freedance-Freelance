@@ -26,34 +26,26 @@ public class PromoCodeService {
         return promoCodeRepository.save(promoCode);
     }
 
-    public Optional<PromoCode> updatePromoCode(Long id, PromoCode promoCode) {
+    /**
+     * Updates an existing promo code and throws if it does not exist.
+     *
+     * @param id The ID of the promo code to update
+     * @param promoCode The object containing updated fields
+     * @return The updated promo code
+     * @throws RuntimeException if the promo code is not found
+     */
+    public PromoCode updatePromoCode(Long id, PromoCode promoCode) {
         return promoCodeRepository.findById(id).map(existing -> {
-            if (promoCode.getCode() != null) {
-                existing.setCode(promoCode.getCode());
-            }
-            if (promoCode.getDiscountType() != null) {
-                existing.setDiscountType(promoCode.getDiscountType());
-            }
-            if (promoCode.getDiscountValue() != null) {
-                existing.setDiscountValue(promoCode.getDiscountValue());
-            }
-            if (promoCode.getMaxUses() != null) {
-                existing.setMaxUses(promoCode.getMaxUses());
-            }
-            if (promoCode.getCurrentUses() != null) {
-                existing.setCurrentUses(promoCode.getCurrentUses());
-            }
-            if (promoCode.getExpiryDate() != null) {
-                existing.setExpiryDate(promoCode.getExpiryDate());
-            }
-            if (promoCode.getActive() != null) {
-                existing.setActive(promoCode.getActive());
-            }
-            if (promoCode.getMetadata() != null) {
-                existing.setMetadata(promoCode.getMetadata());
-            }
+                if (promoCode.getCode() != null) existing.setCode(promoCode.getCode());
+                if (promoCode.getDiscountType() != null) existing.setDiscountType(promoCode.getDiscountType());
+                if (promoCode.getDiscountValue() != null) existing.setDiscountValue(promoCode.getDiscountValue());
+                if (promoCode.getMaxUses() != null) existing.setMaxUses(promoCode.getMaxUses());
+                if (promoCode.getCurrentUses() != null) existing.setCurrentUses(promoCode.getCurrentUses());
+                if (promoCode.getExpiryDate() != null) existing.setExpiryDate(promoCode.getExpiryDate());
+                if (promoCode.getActive() != null) existing.setActive(promoCode.getActive());
+                if (promoCode.getMetadata() != null) existing.setMetadata(promoCode.getMetadata());
             return promoCodeRepository.save(existing);
-        });
+        }).orElseThrow(() -> new RuntimeException("Promo code not found with id: " + id));
     }
 
     public boolean deletePromoCodeById(Long id) {

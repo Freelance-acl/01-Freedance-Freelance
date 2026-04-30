@@ -39,11 +39,20 @@ public class ProposalMilestoneController {
         return ResponseEntity.ok(proposalMilestoneService.createProposalMilestone(proposalMilestone));
     }
 
+    /**
+     * Updates a proposal milestone by ID.
+     *
+     * @param id the proposal milestone ID
+     * @param proposalMilestone the update payload
+     * @return 200 with updated proposal milestone, or 404 if not found
+     */
     @PutMapping("/{id}")
     public ResponseEntity<ProposalMilestone> updateProposalMilestone(@PathVariable Long id, @RequestBody ProposalMilestone proposalMilestone) {
-        return proposalMilestoneService.updateProposalMilestone(id, proposalMilestone)
-                .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
+        try {
+            return ResponseEntity.ok(proposalMilestoneService.updateProposalMilestone(id, proposalMilestone));
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
+        }
     }
 
     @DeleteMapping("/{id}")

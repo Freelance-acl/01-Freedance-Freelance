@@ -39,11 +39,20 @@ public class ContractController {
         return ResponseEntity.ok(contractService.createContract(contract));
     }
 
+    /**
+     * Updates a contract by ID.
+     *
+     * @param id the contract ID
+     * @param contract the update payload
+     * @return 200 with updated contract, or 404 if not found
+     */
     @PutMapping("/{id}")
     public ResponseEntity<Contract> updateContract(@PathVariable Long id, @RequestBody Contract contract) {
-        return contractService.updateContract(id, contract)
-                .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
+        try {
+            return ResponseEntity.ok(contractService.updateContract(id, contract));
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
+        }
     }
 
     @DeleteMapping("/{id}")

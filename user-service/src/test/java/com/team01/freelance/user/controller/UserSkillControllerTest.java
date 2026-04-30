@@ -67,7 +67,7 @@ class UserSkillControllerTest {
     @Test
     void updateReturnsOk() throws Exception {
         UserSkill userSkill = new UserSkill();
-        when(userSkillService.updateUserSkill(eq(1L), any(UserSkill.class))).thenReturn(Optional.of(userSkill));
+        when(userSkillService.updateUserSkill(eq(1L), any(UserSkill.class))).thenReturn(userSkill);
 
         mockMvc.perform(put("/api/user-skills/{id}", 1L)
                         .contentType(MediaType.APPLICATION_JSON)

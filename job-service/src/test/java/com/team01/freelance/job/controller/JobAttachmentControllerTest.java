@@ -67,7 +67,7 @@ class JobAttachmentControllerTest {
     @Test
     void updateReturnsOk() throws Exception {
         JobAttachment jobAttachment = new JobAttachment();
-        when(jobAttachmentService.updateJobAttachment(eq(1L), any(JobAttachment.class))).thenReturn(Optional.of(jobAttachment));
+        when(jobAttachmentService.updateJobAttachment(eq(1L), any(JobAttachment.class))).thenReturn(jobAttachment);
 
         mockMvc.perform(put("/api/job-attachments/{id}", 1L)
                         .contentType(MediaType.APPLICATION_JSON)

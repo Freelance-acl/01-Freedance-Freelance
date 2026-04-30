@@ -67,7 +67,7 @@ class PayoutControllerTest {
     @Test
     void updateReturnsOk() throws Exception {
         Payout payout = new Payout();
-        when(payoutService.updatePayout(eq(1L), any(Payout.class))).thenReturn(Optional.of(payout));
+        when(payoutService.updatePayout(eq(1L), any(Payout.class))).thenReturn(payout);
 
         mockMvc.perform(put("/api/payouts/{id}", 1L)
                         .contentType(MediaType.APPLICATION_JSON)
