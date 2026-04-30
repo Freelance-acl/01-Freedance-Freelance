@@ -27,11 +27,27 @@ public class JobAttachmentService {
     }
 
     public Optional<JobAttachment> updateJobAttachment(Long id, JobAttachment jobAttachment) {
-        if (!jobAttachmentRepository.existsById(id)) {
-            return Optional.empty();
-        }
-        jobAttachment.setId(id);
-        return Optional.of(jobAttachmentRepository.save(jobAttachment));
+        return jobAttachmentRepository.findById(id).map(existing -> {
+            if (jobAttachment.getType() != null) {
+                existing.setType(jobAttachment.getType());
+            }
+            if (jobAttachment.getFileUrl() != null) {
+                existing.setFileUrl(jobAttachment.getFileUrl());
+            }
+            if (jobAttachment.getExpiryDate() != null) {
+                existing.setExpiryDate(jobAttachment.getExpiryDate());
+            }
+            if (jobAttachment.getVerified() != null) {
+                existing.setVerified(jobAttachment.getVerified());
+            }
+            if (jobAttachment.getMetadata() != null) {
+                existing.setMetadata(jobAttachment.getMetadata());
+            }
+            if (jobAttachment.getJob() != null) {
+                existing.setJob(jobAttachment.getJob());
+            }
+            return jobAttachmentRepository.save(existing);
+        });
     }
 
     public boolean deleteJobAttachmentById(Long id) {

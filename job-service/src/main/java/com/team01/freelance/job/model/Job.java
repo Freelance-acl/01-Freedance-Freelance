@@ -53,21 +53,20 @@ public class Job {
     @OneToMany(mappedBy = "job", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<JobAttachment> jobAttachments;
 
-    // Constructors
-    public Job() {
-    }
-
-    public Job(Long clientId, String title, String description, JobCategory category, Double budgetMin, Double budgetMax) {
-        this.clientId = clientId;
-        this.title = title;
-        this.description = description;
-        this.category = category;
-        this.status = JobStatus.OPEN;
-        this.budgetMin = budgetMin;
-        this.budgetMax = budgetMax;
-        this.rating = 0.0;
-        this.totalRatings = 0;
-        this.createdAt = LocalDateTime.now();
+    @PrePersist
+    public void onCreate() {
+        if (status == null) {
+            status = JobStatus.OPEN;
+        }
+        if (rating == null) {
+            rating = 0.0;
+        }
+        if (totalRatings == null) {
+            totalRatings = 0;
+        }
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
     }
 
     // Getters and Setters

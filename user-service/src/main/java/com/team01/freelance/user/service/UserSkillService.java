@@ -27,11 +27,30 @@ public class UserSkillService {
     }
 
     public Optional<UserSkill> updateUserSkill(Long id, UserSkill userSkill) {
-        if (!userSkillRepository.existsById(id)) {
-            return Optional.empty();
-        }
-        userSkill.setId(id);
-        return Optional.of(userSkillRepository.save(userSkill));
+        return userSkillRepository.findById(id).map(existing -> {
+            if (userSkill.getSkillName() != null) {
+                existing.setSkillName(userSkill.getSkillName());
+            }
+            if (userSkill.getCategory() != null) {
+                existing.setCategory(userSkill.getCategory());
+            }
+            if (userSkill.getYearsOfExperience() != null) {
+                existing.setYearsOfExperience(userSkill.getYearsOfExperience());
+            }
+            if (userSkill.getProficiencyLevel() != null) {
+                existing.setProficiencyLevel(userSkill.getProficiencyLevel());
+            }
+            if (userSkill.getIsPrimary() != null) {
+                existing.setIsPrimary(userSkill.getIsPrimary());
+            }
+            if (userSkill.getMetadata() != null) {
+                existing.setMetadata(userSkill.getMetadata());
+            }
+            if (userSkill.getUser() != null) {
+                existing.setUser(userSkill.getUser());
+            }
+            return userSkillRepository.save(existing);
+        });
     }
 
     public boolean deleteUserSkillById(Long id) {

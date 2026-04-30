@@ -35,8 +35,11 @@ public class Payout {
     @JdbcTypeCode(SqlTypes.JSON)
     private Map<String, Object> transactionDetails;
 
-    // Constructors
-    public Payout() {
+    @PrePersist
+    public void onCreate() {
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
     }
 
     // Getters and Setters

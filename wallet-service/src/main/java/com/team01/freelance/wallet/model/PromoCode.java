@@ -43,18 +43,14 @@ public class PromoCode {
     @OneToMany(mappedBy = "promoCode", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<PayoutPromo> payoutPromos;
 
-    // Constructors
-    public PromoCode() {
-    }
-
-    public PromoCode(String code, DiscountType discountType, Double discountValue, Integer maxUses, LocalDateTime expiryDate) {
-        this.code = code;
-        this.discountType = discountType;
-        this.discountValue = discountValue;
-        this.maxUses = maxUses;
-        this.currentUses = 0;
-        this.expiryDate = expiryDate;
-        this.active = true;
+    @PrePersist
+    public void onCreate() {
+        if (currentUses == null) {
+            currentUses = 0;
+        }
+        if (active == null) {
+            active = true;
+        }
     }
 
     // Getters and Setters

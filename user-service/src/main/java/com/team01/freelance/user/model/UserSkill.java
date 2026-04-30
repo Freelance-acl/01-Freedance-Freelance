@@ -40,18 +40,14 @@ public class UserSkill {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    // Constructors
-    public UserSkill() {
-    }
-
-    public UserSkill(String skillName, String category, Integer yearsOfExperience, ProficiencyLevel proficiencyLevel, User user) {
-        this.skillName = skillName;
-        this.category = category;
-        this.yearsOfExperience = yearsOfExperience;
-        this.proficiencyLevel = proficiencyLevel;
-        this.isPrimary = false;
-        this.createdAt = LocalDateTime.now();
-        this.user = user;
+    @PrePersist
+    public void onCreate() {
+        if (isPrimary == null) {
+            isPrimary = false;
+        }
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
     }
 
     // Getters and Setters

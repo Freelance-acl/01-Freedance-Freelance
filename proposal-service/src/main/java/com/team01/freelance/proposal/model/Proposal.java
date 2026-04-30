@@ -1,5 +1,6 @@
 package com.team01.freelance.proposal.model;
 
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -43,21 +44,18 @@ public class Proposal {
     @Column(name = "accepted_at")
     private LocalDateTime acceptedAt;
 
+    @JsonManagedReference
     @OneToMany(mappedBy = "proposal", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ProposalMilestone> proposalMilestones;
 
-    // Constructors
-    public Proposal() {
-    }
-
-    public Proposal(Long jobId, Long freelancerId, String coverLetter, Double bidAmount, Integer estimatedDays) {
-        this.jobId = jobId;
-        this.freelancerId = freelancerId;
-        this.coverLetter = coverLetter;
-        this.bidAmount = bidAmount;
-        this.estimatedDays = estimatedDays;
-        this.status = ProposalStatus.SUBMITTED;
-        this.submittedAt = LocalDateTime.now();
+    @PrePersist
+    public void onCreate() {
+        if (status == null) {
+            status = ProposalStatus.SUBMITTED;
+        }
+        if (submittedAt == null) {
+            submittedAt = LocalDateTime.now();
+        }
     }
 
     // Getters and Setters

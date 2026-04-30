@@ -24,15 +24,14 @@ public class PayoutPromo {
     @JoinColumn(name = "promo_code_id", nullable = false)
     private PromoCode promoCode;
 
-    // Constructors
-    public PayoutPromo() {
-    }
 
-    public PayoutPromo(Double discountApplied, Payout payout, PromoCode promoCode) {
-        this.discountApplied = discountApplied;
-        this.appliedAt = LocalDateTime.now();
-        this.payout = payout;
-        this.promoCode = promoCode;
+
+
+    @PrePersist
+    public void onCreate() {
+        if (appliedAt == null) {
+            appliedAt = LocalDateTime.now();
+        }
     }
 
     // Getters and Setters

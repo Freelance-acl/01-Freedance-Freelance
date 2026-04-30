@@ -45,19 +45,14 @@ public class Contract {
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
-    // Constructors
-    public Contract() {
-    }
-
-    public Contract(Long jobId, Long freelancerId, Long clientId, Long proposalId, Double agreedAmount, LocalDateTime startDate) {
-        this.jobId = jobId;
-        this.freelancerId = freelancerId;
-        this.clientId = clientId;
-        this.proposalId = proposalId;
-        this.agreedAmount = agreedAmount;
-        this.status = ContractStatus.ACTIVE;
-        this.startDate = startDate;
-        this.createdAt = LocalDateTime.now();
+    @PrePersist
+    public void onCreate() {
+        if (status == null) {
+            status = ContractStatus.ACTIVE;
+        }
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
     }
 
     // Getters and Setters

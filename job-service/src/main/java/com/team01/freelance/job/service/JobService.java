@@ -58,6 +58,12 @@ public class JobService {
             if (jobDetails.getRequirements() != null) {
                 existingJob.setRequirements(jobDetails.getRequirements());
             }
+
+            if (existingJob.getBudgetMin() != null && existingJob.getBudgetMax() != null
+                    && existingJob.getBudgetMin() > existingJob.getBudgetMax()) {
+                throw new IllegalArgumentException("Budget minimum cannot be greater than budget maximum");
+            }
+
             return jobRepository.save(existingJob);
         });
     }

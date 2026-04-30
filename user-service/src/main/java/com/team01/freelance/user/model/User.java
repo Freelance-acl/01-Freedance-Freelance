@@ -44,18 +44,14 @@ public class User {
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<UserSkill> userSkills;
 
-    // Constructors
-    public User() {
-    }
-
-    public User(String name, String email, String password, String phone, UserRole role) {
-        this.name = name;
-        this.email = email;
-        this.password = password;
-        this.phone = phone;
-        this.role = role;
-        this.status = UserStatus.ACTIVE;
-        this.createdAt = LocalDateTime.now();
+    @PrePersist
+    public void onCreate() {
+        if (status == null) {
+            status = UserStatus.ACTIVE;
+        }
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
     }
 
     // Getters and Setters

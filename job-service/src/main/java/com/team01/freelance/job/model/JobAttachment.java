@@ -24,7 +24,7 @@ public class JobAttachment {
     @Column(name = "expiry_date", nullable = false)
     private LocalDate expiryDate;
 
-    @Column(name = "verified", columnDefinition = "boolean default false")
+    @Column(name = "verified", nullable = false)
     private Boolean verified;
 
     @Column(name = "metadata", columnDefinition = "jsonb")
@@ -38,17 +38,14 @@ public class JobAttachment {
     @JoinColumn(name = "job_id", nullable = false)
     private Job job;
 
-    // Constructors
-    public JobAttachment() {
-    }
-
-    public JobAttachment(JobAttachmentType type, String fileUrl, LocalDate expiryDate, Job job) {
-        this.type = type;
-        this.fileUrl = fileUrl;
-        this.expiryDate = expiryDate;
-        this.verified = false;
-        this.uploadedAt = LocalDateTime.now();
-        this.job = job;
+    @PrePersist
+    public void onCreate() {
+        if (verified == null) {
+            verified = false;
+        }
+        if (uploadedAt == null) {
+            uploadedAt = LocalDateTime.now();
+        }
     }
 
     // Getters and Setters

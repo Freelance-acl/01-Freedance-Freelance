@@ -27,11 +27,30 @@ public class ProposalMilestoneService {
     }
 
     public Optional<ProposalMilestone> updateProposalMilestone(Long id, ProposalMilestone proposalMilestone) {
-        if (!proposalMilestoneRepository.existsById(id)) {
-            return Optional.empty();
-        }
-        proposalMilestone.setId(id);
-        return Optional.of(proposalMilestoneRepository.save(proposalMilestone));
+        return proposalMilestoneRepository.findById(id).map(existing -> {
+            if (proposalMilestone.getMilestoneOrder() != null) {
+                existing.setMilestoneOrder(proposalMilestone.getMilestoneOrder());
+            }
+            if (proposalMilestone.getTitle() != null) {
+                existing.setTitle(proposalMilestone.getTitle());
+            }
+            if (proposalMilestone.getDescription() != null) {
+                existing.setDescription(proposalMilestone.getDescription());
+            }
+            if (proposalMilestone.getAmount() != null) {
+                existing.setAmount(proposalMilestone.getAmount());
+            }
+            if (proposalMilestone.getStatus() != null) {
+                existing.setStatus(proposalMilestone.getStatus());
+            }
+            if (proposalMilestone.getMetadata() != null) {
+                existing.setMetadata(proposalMilestone.getMetadata());
+            }
+            if (proposalMilestone.getProposal() != null) {
+                existing.setProposal(proposalMilestone.getProposal());
+            }
+            return proposalMilestoneRepository.save(existing);
+        });
     }
 
     public boolean deleteProposalMilestoneById(Long id) {

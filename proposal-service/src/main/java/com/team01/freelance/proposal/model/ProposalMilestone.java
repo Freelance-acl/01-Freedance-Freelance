@@ -1,5 +1,6 @@
 package com.team01.freelance.proposal.model;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -32,21 +33,16 @@ public class ProposalMilestone {
     @JdbcTypeCode(SqlTypes.JSON)
     private Map<String, Object> metadata;
 
+    @JsonBackReference
     @ManyToOne
     @JoinColumn(name = "proposal_id", nullable = false)
     private Proposal proposal;
 
-    // Constructors
-    public ProposalMilestone() {
-    }
-
-    public ProposalMilestone(Integer milestoneOrder, String title, String description, Double amount, Proposal proposal) {
-        this.milestoneOrder = milestoneOrder;
-        this.title = title;
-        this.description = description;
-        this.amount = amount;
-        this.status = MilestoneStatus.PENDING;
-        this.proposal = proposal;
+    @PrePersist
+    public void onCreate() {
+        if (status == null) {
+            status = MilestoneStatus.PENDING;
+        }
     }
 
     // Getters and Setters

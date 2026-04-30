@@ -27,11 +27,33 @@ public class PromoCodeService {
     }
 
     public Optional<PromoCode> updatePromoCode(Long id, PromoCode promoCode) {
-        if (!promoCodeRepository.existsById(id)) {
-            return Optional.empty();
-        }
-        promoCode.setId(id);
-        return Optional.of(promoCodeRepository.save(promoCode));
+        return promoCodeRepository.findById(id).map(existing -> {
+            if (promoCode.getCode() != null) {
+                existing.setCode(promoCode.getCode());
+            }
+            if (promoCode.getDiscountType() != null) {
+                existing.setDiscountType(promoCode.getDiscountType());
+            }
+            if (promoCode.getDiscountValue() != null) {
+                existing.setDiscountValue(promoCode.getDiscountValue());
+            }
+            if (promoCode.getMaxUses() != null) {
+                existing.setMaxUses(promoCode.getMaxUses());
+            }
+            if (promoCode.getCurrentUses() != null) {
+                existing.setCurrentUses(promoCode.getCurrentUses());
+            }
+            if (promoCode.getExpiryDate() != null) {
+                existing.setExpiryDate(promoCode.getExpiryDate());
+            }
+            if (promoCode.getActive() != null) {
+                existing.setActive(promoCode.getActive());
+            }
+            if (promoCode.getMetadata() != null) {
+                existing.setMetadata(promoCode.getMetadata());
+            }
+            return promoCodeRepository.save(existing);
+        });
     }
 
     public boolean deletePromoCodeById(Long id) {

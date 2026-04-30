@@ -27,11 +27,21 @@ public class PayoutPromoService {
     }
 
     public Optional<PayoutPromo> updatePayoutPromo(Long id, PayoutPromo payoutPromo) {
-        if (!payoutPromoRepository.existsById(id)) {
-            return Optional.empty();
-        }
-        payoutPromo.setId(id);
-        return Optional.of(payoutPromoRepository.save(payoutPromo));
+        return payoutPromoRepository.findById(id).map(existing -> {
+            if (payoutPromo.getDiscountApplied() != null) {
+                existing.setDiscountApplied(payoutPromo.getDiscountApplied());
+            }
+            if (payoutPromo.getAppliedAt() != null) {
+                existing.setAppliedAt(payoutPromo.getAppliedAt());
+            }
+            if (payoutPromo.getPayout() != null) {
+                existing.setPayout(payoutPromo.getPayout());
+            }
+            if (payoutPromo.getPromoCode() != null) {
+                existing.setPromoCode(payoutPromo.getPromoCode());
+            }
+            return payoutPromoRepository.save(existing);
+        });
     }
 
     public boolean deletePayoutPromoById(Long id) {
