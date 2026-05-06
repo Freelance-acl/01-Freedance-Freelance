@@ -26,7 +26,6 @@ All services run on internal container port `8080` and are mapped to host ports 
 ### 1) First-time setup
 
 ```bash
-cp .env.example .env
 bash ./setup.bash
 ```
 
