@@ -70,7 +70,7 @@ class JobAttachmentServiceTest {
     }
 
     @Test
-    void updateJobAttachment_ShouldValidateJobIfProvided() {
+    void updateJobAttachment_ShouldIgnoreJobChangeIfProvided() {
         // Arrange
         Long id = 1L;
         JobAttachment existing = new JobAttachment();
@@ -82,7 +82,6 @@ class JobAttachmentServiceTest {
         incoming.setJob(job);
 
         when(jobAttachmentRepository.findById(id)).thenReturn(Optional.of(existing));
-        when(jobRepository.findById(100L)).thenReturn(Optional.of(job));
         when(jobAttachmentRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
         // Act
@@ -90,26 +89,8 @@ class JobAttachmentServiceTest {
 
         // Assert
         assertNotNull(result);
-        verify(jobRepository).findById(100L);
-    }
-
-    @Test
-    void updateJobAttachment_ShouldThrowIfJobNotFound() {
-        // Arrange
-        Long id = 1L;
-        JobAttachment existing = new JobAttachment();
-        existing.setId(id);
-        
-        JobAttachment incoming = new JobAttachment();
-        Job job = new Job();
-        job.setId(100L);
-        incoming.setJob(job);
-
-        when(jobAttachmentRepository.findById(id)).thenReturn(Optional.of(existing));
-        when(jobRepository.findById(100L)).thenReturn(Optional.empty());
-
-        // Act & Assert
-        assertThrows(EntityNotFoundException.class, () -> jobAttachmentService.updateJobAttachment(id, incoming));
+        verify(jobRepository, never()).findById(anyLong());
+        assertNull(result.getJob());
     }
 
     @Test
@@ -143,5 +124,14 @@ class JobAttachmentServiceTest {
 
         // Act & Assert
         assertThrows(EntityNotFoundException.class, () -> jobAttachmentService.createJobAttachment(attachment));
+    }
+    @Test
+    void createJobAttachment_ShouldThrowIfJobIdMissing() {
+        // Arrange
+        JobAttachment attachment = new JobAttachment();
+        // Job is null
+
+        // Act & Assert
+        assertThrows(IllegalArgumentException.class, () -> jobAttachmentService.createJobAttachment(attachment));
     }
 }

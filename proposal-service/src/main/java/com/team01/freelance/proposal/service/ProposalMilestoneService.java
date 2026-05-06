@@ -28,21 +28,24 @@ public class ProposalMilestoneService {
     }
 
     public ProposalMilestone createProposalMilestone(ProposalMilestone proposalMilestone) {
-        if (proposalMilestone.getProposal() != null && proposalMilestone.getProposal().getId() != null) {
-            proposalMilestone.setProposal(proposalRepository.findById(proposalMilestone.getProposal().getId())
-                    .orElseThrow(() -> new EntityNotFoundException("Proposal not found with id: " + proposalMilestone.getProposal().getId())));
+        if (proposalMilestone.getProposal() == null || proposalMilestone.getProposal().getId() == null) {
+            throw new IllegalArgumentException("Proposal ID is required to create a ProposalMilestone");
         }
+
+        proposalMilestone.setProposal(proposalRepository.findById(proposalMilestone.getProposal().getId())
+                .orElseThrow(() -> new EntityNotFoundException("Proposal not found with id: " + proposalMilestone.getProposal().getId())));
+
         return proposalMilestoneRepository.save(proposalMilestone);
     }
 
     /**
-     * Updates an existing proposal milestone and throws if it does not exist.
-     * Validates the existence of the associated proposal if provided.
+     * Updates editable fields on an existing proposal milestone.
+     * The associated proposal cannot be changed after creation.
      *
      * @param id The ID of the proposal milestone to update
      * @param proposalMilestone The object containing updated fields
      * @return The updated proposal milestone
-     * @throws EntityNotFoundException if the proposal milestone or associated proposal is not found
+     * @throws EntityNotFoundException if the proposal milestone is not found
      */
     public ProposalMilestone updateProposalMilestone(Long id, ProposalMilestone proposalMilestone) {
         return proposalMilestoneRepository.findById(id).map(existing -> {
@@ -52,10 +55,6 @@ public class ProposalMilestoneService {
                 if (proposalMilestone.getAmount() != null) existing.setAmount(proposalMilestone.getAmount());
                 if (proposalMilestone.getStatus() != null) existing.setStatus(proposalMilestone.getStatus());
                 if (proposalMilestone.getMetadata() != null) existing.setMetadata(proposalMilestone.getMetadata());
-                if (proposalMilestone.getProposal() != null && proposalMilestone.getProposal().getId() != null) {
-                    existing.setProposal(proposalRepository.findById(proposalMilestone.getProposal().getId())
-                            .orElseThrow(() -> new EntityNotFoundException("Proposal not found with id: " + proposalMilestone.getProposal().getId())));
-                }
             return proposalMilestoneRepository.save(existing);
         }).orElseThrow(() -> new EntityNotFoundException("Proposal Milestone not found with id: " + id));
     }

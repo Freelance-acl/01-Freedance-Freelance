@@ -2,9 +2,11 @@ package com.team01.freelance.contract.service;
 
 import com.team01.freelance.contract.model.Contract;
 import com.team01.freelance.contract.repository.ContractRepository;
+import com.team01.freelance.job.repository.JobRepository;
+import com.team01.freelance.proposal.repository.ProposalRepository;
+import com.team01.freelance.user.repository.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -17,7 +19,13 @@ public class ContractService {
     private ContractRepository contractRepository;
 
     @Autowired
-    private JdbcTemplate jdbcTemplate;
+    private UserRepository userRepository;
+
+    @Autowired
+    private JobRepository jobRepository;
+
+    @Autowired
+    private ProposalRepository proposalRepository;
 
     public List<Contract> getAllContracts() {
         return contractRepository.findAll();
@@ -28,66 +36,48 @@ public class ContractService {
     }
 
     public Contract createContract(Contract contract) {
-        validateContractReferences(contract.getFreelancerId(), contract.getJobId(), contract.getClientId(), contract.getProposalId());
+        if (contract.getFreelancerId() == null || contract.getJobId() == null ||
+            contract.getClientId() == null || contract.getProposalId() == null) {
+            throw new IllegalArgumentException("Freelancer, Job, Client, and Proposal IDs are required to create a Contract");
+        }
+
+        userRepository.findById(contract.getFreelancerId())
+                .orElseThrow(() -> new EntityNotFoundException("Freelancer not found with id: " + contract.getFreelancerId()));
+
+        jobRepository.findById(contract.getJobId())
+                .orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + contract.getJobId()));
+
+        userRepository.findById(contract.getClientId())
+                .orElseThrow(() -> new EntityNotFoundException("Client not found with id: " + contract.getClientId()));
+
+        proposalRepository.findById(contract.getProposalId())
+                .orElseThrow(() -> new EntityNotFoundException("Proposal not found with id: " + contract.getProposalId()));
+
         return contractRepository.save(contract);
     }
 
     /**
-     * Updates an existing contract with non-null fields from the provided contract details object.
-     * Note: Cross-service foreign keys (jobId, freelancerId, clientId, proposalId) are updated directly.
+     * Updates editable fields on an existing contract.
+     * Link fields (jobId, freelancerId, clientId, proposalId) are immutable after creation.
      *
      * @param id The ID of the contract to update
      * @param contractDetails The object containing updated fields
      * @return The updated contract
-     * @throws RuntimeException if the contract is not found
+     * @throws EntityNotFoundException if the contract is not found
      */
     public Contract updateContract(Long id, Contract contractDetails) {
-
         return contractRepository.findById(id).map(existingContract -> {
-                if (contractDetails.getJobId() != null) existingContract.setJobId(contractDetails.getJobId());
-                if (contractDetails.getFreelancerId() != null) existingContract.setFreelancerId(contractDetails.getFreelancerId());
-                if (contractDetails.getClientId() != null) existingContract.setClientId(contractDetails.getClientId());
-                if (contractDetails.getProposalId() != null) existingContract.setProposalId(contractDetails.getProposalId());
                 if (contractDetails.getAgreedAmount() != null) existingContract.setAgreedAmount(contractDetails.getAgreedAmount());
                 if (contractDetails.getStatus() != null) existingContract.setStatus(contractDetails.getStatus());
                 if (contractDetails.getStartDate() != null) existingContract.setStartDate(contractDetails.getStartDate());
                 if (contractDetails.getEndDate() != null) existingContract.setEndDate(contractDetails.getEndDate());
                 if (contractDetails.getMetadata() != null) existingContract.setMetadata(contractDetails.getMetadata());
-            validateContractReferences(
-                    existingContract.getFreelancerId(),
-                    existingContract.getJobId(),
-                    existingContract.getClientId(),
-                    existingContract.getProposalId()
-            );
             return contractRepository.save(existingContract);
         }).orElseThrow(() -> new EntityNotFoundException("Contract not found with id: " + id));
     }
 
-    private void validateContractReferences(Long freelancerId, Long jobId, Long clientId, Long proposalId) {
-        validateReferenceExists("users", freelancerId, "Freelancer");
-        validateReferenceExists("jobs", jobId, "Job");
-        validateReferenceExists("users", clientId, "Client");
-        validateReferenceExists("proposals", proposalId, "Proposal");
-    }
-
-    private void validateReferenceExists(String tableName, Long id, String label) {
-        if (id == null) {
-            throw new IllegalArgumentException(label + " id is required");
-        }
-
-        Boolean exists = jdbcTemplate.queryForObject(
-                "SELECT EXISTS (SELECT 1 FROM " + tableName + " WHERE id = ?)",
-                Boolean.class,
-                id
-        );
-
-        if (!Boolean.TRUE.equals(exists)) {
-            throw new IllegalArgumentException(label + " not found with id: " + id);
-        }
-    }
-
     public boolean deleteContractById(Long id) {
-        try{
+        try {
             contractRepository.deleteById(id);
         } catch (Exception e) {
             return false;

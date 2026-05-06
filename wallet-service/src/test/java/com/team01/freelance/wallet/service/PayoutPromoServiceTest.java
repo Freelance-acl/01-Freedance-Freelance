@@ -6,7 +6,6 @@ import com.team01.freelance.wallet.model.PromoCode;
 import com.team01.freelance.wallet.repository.PayoutPromoRepository;
 import com.team01.freelance.wallet.repository.PayoutRepository;
 import com.team01.freelance.wallet.repository.PromoCodeRepository;
-import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
@@ -39,7 +38,7 @@ class PayoutPromoServiceTest {
     }
 
     @Test
-    void updatePayoutPromo_ShouldMergeNonNullFieldsAndFetchRelationships() {
+    void updatePayoutPromo_ShouldMergeNonNullFieldsAndIgnoreRelationshipChanges() {
         // Arrange
         Long id = 1L;
         PayoutPromo existing = new PayoutPromo();
@@ -58,8 +57,6 @@ class PayoutPromoServiceTest {
         incoming.setPromoCode(promoCode);
 
         when(payoutPromoRepository.findById(id)).thenReturn(Optional.of(existing));
-        when(payoutRepository.findById(10L)).thenReturn(Optional.of(payout));
-        when(promoCodeRepository.findById(20L)).thenReturn(Optional.of(promoCode));
         when(payoutPromoRepository.save(any(PayoutPromo.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // Act
@@ -70,31 +67,61 @@ class PayoutPromoServiceTest {
         PayoutPromo updated = result;
         assertEquals(id, updated.getId());
         assertEquals(25.0, updated.getDiscountApplied());
-        assertEquals(payout, updated.getPayout());
-        assertEquals(promoCode, updated.getPromoCode());
+        assertNull(updated.getPayout());
+        assertNull(updated.getPromoCode());
         
         verify(payoutPromoRepository).findById(id);
-        verify(payoutRepository).findById(10L);
-        verify(promoCodeRepository).findById(20L);
+        verify(payoutRepository, never()).findById(anyLong());
+        verify(promoCodeRepository, never()).findById(anyLong());
         verify(payoutPromoRepository).save(updated);
     }
 
     @Test
-    void updatePayoutPromo_ShouldThrowExceptionIfPayoutNotFound() {
+    void createPayoutPromo_ShouldValidateRelationships() {
         // Arrange
-        Long id = 1L;
-        PayoutPromo existing = new PayoutPromo();
-        existing.setId(id);
-
-        PayoutPromo incoming = new PayoutPromo();
+        PayoutPromo payoutPromo = new PayoutPromo();
+        
         Payout payout = new Payout();
         payout.setId(10L);
-        incoming.setPayout(payout);
+        payoutPromo.setPayout(payout);
+        
+        PromoCode promoCode = new PromoCode();
+        promoCode.setId(20L);
+        payoutPromo.setPromoCode(promoCode);
 
-        when(payoutPromoRepository.findById(id)).thenReturn(Optional.of(existing));
-        when(payoutRepository.findById(10L)).thenReturn(Optional.empty());
+        when(payoutRepository.findById(10L)).thenReturn(Optional.of(payout));
+        when(promoCodeRepository.findById(20L)).thenReturn(Optional.of(promoCode));
+        when(payoutPromoRepository.save(payoutPromo)).thenReturn(payoutPromo);
+
+        // Act
+        PayoutPromo result = payoutPromoService.createPayoutPromo(payoutPromo);
+
+        // Assert
+        assertNotNull(result);
+        verify(payoutRepository).findById(10L);
+        verify(promoCodeRepository).findById(20L);
+    }
+
+    @Test
+    void createPayoutPromo_ShouldThrowIfPayoutIdMissing() {
+        // Arrange
+        PayoutPromo payoutPromo = new PayoutPromo();
+        // Payout is null
 
         // Act & Assert
-        assertThrows(EntityNotFoundException.class, () -> payoutPromoService.updatePayoutPromo(id, incoming));
+        assertThrows(IllegalArgumentException.class, () -> payoutPromoService.createPayoutPromo(payoutPromo));
+    }
+
+    @Test
+    void createPayoutPromo_ShouldThrowIfPromoCodeIdMissing() {
+        // Arrange
+        PayoutPromo payoutPromo = new PayoutPromo();
+        Payout payout = new Payout();
+        payout.setId(10L);
+        payoutPromo.setPayout(payout);
+        // PromoCode is null
+
+        // Act & Assert
+        assertThrows(IllegalArgumentException.class, () -> payoutPromoService.createPayoutPromo(payoutPromo));
     }
 }

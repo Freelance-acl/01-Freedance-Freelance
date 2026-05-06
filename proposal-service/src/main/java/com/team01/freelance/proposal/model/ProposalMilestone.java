@@ -33,7 +33,6 @@ public class ProposalMilestone {
     @JdbcTypeCode(SqlTypes.JSON)
     private Map<String, Object> metadata;
 
-    @JsonBackReference
     @ManyToOne
     @JoinColumn(name = "proposal_id", nullable = false)
     private Proposal proposal;

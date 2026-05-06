@@ -1,5 +1,6 @@
 package com.team01.freelance.wallet.model;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.persistence.*;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -19,21 +20,24 @@ public class Payout {
     @Column(name = "freelancer_id", nullable = false)
     private Long freelancerId;
 
-    @Column(name = "amount")
+    @Column(name = "amount", nullable = false)
     private Double amount;
 
-    @Column(name = "method")
-    private String method;
+    @Column(name = "method", nullable = false)
+    @Enumerated(EnumType.STRING)
+    private PayoutMethod method;
 
-    @Column(name = "status")
-    private String status;
+    @Column(name = "status", nullable = false)
+    @Enumerated(EnumType.STRING)
+    private PayoutStatus status;
 
-    @Column(name = "created_at")
-    private LocalDateTime createdAt;
 
     @Column(name = "transaction_details", columnDefinition = "jsonb")
     @JdbcTypeCode(SqlTypes.JSON)
     private Map<String, Object> transactionDetails;
+    
+    @Column(name = "created_at", nullable = false)
+    private LocalDateTime createdAt;
 
     @PrePersist
     public void onCreate() {
@@ -75,19 +79,19 @@ public class Payout {
         this.amount = amount;
     }
 
-    public String getMethod() {
+    public PayoutMethod getMethod() {
         return method;
     }
 
-    public void setMethod(String method) {
+    public void setMethod(PayoutMethod method) {
         this.method = method;
     }
 
-    public String getStatus() {
+    public PayoutStatus getStatus() {
         return status;
     }
 
-    public void setStatus(String status) {
+    public void setStatus(PayoutStatus status) {
         this.status = status;
     }
 

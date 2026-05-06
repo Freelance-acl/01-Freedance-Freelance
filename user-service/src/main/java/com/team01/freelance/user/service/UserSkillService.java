@@ -28,21 +28,24 @@ public class UserSkillService {
     }
 
     public UserSkill createUserSkill(UserSkill userSkill) {
-        if (userSkill.getUser() != null && userSkill.getUser().getId() != null) {
-            userSkill.setUser(userRepository.findById(userSkill.getUser().getId())
-                    .orElseThrow(() -> new EntityNotFoundException("User not found with id: " + userSkill.getUser().getId())));
+        if (userSkill.getUser() == null || userSkill.getUser().getId() == null) {
+            throw new IllegalArgumentException("User ID is required to create a UserSkill");
         }
+
+        userSkill.setUser(userRepository.findById(userSkill.getUser().getId())
+                .orElseThrow(() -> new EntityNotFoundException("User not found with id: " + userSkill.getUser().getId())));
+
         return userSkillRepository.save(userSkill);
     }
 
     /**
-     * Updates an existing user skill with non-null fields from the provided user skill object.
-     * Validates the existence of the associated user if provided.
+     * Updates editable fields on an existing user skill.
+     * The associated user cannot be changed after creation.
      *
      * @param id The ID of the user skill to update
      * @param userSkill The user skill object containing updated fields
      * @return The updated user skill
-     * @throws EntityNotFoundException if the user skill or associated user is not found
+     * @throws EntityNotFoundException if the user skill is not found
      */
     public UserSkill updateUserSkill(Long id, UserSkill userSkill) {
         return userSkillRepository.findById(id).map(existing -> {
@@ -52,10 +55,6 @@ public class UserSkillService {
                 if (userSkill.getProficiencyLevel() != null) existing.setProficiencyLevel(userSkill.getProficiencyLevel());
                 if (userSkill.getIsPrimary() != null) existing.setIsPrimary(userSkill.getIsPrimary());
                 if (userSkill.getMetadata() != null) existing.setMetadata(userSkill.getMetadata());
-                if (userSkill.getUser() != null && userSkill.getUser().getId() != null) {
-                    existing.setUser(userRepository.findById(userSkill.getUser().getId())
-                            .orElseThrow(() -> new EntityNotFoundException("User not found with id: " + userSkill.getUser().getId())));
-                }
             return userSkillRepository.save(existing);
         }).orElseThrow(() -> new EntityNotFoundException("User Skill not found with id: " + id));
     }

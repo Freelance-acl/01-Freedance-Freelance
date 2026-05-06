@@ -40,7 +40,6 @@ public class PromoCodeService {
                 if (promoCode.getDiscountType() != null) existing.setDiscountType(promoCode.getDiscountType());
                 if (promoCode.getDiscountValue() != null) existing.setDiscountValue(promoCode.getDiscountValue());
                 if (promoCode.getMaxUses() != null) existing.setMaxUses(promoCode.getMaxUses());
-                if (promoCode.getCurrentUses() != null) existing.setCurrentUses(promoCode.getCurrentUses());
                 if (promoCode.getExpiryDate() != null) existing.setExpiryDate(promoCode.getExpiryDate());
                 if (promoCode.getActive() != null) existing.setActive(promoCode.getActive());
                 if (promoCode.getMetadata() != null) existing.setMetadata(promoCode.getMetadata());

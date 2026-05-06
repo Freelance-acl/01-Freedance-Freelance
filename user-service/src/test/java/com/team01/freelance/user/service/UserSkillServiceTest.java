@@ -118,4 +118,14 @@ class UserSkillServiceTest {
         verify(userRepository).findById(10L);
         verify(userSkillRepository, never()).save(any());
     }
+
+    @Test
+    void createUserSkill_ShouldThrowIfUserIdMissing() {
+        // Arrange
+        UserSkill skill = new UserSkill();
+        // User is null
+
+        // Act & Assert
+        assertThrows(IllegalArgumentException.class, () -> userSkillService.createUserSkill(skill));
+    }
 }

@@ -70,7 +70,7 @@ class ProposalMilestoneServiceTest {
     }
 
     @Test
-    void updateProposalMilestone_ShouldValidateProposalIfProvided() {
+    void updateProposalMilestone_ShouldIgnoreProposalChangeIfProvided() {
         // Arrange
         Long id = 1L;
         ProposalMilestone existing = new ProposalMilestone();
@@ -82,7 +82,6 @@ class ProposalMilestoneServiceTest {
         incoming.setProposal(proposal);
 
         when(proposalMilestoneRepository.findById(id)).thenReturn(Optional.of(existing));
-        when(proposalRepository.findById(50L)).thenReturn(Optional.of(proposal));
         when(proposalMilestoneRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
         // Act
@@ -90,26 +89,8 @@ class ProposalMilestoneServiceTest {
 
         // Assert
         assertNotNull(result);
-        verify(proposalRepository).findById(50L);
-    }
-
-    @Test
-    void updateProposalMilestone_ShouldThrowIfProposalNotFound() {
-        // Arrange
-        Long id = 1L;
-        ProposalMilestone existing = new ProposalMilestone();
-        existing.setId(id);
-        
-        ProposalMilestone incoming = new ProposalMilestone();
-        Proposal proposal = new Proposal();
-        proposal.setId(50L);
-        incoming.setProposal(proposal);
-
-        when(proposalMilestoneRepository.findById(id)).thenReturn(Optional.of(existing));
-        when(proposalRepository.findById(50L)).thenReturn(Optional.empty());
-
-        // Act & Assert
-        assertThrows(EntityNotFoundException.class, () -> proposalMilestoneService.updateProposalMilestone(id, incoming));
+        verify(proposalRepository, never()).findById(anyLong());
+        assertNull(result.getProposal());
     }
 
     @Test
@@ -143,5 +124,14 @@ class ProposalMilestoneServiceTest {
 
         // Act & Assert
         assertThrows(EntityNotFoundException.class, () -> proposalMilestoneService.createProposalMilestone(milestone));
+    }
+    @Test
+    void createProposalMilestone_ShouldThrowIfProposalIdMissing() {
+        // Arrange
+        ProposalMilestone milestone = new ProposalMilestone();
+        // Proposal is null
+
+        // Act & Assert
+        assertThrows(IllegalArgumentException.class, () -> proposalMilestoneService.createProposalMilestone(milestone));
     }
 }

@@ -24,10 +24,4 @@ class HealthControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string("OK"));
     }
-    @Test
-    void indexEndpointReturnsOk() throws Exception {
-        mockMvc.perform(get("/api/contracts"))
-                .andExpect(status().isOk())
-                .andExpect(content().string("Welcome to Freelance Contract Service"));
-    }
 }

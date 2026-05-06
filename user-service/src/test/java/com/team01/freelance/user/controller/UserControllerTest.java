@@ -87,7 +87,6 @@ class UserControllerTest {
     @Test
     void getByIdReturnsOkAndDoesNotExposePassword() throws Exception {
         User user = new User();
-        user.setId(1L);
         user.setName("John Doe");
         user.setPassword("secret123");
         when(userService.getUserById(1L)).thenReturn(Optional.of(user));

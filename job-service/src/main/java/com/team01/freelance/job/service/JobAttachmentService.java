@@ -28,21 +28,24 @@ public class JobAttachmentService {
     }
 
     public JobAttachment createJobAttachment(JobAttachment jobAttachment) {
-        if (jobAttachment.getJob() != null && jobAttachment.getJob().getId() != null) {
-            jobAttachment.setJob(jobRepository.findById(jobAttachment.getJob().getId())
-                    .orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + jobAttachment.getJob().getId())));
+        if (jobAttachment.getJob() == null || jobAttachment.getJob().getId() == null) {
+            throw new IllegalArgumentException("Job ID is required to create a JobAttachment");
         }
+
+        jobAttachment.setJob(jobRepository.findById(jobAttachment.getJob().getId())
+                .orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + jobAttachment.getJob().getId())));
+
         return jobAttachmentRepository.save(jobAttachment);
     }
 
     /**
-     * Updates an existing job attachment and throws if it does not exist.
-     * Validates the existence of the associated job if provided.
+     * Updates editable fields on an existing job attachment.
+     * The associated job cannot be changed after creation.
      *
      * @param id The ID of the job attachment to update
      * @param jobAttachment The object containing updated fields
      * @return The updated job attachment
-     * @throws EntityNotFoundException if the job attachment or associated job is not found
+     * @throws EntityNotFoundException if the job attachment is not found
      */
     public JobAttachment updateJobAttachment(Long id, JobAttachment jobAttachment) {
         return jobAttachmentRepository.findById(id).map(existing -> {
@@ -51,10 +54,6 @@ public class JobAttachmentService {
                 if (jobAttachment.getExpiryDate() != null) existing.setExpiryDate(jobAttachment.getExpiryDate());
                 if (jobAttachment.getVerified() != null) existing.setVerified(jobAttachment.getVerified());
                 if (jobAttachment.getMetadata() != null) existing.setMetadata(jobAttachment.getMetadata());
-                if (jobAttachment.getJob() != null && jobAttachment.getJob().getId() != null) {
-                    existing.setJob(jobRepository.findById(jobAttachment.getJob().getId())
-                            .orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + jobAttachment.getJob().getId())));
-                }
             return jobAttachmentRepository.save(existing);
         }).orElseThrow(() -> new EntityNotFoundException("Job Attachment not found with id: " + id));
     }

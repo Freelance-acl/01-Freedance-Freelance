@@ -1,9 +1,11 @@
 package com.team01.freelance.wallet.service;
 
+import com.team01.freelance.contract.repository.ContractRepository;
+import com.team01.freelance.user.repository.UserRepository;
 import com.team01.freelance.wallet.model.Payout;
 import com.team01.freelance.wallet.repository.PayoutRepository;
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -16,7 +18,10 @@ public class PayoutService {
     private PayoutRepository payoutRepository;
 
     @Autowired
-    private JdbcTemplate jdbcTemplate;
+    private ContractRepository contractRepository;
+
+    @Autowired
+    private UserRepository userRepository;
 
     public List<Payout> getAllPayouts() {
         return payoutRepository.findAll();
@@ -27,51 +32,38 @@ public class PayoutService {
     }
 
     public Payout createPayout(Payout payout) {
-        validatePayoutReferences(payout.getContractId(), payout.getFreelancerId());
+        if (payout.getContractId() == null || payout.getFreelancerId() == null) {
+            throw new IllegalArgumentException("Contract and Freelancer IDs are required to create a Payout");
+        }
+
+        if (contractRepository.findById(payout.getContractId()).isEmpty()){
+            throw new EntityNotFoundException("Contract not found with id: " + payout.getContractId());
+        }
+
+        if (userRepository.findById(payout.getFreelancerId()).isEmpty()){
+            throw new EntityNotFoundException("Freelancer not found with id: " + payout.getFreelancerId());
+        }
+
         return payoutRepository.save(payout);
     }
 
     /**
-     * Updates an existing payout and throws if it does not exist.
-     * Note: Cross-service foreign keys (contractId, freelancerId) are updated directly.
+     * Updates editable fields on an existing payout.
+     * Link fields (contractId, freelancerId) are immutable after creation.
      *
      * @param id The ID of the payout to update
      * @param payoutDetails The object containing updated fields
      * @return The updated payout
-     * @throws RuntimeException if the payout is not found
+     * @throws EntityNotFoundException if the payout is not found
      */
     public Payout updatePayout(Long id, Payout payoutDetails) {
         return payoutRepository.findById(id).map(existingPayout -> {
-                if (payoutDetails.getContractId() != null) existingPayout.setContractId(payoutDetails.getContractId());
-                if (payoutDetails.getFreelancerId() != null) existingPayout.setFreelancerId(payoutDetails.getFreelancerId());
                 if (payoutDetails.getAmount() != null) existingPayout.setAmount(payoutDetails.getAmount());
                 if (payoutDetails.getMethod() != null) existingPayout.setMethod(payoutDetails.getMethod());
                 if (payoutDetails.getStatus() != null) existingPayout.setStatus(payoutDetails.getStatus());
                 if (payoutDetails.getTransactionDetails() != null) existingPayout.setTransactionDetails(payoutDetails.getTransactionDetails());
-            validatePayoutReferences(existingPayout.getContractId(), existingPayout.getFreelancerId());
             return payoutRepository.save(existingPayout);
-        }).orElseThrow(() -> new RuntimeException("Payout not found with id: " + id));
-    }
-
-    private void validatePayoutReferences(Long contractId, Long freelancerId) {
-        validateReferenceExists("contracts", contractId, "Contract");
-        validateReferenceExists("users", freelancerId, "Freelancer");
-    }
-
-    private void validateReferenceExists(String tableName, Long id, String label) {
-        if (id == null) {
-            throw new IllegalArgumentException(label + " id is required");
-        }
-
-        Boolean exists = jdbcTemplate.queryForObject(
-                "SELECT EXISTS (SELECT 1 FROM " + tableName + " WHERE id = ?)",
-                Boolean.class,
-                id
-        );
-
-        if (!Boolean.TRUE.equals(exists)) {
-            throw new IllegalArgumentException(label + " not found with id: " + id);
-        }
+        }).orElseThrow(() -> new EntityNotFoundException("Payout not found with id: " + id));
     }
 
     public boolean deletePayoutById(Long id) {

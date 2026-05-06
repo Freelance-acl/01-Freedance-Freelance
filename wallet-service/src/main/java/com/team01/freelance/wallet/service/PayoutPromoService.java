@@ -32,25 +32,30 @@ public class PayoutPromoService {
     }
 
     public PayoutPromo createPayoutPromo(PayoutPromo payoutPromo) {
-        if (payoutPromo.getPayout() != null && payoutPromo.getPayout().getId() != null) {
-            payoutPromo.setPayout(payoutRepository.findById(payoutPromo.getPayout().getId())
-                    .orElseThrow(() -> new EntityNotFoundException("Payout not found with id: " + payoutPromo.getPayout().getId())));
+        if (payoutPromo.getPayout() == null || payoutPromo.getPayout().getId() == null) {
+            throw new IllegalArgumentException("Payout ID is required to create a PayoutPromo");
         }
-        if (payoutPromo.getPromoCode() != null && payoutPromo.getPromoCode().getId() != null) {
-            payoutPromo.setPromoCode(promoCodeRepository.findById(payoutPromo.getPromoCode().getId())
-                    .orElseThrow(() -> new EntityNotFoundException("PromoCode not found with id: " + payoutPromo.getPromoCode().getId())));
+        if (payoutPromo.getPromoCode() == null || payoutPromo.getPromoCode().getId() == null) {
+            throw new IllegalArgumentException("PromoCode ID is required to create a PayoutPromo");
         }
+
+        payoutPromo.setPayout(payoutRepository.findById(payoutPromo.getPayout().getId())
+                .orElseThrow(() -> new EntityNotFoundException("Payout not found with id: " + payoutPromo.getPayout().getId())));
+        
+        payoutPromo.setPromoCode(promoCodeRepository.findById(payoutPromo.getPromoCode().getId())
+                .orElseThrow(() -> new EntityNotFoundException("PromoCode not found with id: " + payoutPromo.getPromoCode().getId())));
+
         return payoutPromoRepository.save(payoutPromo);
     }
 
     /**
-     * Updates an existing payout promo and throws if it does not exist.
-     * Validates the existence of the associated payout and promo code if provided.
+     * Updates editable fields on an existing payout promo.
+     * Associated payout and promo code cannot be changed after creation.
      *
      * @param id The ID of the payout promo to update
      * @param payoutPromo The object containing updated fields
      * @return The updated payout promo
-     * @throws EntityNotFoundException if the payout promo, payout, or promo code is not found
+     * @throws EntityNotFoundException if the payout promo is not found
      */
     public PayoutPromo updatePayoutPromo(Long id, PayoutPromo payoutPromo) {
         return payoutPromoRepository.findById(id).map(existing -> {
@@ -59,14 +64,6 @@ public class PayoutPromoService {
             }
             if (payoutPromo.getAppliedAt() != null) {
                 existing.setAppliedAt(payoutPromo.getAppliedAt());
-            }
-            if (payoutPromo.getPayout() != null && payoutPromo.getPayout().getId() != null) {
-                existing.setPayout(payoutRepository.findById(payoutPromo.getPayout().getId())
-                        .orElseThrow(() -> new EntityNotFoundException("Payout not found with id: " + payoutPromo.getPayout().getId())));
-            }
-            if (payoutPromo.getPromoCode() != null && payoutPromo.getPromoCode().getId() != null) {
-                existing.setPromoCode(promoCodeRepository.findById(payoutPromo.getPromoCode().getId())
-                        .orElseThrow(() -> new EntityNotFoundException("PromoCode not found with id: " + payoutPromo.getPromoCode().getId())));
             }
             return payoutPromoRepository.save(existing);
         }).orElseThrow(() -> new EntityNotFoundException("Payout Promo not found with id: " + id));
