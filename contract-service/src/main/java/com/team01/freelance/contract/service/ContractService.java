@@ -72,6 +72,7 @@ public class ContractService {
                 if (contractDetails.getStartDate() != null) existingContract.setStartDate(contractDetails.getStartDate());
                 if (contractDetails.getEndDate() != null) existingContract.setEndDate(contractDetails.getEndDate());
                 if (contractDetails.getMetadata() != null) existingContract.setMetadata(contractDetails.getMetadata());
+                if (contractDetails.getCreatedAt() != null) existingContract.setCreatedAt(contractDetails.getCreatedAt());
             return contractRepository.save(existingContract);
         }).orElseThrow(() -> new EntityNotFoundException("Contract not found with id: " + id));
     }

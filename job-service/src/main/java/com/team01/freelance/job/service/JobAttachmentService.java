@@ -54,6 +54,7 @@ public class JobAttachmentService {
                 if (jobAttachment.getExpiryDate() != null) existing.setExpiryDate(jobAttachment.getExpiryDate());
                 if (jobAttachment.getVerified() != null) existing.setVerified(jobAttachment.getVerified());
                 if (jobAttachment.getMetadata() != null) existing.setMetadata(jobAttachment.getMetadata());
+                if (jobAttachment.getUploadedAt() != null) existing.setUploadedAt(jobAttachment.getUploadedAt());
             return jobAttachmentRepository.save(existing);
         }).orElseThrow(() -> new EntityNotFoundException("Job Attachment not found with id: " + id));
     }

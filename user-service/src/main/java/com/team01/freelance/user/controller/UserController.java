@@ -2,6 +2,7 @@ package com.team01.freelance.user.controller;
 
 import com.team01.freelance.user.model.User;
 import com.team01.freelance.user.service.UserService;
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -50,7 +51,9 @@ public class UserController {
     public ResponseEntity<User> updateUser(@PathVariable Long id, @RequestBody User user) {
         try {
             return ResponseEntity.ok(userService.updateUser(id, user));
-        } catch (RuntimeException e) {
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        } catch (EntityNotFoundException e) {
             return ResponseEntity.notFound().build();
         }
     }

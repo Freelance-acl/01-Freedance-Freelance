@@ -1,5 +1,6 @@
 package com.team01.freelance.contract.model;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.persistence.*;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -14,18 +15,23 @@ public class Contract {
     private Long id;
 
     @Column(name = "job_id", nullable = false)
+    @JsonAlias({"jobId", "job_id"})
     private Long jobId;
 
     @Column(name = "freelancer_id", nullable = false)
+    @JsonAlias({"freelancerId", "freelancer_id"})
     private Long freelancerId;
 
     @Column(name = "client_id", nullable = false)
+    @JsonAlias({"clientId", "client_id"})
     private Long clientId;
 
     @Column(name = "proposal_id", nullable = false)
+    @JsonAlias({"proposalId", "proposal_id"})
     private Long proposalId;
 
     @Column(name = "agreed_amount", nullable = false)
+    @JsonAlias({"agreedAmount", "agreed_amount"})
     private Double agreedAmount;
 
     @Column(name = "status", nullable = false)
@@ -33,9 +39,11 @@ public class Contract {
     private ContractStatus status;
 
     @Column(name = "start_date", nullable = false)
+    @JsonAlias({"startDate", "start_date"})
     private LocalDateTime startDate;
 
     @Column(name = "end_date")
+    @JsonAlias({"endDate", "end_date"})
     private LocalDateTime endDate;
 
     @Column(name = "metadata", columnDefinition = "jsonb")
@@ -43,6 +51,7 @@ public class Contract {
     private Map<String, Object> metadata;
 
     @Column(name = "created_at", nullable = false)
+    @JsonAlias({"createdAt", "created_at"})
     private LocalDateTime createdAt;
 
     @PrePersist

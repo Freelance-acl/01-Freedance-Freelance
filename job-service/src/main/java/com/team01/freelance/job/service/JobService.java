@@ -62,7 +62,7 @@ public class JobService {
                 if (jobDetails.getBudgetMin() != null) existingJob.setBudgetMin(jobDetails.getBudgetMin());
                 if (jobDetails.getBudgetMax() != null) existingJob.setBudgetMax(jobDetails.getBudgetMax());
                 if (jobDetails.getRequirements() != null) existingJob.setRequirements(jobDetails.getRequirements());
-
+                if (jobDetails.getCreatedAt() != null) existingJob.setCreatedAt(jobDetails.getCreatedAt());
             if (existingJob.getBudgetMin() != null && existingJob.getBudgetMax() != null
                     && existingJob.getBudgetMin() > existingJob.getBudgetMax()) {
                 throw new IllegalArgumentException("Budget minimum cannot be greater than budget maximum");

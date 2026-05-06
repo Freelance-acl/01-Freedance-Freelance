@@ -2,6 +2,7 @@ package com.team01.freelance.proposal.model;
 
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.persistence.*;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -17,18 +18,23 @@ public class Proposal {
     private Long id;
 
     @Column(name = "job_id", nullable = false)
+    @JsonAlias({"jobId", "job_id"})
     private Long jobId;
 
     @Column(name = "freelancer_id", nullable = false)
+    @JsonAlias({"freelancerId", "freelancer_id"})
     private Long freelancerId;
 
     @Column(name = "cover_letter", nullable = false)
+    @JsonAlias({"coverLetter", "cover_letter"})
     private String coverLetter;
 
     @Column(name = "bid_amount", nullable = false)
+    @JsonAlias({"bidAmount", "bid_amount"})
     private Double bidAmount;
 
     @Column(name = "estimated_days", nullable = false)
+    @JsonAlias({"estimatedDays", "estimated_days"})
     private Integer estimatedDays;
 
     @Column(name = "status", nullable = false)
@@ -40,9 +46,11 @@ public class Proposal {
     private Map<String, Object> metadata;
 
     @Column(name = "submitted_at", nullable = false)
+    @JsonAlias({"submittedAt", "submitted_at"})
     private LocalDateTime submittedAt;
 
     @Column(name = "accepted_at")
+    @JsonAlias({"acceptedAt", "accepted_at"})
     private LocalDateTime acceptedAt;
 
     @JsonIgnore

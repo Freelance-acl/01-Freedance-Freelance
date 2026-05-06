@@ -1,5 +1,6 @@
 package com.team01.freelance.user.model;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.persistence.*;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -14,19 +15,23 @@ public class UserSkill {
     private Long id;
 
     @Column(name = "skill_name", nullable = false)
+    @JsonAlias({"skillName", "skill_name"})
     private String skillName;
 
     @Column(name = "category", nullable = false)
     private String category;
 
     @Column(name = "years_of_experience", nullable = false)
+    @JsonAlias({"yearsOfExperience", "years_of_experience"})
     private Integer yearsOfExperience;
 
     @Column(name = "proficiency_level", nullable = false)
+    @JsonAlias({"proficiencyLevel", "proficiency_level"})
     @Enumerated(EnumType.STRING)
     private ProficiencyLevel proficiencyLevel;
 
     @Column(name = "is_primary", columnDefinition = "boolean default false")
+    @JsonAlias({"isPrimary", "is_primary"})
     private Boolean isPrimary;
 
     @Column(name = "metadata", columnDefinition = "jsonb")
@@ -34,6 +39,7 @@ public class UserSkill {
     private Map<String, Object> metadata;
 
     @Column(name = "created_at", nullable = false)
+    @JsonAlias({"createdAt", "created_at"})
     private LocalDateTime createdAt;
 
     @ManyToOne

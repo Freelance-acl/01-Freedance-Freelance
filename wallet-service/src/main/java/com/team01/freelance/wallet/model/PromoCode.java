@@ -1,6 +1,7 @@
 package com.team01.freelance.wallet.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.persistence.*;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -19,19 +20,24 @@ public class PromoCode {
     private String code;
 
     @Column(name = "discount_type", nullable = false)
+    @JsonAlias({"discountType", "discount_type"})
     @Enumerated(EnumType.STRING)
     private DiscountType discountType;
 
     @Column(name = "discount_value", nullable = false)
+    @JsonAlias({"discountValue", "discount_value"})
     private Double discountValue;
 
     @Column(name = "max_uses", nullable = false)
+    @JsonAlias({"maxUses", "max_uses"})
     private Integer maxUses;
 
     @Column(name = "current_uses", columnDefinition = "integer default 0")
+    @JsonAlias({"currentUses", "current_uses"})
     private Integer currentUses;
 
     @Column(name = "expiry_date", nullable = false)
+    @JsonAlias({"expiryDate", "expiry_date"})
     private LocalDateTime expiryDate;
 
     @Column(name = "active", columnDefinition = "boolean default true")

@@ -15,9 +15,11 @@ public class Payout {
     private Long id;
 
     @Column(name = "contract_id", nullable = false)
+    @JsonAlias({"contractId", "contract_id"})
     private Long contractId;
 
     @Column(name = "freelancer_id", nullable = false)
+    @JsonAlias({"freelancerId", "freelancer_id"})
     private Long freelancerId;
 
     @Column(name = "amount", nullable = false)
@@ -33,10 +35,12 @@ public class Payout {
 
 
     @Column(name = "transaction_details", columnDefinition = "jsonb")
+    @JsonAlias({"transactionDetails", "transaction_details"})
     @JdbcTypeCode(SqlTypes.JSON)
     private Map<String, Object> transactionDetails;
     
     @Column(name = "created_at", nullable = false)
+    @JsonAlias({"createdAt", "created_at"})
     private LocalDateTime createdAt;
 
     @PrePersist

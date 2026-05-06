@@ -62,6 +62,7 @@ public class PayoutService {
                 if (payoutDetails.getMethod() != null) existingPayout.setMethod(payoutDetails.getMethod());
                 if (payoutDetails.getStatus() != null) existingPayout.setStatus(payoutDetails.getStatus());
                 if (payoutDetails.getTransactionDetails() != null) existingPayout.setTransactionDetails(payoutDetails.getTransactionDetails());
+                if (payoutDetails.getCreatedAt() != null) existingPayout.setCreatedAt(payoutDetails.getCreatedAt());
             return payoutRepository.save(existingPayout);
         }).orElseThrow(() -> new EntityNotFoundException("Payout not found with id: " + id));
     }

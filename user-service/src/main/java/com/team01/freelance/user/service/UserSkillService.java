@@ -55,6 +55,7 @@ public class UserSkillService {
                 if (userSkill.getProficiencyLevel() != null) existing.setProficiencyLevel(userSkill.getProficiencyLevel());
                 if (userSkill.getIsPrimary() != null) existing.setIsPrimary(userSkill.getIsPrimary());
                 if (userSkill.getMetadata() != null) existing.setMetadata(userSkill.getMetadata());
+                if (userSkill.getCreatedAt() != null) existing.setCreatedAt(userSkill.getCreatedAt());
             return userSkillRepository.save(existing);
         }).orElseThrow(() -> new EntityNotFoundException("User Skill not found with id: " + id));
     }

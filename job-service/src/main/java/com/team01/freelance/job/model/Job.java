@@ -1,6 +1,7 @@
  package com.team01.freelance.job.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.persistence.*;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -16,6 +17,7 @@ public class Job {
     private Long id;
 
     @Column(name = "client_id", nullable = false)
+    @JsonAlias({"clientId", "client_id"})
     private Long clientId;
 
     @Column(name = "title", nullable = false)
@@ -33,15 +35,18 @@ public class Job {
     private JobStatus status;
 
     @Column(name = "budget_min", nullable = false)
+    @JsonAlias({"budgetMin", "budget_min"})
     private Double budgetMin;
 
     @Column(name = "budget_max", nullable = false)
+    @JsonAlias({"budgetMax", "budget_max"})
     private Double budgetMax;
 
     @Column(name = "rating", columnDefinition = "double precision default 0.0")
     private Double rating;
 
     @Column(name = "total_ratings", columnDefinition = "integer default 0")
+    @JsonAlias({"totalRatings", "total_ratings"})
     private Integer totalRatings;
 
     @Column(name = "requirements", columnDefinition = "jsonb")
@@ -49,6 +54,7 @@ public class Job {
     private Map<String, Object> requirements;
 
     @Column(name = "created_at", nullable = false)
+    @JsonAlias({"createdAt", "created_at"})
     private LocalDateTime createdAt;
 
     @JsonIgnore

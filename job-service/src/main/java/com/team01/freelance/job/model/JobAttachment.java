@@ -1,5 +1,6 @@
 package com.team01.freelance.job.model;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.persistence.*;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -19,9 +20,11 @@ public class JobAttachment {
     private JobAttachmentType type;
 
     @Column(name = "file_url", nullable = false)
+    @JsonAlias({"fileUrl", "file_url"})
     private String fileUrl;
 
     @Column(name = "expiry_date", nullable = false)
+    @JsonAlias({"expiryDate", "expiry_date"})
     private LocalDate expiryDate;
 
     @Column(name = "verified", nullable = false)
@@ -32,6 +35,7 @@ public class JobAttachment {
     private Map<String, Object> metadata;
 
     @Column(name = "uploaded_at", nullable = false)
+    @JsonAlias({"uploadedAt", "uploaded_at"})
     private LocalDateTime uploadedAt;
 
     @ManyToOne
