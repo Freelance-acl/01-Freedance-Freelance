@@ -27,7 +27,20 @@ public class ApiInstructionsController {
                 "password", "youssef1",
                 "phone", "+201550830082",
                 "role", "ADMIN",
-                "status", "ACTIVE"
+                "status", "ACTIVE",
+                "preferences", Map.of(
+                        "language", "en",
+                        "notifications", Map.of(
+                                "email", true,
+                                "sms", false
+                        ),
+                        "timezone", "Africa/Cairo",
+                        "profileVisibility", "PUBLIC",
+                        "hourlyRateRange", Map.of(
+                                "min", 300,
+                                "max", 600
+                        )
+                )
         ));
 
         Map<String, Object> job = new LinkedHashMap<>();
@@ -40,7 +53,14 @@ public class ApiInstructionsController {
                 "category", "WEB_DEV",
                 "status", "IN_PROGRESS",
                 "budgetMin", 10000,
-                "budgetMax", 20000
+                "budgetMax", 20000,
+                "requirements", Map.of(
+                        "requiredSkills", new String[]{"Java", "Spring Boot", "PostgreSQL"},
+                        "experienceLevel", "SENIOR",
+                        "estimatedDuration", 8,
+                        "remoteAllowed", true,
+                        "preferredTimezone", "GMT+2"
+                )
         ));
 
         Map<String, Object> proposal = new LinkedHashMap<>();
@@ -53,7 +73,14 @@ public class ApiInstructionsController {
                 "bidAmount", 100.0,
                 "estimatedDays", 12,
                 "status", "ACCEPTED",
-                "submittedAt", "2026-05-06T14:30:00"
+                "submittedAt", "2026-05-06T14:30:00",
+                "metadata", Map.of(
+                        "approachSummary", "Microservices with Spring Boot",
+                        "relevantExperience", "5 years in similar projects",
+                        "toolsProposed", new String[]{"IntelliJ", "Docker", "GitHub"},
+                        "availabilityStart", "2026-04-01",
+                        "portfolioLinks", new String[]{"https://portfolio.example.com/project1"}
+                )
         ));
 
         Map<String, Object> contract = new LinkedHashMap<>();
@@ -66,19 +93,35 @@ public class ApiInstructionsController {
                 "proposalId", 1,
                 "agreedAmount", 150,
                 "status", "COMPLETED",
-                "startDate", "2026-05-06T14:30:00"
+                "startDate", "2026-05-06T14:30:00",
+                "metadata", Map.of(
+                        "paymentTerms", "MILESTONE",
+                        "revisionLimit", 3,
+                        "ndaSigned", true,
+                        "weeklyHoursExpected", 40,
+                        "progressPercentage", 65,
+                        "lastActivityDate", "2026-03-15"
+                )
         ));
+
+        Map<String, Object> payoutTransactionDetails = new LinkedHashMap<>();
+        payoutTransactionDetails.put("gatewayResponse", "approved");
+        payoutTransactionDetails.put("accountLastFour", "9876");
+        payoutTransactionDetails.put("receiptUrl", "https://receipts.example.com/abc");
+        payoutTransactionDetails.put("failureReason", null);
+
+        Map<String, Object> payoutSampleBody = new LinkedHashMap<>();
+        payoutSampleBody.put("contractId", 1);
+        payoutSampleBody.put("freelancerId", 22);
+        payoutSampleBody.put("amount", 140.5);
+        payoutSampleBody.put("method", "BANK_TRANSFER");
+        payoutSampleBody.put("status", "COMPLETED");
+        payoutSampleBody.put("transactionDetails", payoutTransactionDetails);
 
         Map<String, Object> payout = new LinkedHashMap<>();
         payout.put("url", "http://localhost:8085/api/payouts");
         payout.put("method", "POST");
-        payout.put("sampleBody", Map.of(
-                "contractId", 1,
-                "freelancerId", 22,
-                "amount", 140.5,
-                "method", "BANK_TRANSFER",
-                "status", "COMPLETED"
-        ));
+        payout.put("sampleBody", payoutSampleBody);
 
         Map<String, Object> endpoints = new LinkedHashMap<>();
         endpoints.put("user", user);
@@ -92,7 +135,8 @@ public class ApiInstructionsController {
                 "Create records in order: User -> Job -> Proposal -> Contract -> Payout.",
                 "Use freelancerId (not freeLancerId).",
                 "Use contractId (not conractId).",
-                "For job budgets, preferred keys are budgetMin and budgetMax."
+                "For job budgets, preferred keys are budgetMin and budgetMax.",
+                "Payout API also accepts contract_id, conractId (typo alias), and freelancer_id."
         });
 
         return ResponseEntity.ok(body);

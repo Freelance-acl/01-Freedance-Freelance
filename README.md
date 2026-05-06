@@ -132,7 +132,14 @@ Create records in this order to satisfy foreign-key checks:
   "password": "youssef1",
   "phone": "+201550830082",
   "role": "ADMIN",
-  "status": "ACTIVE"
+  "status": "ACTIVE",
+  "preferences": {
+    "language": "en",
+    "notifications": { "email": true, "sms": false },
+    "timezone": "Africa/Cairo",
+    "profileVisibility": "PUBLIC",
+    "hourlyRateRange": { "min": 300, "max": 600 }
+  }
 }
 ```
 
@@ -148,7 +155,14 @@ Create records in this order to satisfy foreign-key checks:
   "category": "WEB_DEV",
   "status": "IN_PROGRESS",
   "budgetMin": 10000,
-  "budgetMax": 20000
+  "budgetMax": 20000,
+  "requirements": {
+    "requiredSkills": ["Java", "Spring Boot", "PostgreSQL"],
+    "experienceLevel": "SENIOR",
+    "estimatedDuration": 8,
+    "remoteAllowed": true,
+    "preferredTimezone": "GMT+2"
+  }
 }
 ```
 
@@ -164,7 +178,14 @@ Create records in this order to satisfy foreign-key checks:
   "bidAmount": 100.0,
   "estimatedDays": 12,
   "status": "ACCEPTED",
-  "submittedAt": "2026-05-06T14:30:00"
+  "submittedAt": "2026-05-06T14:30:00",
+  "metadata": {
+    "approachSummary": "Microservices with Spring Boot",
+    "relevantExperience": "5 years in similar projects",
+    "toolsProposed": ["IntelliJ", "Docker", "GitHub"],
+    "availabilityStart": "2026-04-01",
+    "portfolioLinks": ["https://portfolio.example.com/project1"]
+  }
 }
 ```
 
@@ -180,7 +201,15 @@ Create records in this order to satisfy foreign-key checks:
   "proposalId": 1,
   "agreedAmount": 150,
   "status": "COMPLETED",
-  "startDate": "2026-05-06T14:30:00"
+  "startDate": "2026-05-06T14:30:00",
+  "metadata": {
+    "paymentTerms": "MILESTONE",
+    "revisionLimit": 3,
+    "ndaSigned": true,
+    "weeklyHoursExpected": 40,
+    "progressPercentage": 65,
+    "lastActivityDate": "2026-03-15"
+  }
 }
 ```
 
@@ -194,7 +223,13 @@ Create records in this order to satisfy foreign-key checks:
   "freelancerId": 22,
   "amount": 140.5,
   "method": "BANK_TRANSFER",
-  "status": "COMPLETED"
+  "status": "COMPLETED",
+  "transactionDetails": {
+    "gatewayResponse": "approved",
+    "accountLastFour": "9876",
+    "receiptUrl": "https://receipts.example.com/abc",
+    "failureReason": null
+  }
 }
 ```
 
