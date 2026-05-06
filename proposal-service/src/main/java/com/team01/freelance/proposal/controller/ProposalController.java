@@ -36,7 +36,11 @@ public class ProposalController {
 
     @PostMapping
     public ResponseEntity<Proposal> createProposal(@RequestBody Proposal proposal) {
-        return ResponseEntity.ok(proposalService.createProposal(proposal));
+        try {
+            return ResponseEntity.ok(proposalService.createProposal(proposal));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        } 
     }
 
     /**
@@ -50,8 +54,11 @@ public class ProposalController {
     public ResponseEntity<Proposal> updateProposal(@PathVariable Long id, @RequestBody Proposal proposal) {
         try {
             return ResponseEntity.ok(proposalService.updateProposal(id, proposal));
-        } catch (RuntimeException e) {
+        } catch (EntityNotFoundException e) {
             return ResponseEntity.notFound().build();
+        }
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
         }
     }
 

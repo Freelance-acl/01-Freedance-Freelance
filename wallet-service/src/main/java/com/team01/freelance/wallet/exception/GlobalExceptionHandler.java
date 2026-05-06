@@ -46,10 +46,11 @@ public class GlobalExceptionHandler {
             
         String message = "Database constraint violation";
         String detailedMessage = ex.getMostSpecificCause().getMessage();
-        
-        if (detailedMessage.contains("unique") || detailedMessage.contains("duplicate")) {
-            message = "This record already exists.";
-        }
+ 
+        if (detailedMessage != null
+                 && (detailedMessage.contains("unique") || detailedMessage.contains("duplicate"))) {
+             message = "This record already exists.";
+         }
 
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("timestamp", LocalDateTime.now().toString());

@@ -60,12 +60,12 @@ public class UserSkillService {
         }).orElseThrow(() -> new EntityNotFoundException("User Skill not found with id: " + id));
     }
 
-    public boolean deleteUserSkillById(Long id) {
-        if (!userSkillRepository.existsById(id)) {
-            return false;
-        }
-        userSkillRepository.deleteById(id);
-        return true;
+     public boolean deleteUserSkillById(Long id) {
+
+        return userSkillRepository.findById(id).map(existing -> {
+            userSkillRepository.delete(existing);
+            return true;
+        }).orElse(false);
     }
 
     public void deleteAllUserSkills() {

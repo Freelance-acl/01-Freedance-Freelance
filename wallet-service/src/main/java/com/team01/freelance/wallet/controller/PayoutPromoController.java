@@ -35,9 +35,10 @@ public class PayoutPromoController {
     }
 
     @PostMapping
-    public ResponseEntity<PayoutPromo> createPayoutPromo(@RequestBody PayoutPromo payoutPromo) {
-        return ResponseEntity.ok(payoutPromoService.createPayoutPromo(payoutPromo));
-    }
+     public ResponseEntity<PayoutPromo> createPayoutPromo(@RequestBody PayoutPromo payoutPromo) {
+         return ResponseEntity.status(HttpStatus.CREATED)
+                 .body(payoutPromoService.createPayoutPromo(payoutPromo));
+     }
 
     /**
      * Updates a payout promo by ID.
@@ -50,7 +51,7 @@ public class PayoutPromoController {
     public ResponseEntity<PayoutPromo> updatePayoutPromo(@PathVariable Long id, @RequestBody PayoutPromo payoutPromo) {
         try {
             return ResponseEntity.ok(payoutPromoService.updatePayoutPromo(id, payoutPromo));
-        } catch (RuntimeException e) {
+        } catch (EntityNotFoundException  e) {
             return ResponseEntity.notFound().build();
         }
     }

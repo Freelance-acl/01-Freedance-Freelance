@@ -2,6 +2,7 @@ package com.team01.freelance.user.controller;
 
 import com.team01.freelance.user.model.UserSkill;
 import com.team01.freelance.user.service.UserSkillService;
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -36,7 +37,11 @@ public class UserSkillController {
 
     @PostMapping
     public ResponseEntity<UserSkill> createUserSkill(@RequestBody UserSkill userSkill) {
-        return ResponseEntity.ok(userSkillService.createUserSkill(userSkill));
+        try {
+            return ResponseEntity.ok(userSkillService.createUserSkill(userSkill));
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        }
     }
 
     /**
@@ -50,7 +55,7 @@ public class UserSkillController {
     public ResponseEntity<UserSkill> updateUserSkill(@PathVariable Long id, @RequestBody UserSkill userSkill) {
         try {
             return ResponseEntity.ok(userSkillService.updateUserSkill(id, userSkill));
-        } catch (RuntimeException e) {
+        } catch (EntityNotFoundException e) {
             return ResponseEntity.notFound().build();
         }
     }

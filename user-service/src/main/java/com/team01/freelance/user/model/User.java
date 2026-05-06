@@ -139,6 +139,13 @@ public class User {
 
     public void setUserSkills(List<UserSkill> userSkills) {
         this.userSkills = userSkills;
+        if (userSkills != null) {
+            userSkills.forEach(skill -> {
+                if (skill != null) {
+                    skill.setUser(this);
+                }
+            });
+        }
     }
 }
 

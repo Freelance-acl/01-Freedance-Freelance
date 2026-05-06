@@ -6,6 +6,7 @@ import jakarta.persistence.*;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -75,6 +76,8 @@ public class Job {
         if (createdAt == null) {
             createdAt = LocalDateTime.now();
         }
+        jobAttachments = new ArrayList<>();
+        
     }
 
     // Getters and Setters

@@ -91,6 +91,9 @@ public class PromoCode {
     }
 
     public void setDiscountValue(Double discountValue) {
+        if (discountValue != null && discountValue < 0) {
+            throw new IllegalArgumentException("discountValue cannot be negative");
+        }
         this.discountValue = discountValue;
     }
 
@@ -99,6 +102,9 @@ public class PromoCode {
     }
 
     public void setMaxUses(Integer maxUses) {
+        if (maxUses != null && maxUses < 0) {
+            throw new IllegalArgumentException("maxUses cannot be negative");
+        }
         this.maxUses = maxUses;
     }
 
@@ -107,6 +113,9 @@ public class PromoCode {
     }
 
     public void setCurrentUses(Integer currentUses) {
+        if (currentUses != null && currentUses < 0) {
+            throw new IllegalArgumentException("currentUses cannot be negative");
+        }
         this.currentUses = currentUses;
     }
 
