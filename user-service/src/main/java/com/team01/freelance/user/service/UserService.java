@@ -36,13 +36,13 @@ public class UserService {
      */
     public User updateUser(Long id, User userDetails) {
         return userRepository.findById(id).map(existingUser -> {
-                existingUser.setName(userDetails.getName());
-                existingUser.setEmail(userDetails.getEmail());
-                existingUser.setPassword(userDetails.getPassword());
-                existingUser.setPhone(userDetails.getPhone());
-                existingUser.setRole(userDetails.getRole());
-                existingUser.setStatus(userDetails.getStatus());
-                existingUser.setPreferences(userDetails.getPreferences());
+            if (userDetails.getName() != null) existingUser.setName(userDetails.getName());
+            if (userDetails.getEmail() != null) existingUser.setEmail(userDetails.getEmail());
+            if (userDetails.getPassword() != null) existingUser.setPassword(userDetails.getPassword());
+            if (userDetails.getPhone() != null) existingUser.setPhone(userDetails.getPhone());
+            if (userDetails.getRole() != null) existingUser.setRole(userDetails.getRole());
+            if (userDetails.getStatus() != null) existingUser.setStatus(userDetails.getStatus());
+            if (userDetails.getPreferences() != null) existingUser.setPreferences(userDetails.getPreferences());
             return userRepository.save(existingUser);
         }).orElseThrow(() -> new RuntimeException("User not found with id: " + id));
     }

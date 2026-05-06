@@ -36,7 +36,11 @@ public class ContractController {
 
     @PostMapping
     public ResponseEntity<Contract> createContract(@RequestBody Contract contract) {
-        return ResponseEntity.ok(contractService.createContract(contract));
+        try {
+            return ResponseEntity.ok(contractService.createContract(contract));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
     }
 
     /**
@@ -44,13 +48,16 @@ public class ContractController {
      *
      * @param id the contract ID
      * @param contract the update payload
-     * @return 200 with updated contract, or 404 if not found
+     * @return 200 with updated contract, 400 for invalid references, or 404 if not found
      */
     @PutMapping("/{id}")
     public ResponseEntity<Contract> updateContract(@PathVariable Long id, @RequestBody Contract contract) {
         try {
             return ResponseEntity.ok(contractService.updateContract(id, contract));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
         } catch (RuntimeException e) {
+            // Maps to the "Contract not found" exception from service
             return ResponseEntity.notFound().build();
         }
     }

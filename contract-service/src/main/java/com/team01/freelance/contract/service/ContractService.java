@@ -2,6 +2,7 @@ package com.team01.freelance.contract.service;
 
 import com.team01.freelance.contract.model.Contract;
 import com.team01.freelance.contract.repository.ContractRepository;
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -59,7 +60,7 @@ public class ContractService {
                     existingContract.getProposalId()
             );
             return contractRepository.save(existingContract);
-        }).orElseThrow(() -> new RuntimeException("Contract not found with id: " + id));
+        }).orElseThrow(() -> new EntityNotFoundException("Contract not found with id: " + id));
     }
 
     private void validateContractReferences(Long freelancerId, Long jobId, Long clientId, Long proposalId) {
@@ -86,10 +87,11 @@ public class ContractService {
     }
 
     public boolean deleteContractById(Long id) {
-        if (!contractRepository.existsById(id)) {
+        try{
+            contractRepository.deleteById(id);
+        } catch (Exception e) {
             return false;
         }
-        contractRepository.deleteById(id);
         return true;
     }
 

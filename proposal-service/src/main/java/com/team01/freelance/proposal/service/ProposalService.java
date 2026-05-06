@@ -41,14 +41,14 @@ public class ProposalService {
      */
     public Proposal updateProposal(Long id, Proposal proposalDetails) {
         return proposalRepository.findById(id).map(existingProposal -> {
-                existingProposal.setJobId(proposalDetails.getJobId());
-                existingProposal.setFreelancerId(proposalDetails.getFreelancerId());
-                existingProposal.setCoverLetter(proposalDetails.getCoverLetter());
-                existingProposal.setBidAmount(proposalDetails.getBidAmount());
-                existingProposal.setEstimatedDays(proposalDetails.getEstimatedDays());
-                existingProposal.setStatus(proposalDetails.getStatus());
-                existingProposal.setMetadata(proposalDetails.getMetadata());
-                existingProposal.setAcceptedAt(proposalDetails.getAcceptedAt());
+            if (proposalDetails.getJobId() != null) existingProposal.setJobId(proposalDetails.getJobId());
+            if (proposalDetails.getFreelancerId() != null) existingProposal.setFreelancerId(proposalDetails.getFreelancerId());
+            if (proposalDetails.getCoverLetter() != null) existingProposal.setCoverLetter(proposalDetails.getCoverLetter());
+            if (proposalDetails.getBidAmount() != null) existingProposal.setBidAmount(proposalDetails.getBidAmount());
+            if (proposalDetails.getEstimatedDays() != null) existingProposal.setEstimatedDays(proposalDetails.getEstimatedDays());
+            if (proposalDetails.getStatus() != null) existingProposal.setStatus(proposalDetails.getStatus());
+            if (proposalDetails.getMetadata() != null) existingProposal.setMetadata(proposalDetails.getMetadata());
+            if (proposalDetails.getAcceptedAt() != null) existingProposal.setAcceptedAt(proposalDetails.getAcceptedAt());
             validateProposalReferences(existingProposal.getFreelancerId(), existingProposal.getJobId());
             return proposalRepository.save(existingProposal);
         }).orElseThrow(() -> new RuntimeException("Proposal not found with id: " + id));

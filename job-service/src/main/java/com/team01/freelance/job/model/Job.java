@@ -1,5 +1,6 @@
  package com.team01.freelance.job.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -50,6 +51,7 @@ public class Job {
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
+    @JsonIgnore
     @OneToMany(mappedBy = "job", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<JobAttachment> jobAttachments;
 
@@ -168,6 +170,16 @@ public class Job {
 
     public List<JobAttachment> getJobAttachments() {
         return jobAttachments;
+    }
+
+    public void addJobAttachment(JobAttachment jobAttachment) {
+        jobAttachment.setJob(this);
+        this.jobAttachments.add(jobAttachment);
+    }
+
+    public void removeJobAttachment(JobAttachment jobAttachment) {
+        this.jobAttachments.remove(jobAttachment);
+        jobAttachment.setJob(null);
     }
 
     public void setJobAttachments(List<JobAttachment> jobAttachments) {

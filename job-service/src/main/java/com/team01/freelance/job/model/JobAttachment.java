@@ -62,6 +62,9 @@ public class JobAttachment {
     }
 
     public void setType(JobAttachmentType type) {
+        if (type == null) {
+            throw new IllegalArgumentException("Type cannot be null");
+        }
         this.type = type;
     }
 
@@ -113,4 +116,3 @@ public class JobAttachment {
         this.job = job;
     }
 }
-
