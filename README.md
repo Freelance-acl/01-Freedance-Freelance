@@ -1,201 +1,266 @@
-# Freelance Marketplace - API Endpoints & Setup Guide
+# Freelance Marketplace Backend
 
-## Quick Start
+Microservices backend for a freelance marketplace, using Spring Boot + PostgreSQL + Docker.
 
-### Prerequisites
+## Services and Ports
+
+- `user-service` -> `http://localhost:8081`
+- `job-service` -> `http://localhost:8082`
+- `proposal-service` -> `http://localhost:8083`
+- `contract-service` -> `http://localhost:8084`
+- `wallet-service` -> `http://localhost:8085`
+- `postgres` -> `localhost:5432` (`freelancedb`)
+
+All services run on internal container port `8080` and are mapped to host ports `8081..8085`.
+
+## Prerequisites
+
 - Java 25+
-- Maven (included as `./mvnw` or `./mvnw.cmd`)
-- Docker & Docker Compose
-- PostgreSQL (runs in Docker container)
+- Docker + Docker Compose
+- Bash shell (`bash`) for running `*.bash` scripts
+  - macOS/Linux: already available
+  - Windows PowerShell: use `bash .\script.bash` (Git Bash/WSL)
 
-### Steps to Run
+## Setup and Run
 
-#### 1. Setup (First Time Only)
+### 1) First-time setup
+
 ```bash
-# Copy environment configuration (do this once)
-cp .env.example .env
-
-# Then run setup
-./setup.bash
+bash ./setup.bash
 ```
-This runs:
-- `./mvnw.cmd clean install` - Install packages
-- `./mvnw.cmd package -DskipTests` - Build all modules
 
-#### 2. Run the Application
+### 2) Start all services
+
 ```bash
-./run.bash
+bash ./run.bash
 ```
-This runs:
-- `./mvnw.cmd package -DskipTests` - Rebuild all modules
-- `docker-compose up -d --build` - Start all services + PostgreSQL in Docker
 
-#### 3. Stop the Application
+### 3) Stop all services
+
 ```bash
-docker-compose down
+bash ./stop.bash
 ```
 
----
+## Script Usage by OS
 
-## Service Port Mapping
+### macOS / Linux (bash)
 
-| Service | Internal Port | Docker Port | Base URL |
-|---------|---------------|-------------|----------|
-| user-service | 8080 | 8081 | http://localhost:8081 |
-| job-service | 8080 | 8082 | http://localhost:8082 |
-| proposal-service | 8080 | 8083 | http://localhost:8083 |
-| contract-service | 8080 | 8084 | http://localhost:8084 |
-| wallet-service | 8080 | 8085 | http://localhost:8085 |
-| PostgreSQL | 5432 | 5432 | postgresql://postgres:postgres@localhost:5432/freelancedb |
-
----
-
-## API Endpoints
-
-### User Service
-**Base URL:** `http://localhost:8081/api/users`
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/health` | GET | Health check |
-
-**Package:** `com.team01.freelance.user.controllers.HealthController`
-
----
-
-### Job Service
-**Base URL:** `http://localhost:8082/api/jobs`
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/health` | GET | Health check |
-
-**Package:** `com.team01.freelance.job.controllers.HealthController`
-
----
-
-### Proposal Service
-**Base URL:** `http://localhost:8083/api/proposals`
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/health2` | GET | Health check (v2) |
-| `/health` | GET | Health check (from alternative controller) |
-
-**Packages:**
-- `com.team01.freelance.proposal.controllers.HealthController` (uses `/health2`)
-- `com.team01.freelance.proposalservice.controllers.HealthController` (uses `/health`)
-
-**Note:** There are two HealthController classes in different packages. The active one depends on which package Spring Boot's component scan finds first (typically the one closest to the main application class).
-
----
-
-### Contract Service
-**Base URL:** `http://localhost:8084/api/contracts`
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/` | GET | Welcome message |
-| `/health` | GET | Health check |
-
-**Packages:**
-- `com.team01.freelance.contract.controllers.HealthController` (has both endpoints)
-- `com.team01.freelance.contractservice.controllers.HealthController` (health only)
-
----
-
-### Wallet Service / Payouts Service
-**Base URL:** `http://localhost:8085/api/payouts`
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/health` | GET | Health check |
-
-**Packages:**
-- `com.team01.freelance.wallet.controllers.HealthController`
-- `com.team01.freelance.walletservice.controllers.HealthController`
-
----
-
-## Testing Endpoints
-
-### Test User Service
 ```bash
-curl http://localhost:8081/api/users/health
+bash ./setup.bash
+bash ./run.bash
+bash ./stop.bash
 ```
 
-### Test Job Service
+### Windows PowerShell
+
+```powershell
+bash .\setup.bash
+bash .\run.bash
+bash .\stop.bash
+```
+
+If `bash` is not recognized, install Git for Windows (Git Bash) or use WSL.
+
+## Health Endpoints
+
+- `GET http://localhost:8081/api/users/health`
+- `GET http://localhost:8082/api/jobs/health`
+- `GET http://localhost:8083/api/proposals/health2`
+- `GET http://localhost:8084/api/contracts/health`
+- `GET http://localhost:8085/api/payouts/health`
+
+## Public Instructions Endpoint
+
+- `GET http://localhost:8085/api/instructions`
+
+Returns quick-start payloads and notes for the core flow:
+`User -> Job -> Proposal -> Contract -> Payout`
+
+## Core API Endpoints (CRUD)
+
+Each group supports:
+- `GET /` (list)
+- `GET /{id}` (details)
+- `POST /` (create)
+- `PUT /{id}` (update)
+- `DELETE /{id}` (delete one)
+- `DELETE /all` (delete all)
+
+### User Service (`8081`)
+
+- `http://localhost:8081/api/users`
+- `http://localhost:8081/api/user-skills`
+
+### Job Service (`8082`)
+
+- `http://localhost:8082/api/jobs`
+- `http://localhost:8082/api/job-attachments`
+
+### Proposal Service (`8083`)
+
+- `http://localhost:8083/api/proposals`
+- `http://localhost:8083/api/proposal-milestones`
+
+### Contract Service (`8084`)
+
+- `http://localhost:8084/api/contracts`
+
+### Wallet Service (`8085`)
+
+- `http://localhost:8085/api/payouts`
+- `http://localhost:8085/api/promo-codes`
+- `http://localhost:8085/api/payout-promos`
+
+## Recommended Creation Flow (with sample payloads)
+
+Create records in this order to satisfy foreign-key checks:
+
+1. User
+2. Job
+3. Proposal
+4. Contract
+5. Payout
+
+### 1) Create User
+
+`POST http://localhost:8081/api/users`
+
+```json
+{
+  "name": "Youssef1122",
+  "email": "youssef1@x.x",
+  "password": "youssef1",
+  "phone": "+201550830082",
+  "role": "ADMIN",
+  "status": "ACTIVE",
+  "preferences": {
+    "language": "en",
+    "notifications": { "email": true, "sms": false },
+    "timezone": "Africa/Cairo",
+    "profileVisibility": "PUBLIC",
+    "hourlyRateRange": { "min": 300, "max": 600 }
+  }
+}
+```
+
+### 2) Create Job
+
+`POST http://localhost:8082/api/jobs`
+
+```json
+{
+  "clientId": 1,
+  "title": "Software Developer",
+  "description": "develops software",
+  "category": "WEB_DEV",
+  "status": "IN_PROGRESS",
+  "budgetMin": 10000,
+  "budgetMax": 20000,
+  "requirements": {
+    "requiredSkills": ["Java", "Spring Boot", "PostgreSQL"],
+    "experienceLevel": "SENIOR",
+    "estimatedDuration": 8,
+    "remoteAllowed": true,
+    "preferredTimezone": "GMT+2"
+  }
+}
+```
+
+### 3) Create Proposal
+
+`POST http://localhost:8083/api/proposals`
+
+```json
+{
+  "jobId": 1,
+  "freelancerId": 20,
+  "coverLetter": "freelancer cover letter",
+  "bidAmount": 100.0,
+  "estimatedDays": 12,
+  "status": "ACCEPTED",
+  "submittedAt": "2026-05-06T14:30:00",
+  "metadata": {
+    "approachSummary": "Microservices with Spring Boot",
+    "relevantExperience": "5 years in similar projects",
+    "toolsProposed": ["IntelliJ", "Docker", "GitHub"],
+    "availabilityStart": "2026-04-01",
+    "portfolioLinks": ["https://portfolio.example.com/project1"]
+  }
+}
+```
+
+### 4) Create Contract
+
+`POST http://localhost:8084/api/contracts`
+
+```json
+{
+  "jobId": 1,
+  "freelancerId": 20,
+  "clientId": 1,
+  "proposalId": 1,
+  "agreedAmount": 150,
+  "status": "COMPLETED",
+  "startDate": "2026-05-06T14:30:00",
+  "metadata": {
+    "paymentTerms": "MILESTONE",
+    "revisionLimit": 3,
+    "ndaSigned": true,
+    "weeklyHoursExpected": 40,
+    "progressPercentage": 65,
+    "lastActivityDate": "2026-03-15"
+  }
+}
+```
+
+### 5) Create Payout
+
+`POST http://localhost:8085/api/payouts`
+
+```json
+{
+  "contractId": 1,
+  "freelancerId": 22,
+  "amount": 140.5,
+  "method": "BANK_TRANSFER",
+  "status": "COMPLETED",
+  "transactionDetails": {
+    "gatewayResponse": "approved",
+    "accountLastFour": "9876",
+    "receiptUrl": "https://receipts.example.com/abc",
+    "failureReason": null
+  }
+}
+```
+
+## Important Field Notes
+
+- Use `freelancerId` (not `freeLancerId`).
+- Use `contractId` (not `conractId`).
+- Preferred Job budget fields: `budgetMin`, `budgetMax`.
+- The payout API currently accepts alias fields:
+  - `contract_id`
+  - `conractId` (typo alias)
+  - `freelancer_id`
+
+## Helpful Commands
+
+### Rebuild only one service
+
 ```bash
-curl http://localhost:8082/api/jobs/health
+./mvnw -pl wallet-service -am compile
 ```
 
-### Test Proposal Service
+### Full rebuild
+
 ```bash
-curl http://localhost:8083/api/proposals/health2
-# or
-curl http://localhost:8083/api/proposals/health
+./mvnw clean install
 ```
 
-### Test Contract Service
+### Container status/logs
+
 ```bash
-curl http://localhost:8084/api/contracts/health
-# or
-curl http://localhost:8084/api/contracts
+docker-compose ps
+docker-compose logs -f
 ```
 
-### Test Wallet Service
-```bash
-curl http://localhost:8085/api/payouts/health
-```
-
----
-
-## Troubleshooting
-
-### Controllers Not Updating
-After changing controller code:
-1. Rebuild the specific module:
-   ```bash
-   cd <service-name>
-   mvn clean package -DskipTests
-   ```
-2. Or rebuild all and restart:
-   ```bash
-   mvn clean package -DskipTests
-   docker-compose up -d --build
-   ```
-
-### Port Already in Use
-Kill the process using the port or stop Docker containers:
-```bash
-docker-compose down
-```
-
-### Database Connection Issues
-Check if PostgreSQL container is running:
-```bash
-docker ps
-docker logs freelance-db
-```
-
-### Duplicate Controllers
-Note: Some services have multiple HealthController classes in different packages. Only one will be active (the one in the main package scan path). To clean this up, delete or consolidate duplicate controllers.
-
----
-
-## Project Structure
-
-```
-root/
-├── setup.bash              # Initial setup script
-├── run.bash               # Run script for development
-├── docker-compose.yaml    # Main services composition
-├── docker-compose.db.yml  # Database only composition
-├── pom.xml               # Root Maven POM
-├── user-service/
-├── job-service/
-├── proposal-service/
-├── contract-service/
-├── wallet-service/
-└── tstModule/            # Test module
-```

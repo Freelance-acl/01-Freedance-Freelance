@@ -1,6 +1,11 @@
-# INSTALL PACKAGES
-./mvnw.cmd clean install
+#!/usr/bin/env bash
+set -euo pipefail
 
-# TO BUILD PROJECT -> creates .jar file
-./mvnw.cmd package -DskipTests
+echo "[setup] Clean install..."
+./mvnw clean install
+
+echo "[setup] Packaging services (skip tests)..."
+./mvnw package -DskipTests
+
+echo "[setup] Done."
 
