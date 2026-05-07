@@ -1,5 +1,6 @@
 package com.team01.freelance.wallet.controller;
 
+import jakarta.persistence.EntityNotFoundException;
 import com.team01.freelance.wallet.model.PayoutPromo;
 import com.team01.freelance.wallet.service.PayoutPromoService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,8 +37,7 @@ public class PayoutPromoController {
 
     @PostMapping
      public ResponseEntity<PayoutPromo> createPayoutPromo(@RequestBody PayoutPromo payoutPromo) {
-         return ResponseEntity.status(HttpStatus.CREATED)
-                 .body(payoutPromoService.createPayoutPromo(payoutPromo));
+         return ResponseEntity.ok(payoutPromoService.createPayoutPromo(payoutPromo));
      }
 
     /**
