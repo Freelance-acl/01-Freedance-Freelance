@@ -2,6 +2,7 @@ package com.team01.freelance.proposal.controller;
 
 import com.team01.freelance.proposal.model.Proposal;
 import com.team01.freelance.proposal.service.ProposalService;
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -56,7 +57,7 @@ public class ProposalController {
             return ResponseEntity.ok(proposalService.updateProposal(id, proposal));
         } catch (EntityNotFoundException e) {
             return ResponseEntity.notFound().build();
-        }
+        
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().build();
         }

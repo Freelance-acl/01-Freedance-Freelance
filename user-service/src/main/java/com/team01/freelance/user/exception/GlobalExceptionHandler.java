@@ -56,6 +56,7 @@ public class GlobalExceptionHandler {
         } else {
             message = "This record already exists.";
         }
+        }
         
 
         Map<String, Object> body = new LinkedHashMap<>();
