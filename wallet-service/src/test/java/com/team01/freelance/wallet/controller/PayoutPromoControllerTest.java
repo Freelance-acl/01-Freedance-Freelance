@@ -54,14 +54,14 @@ class PayoutPromoControllerTest {
     }
 
     @Test
-    void createReturnsOk() throws Exception {
+    void createReturnsCreated() throws Exception {
         PayoutPromo payoutPromo = new PayoutPromo();
         when(payoutPromoService.createPayoutPromo(any(PayoutPromo.class))).thenReturn(payoutPromo);
 
         mockMvc.perform(post("/api/payout-promos")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
-                .andExpect(status().isOk());
+                .andExpect(status().isCreated());
     }
 
     @Test

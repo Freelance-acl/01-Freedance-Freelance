@@ -5,6 +5,7 @@ import com.team01.freelance.wallet.model.PayoutPromo;
 import com.team01.freelance.wallet.service.PayoutPromoService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -36,9 +37,10 @@ public class PayoutPromoController {
     }
 
     @PostMapping
-     public ResponseEntity<PayoutPromo> createPayoutPromo(@RequestBody PayoutPromo payoutPromo) {
-         return ResponseEntity.ok(payoutPromoService.createPayoutPromo(payoutPromo));
-     }
+    public ResponseEntity<PayoutPromo> createPayoutPromo(@RequestBody PayoutPromo payoutPromo) {
+    //  return ResponseEntity.ok(payoutPromoService.createPayoutPromo(payoutPromo));
+    return ResponseEntity.status(HttpStatus.CREATED).body(payoutPromoService.createPayoutPromo(payoutPromo));
+    }
 
     /**
      * Updates a payout promo by ID.
