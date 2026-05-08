@@ -13,7 +13,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -42,10 +41,14 @@ public class PayoutService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "startDate cannot be after endDate");
         }
 
+        // Half-open interval: [startOfStart, startOfDayAfterEnd). Using the
+        // day-after midnight as an exclusive upper bound keeps the comparison
+        // precision-agnostic regardless of how the JDBC driver handles
+        // sub-microsecond fractions.
         LocalDateTime startDateTime = startDate != null ? startDate.atStartOfDay() : null;
-        LocalDateTime endDateTime = endDate != null ? endDate.atTime(LocalTime.MAX) : null;
+        LocalDateTime endExclusive = endDate != null ? endDate.plusDays(1).atStartOfDay() : null;
         String statusName = status != null ? status.name() : null;
-        return payoutRepository.searchByStatusAndCreatedAtRange(statusName, startDateTime, endDateTime);
+        return payoutRepository.searchByStatusAndCreatedAtRange(statusName, startDateTime, endExclusive);
     }
 
     public Payout createPayout(Payout payout) {
