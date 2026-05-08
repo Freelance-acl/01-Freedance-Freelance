@@ -1,5 +1,6 @@
 package com.team01.freelance.wallet.controller;
 
+import com.team01.freelance.wallet.dto.RefundRequest;
 import com.team01.freelance.wallet.model.Payout;
 import com.team01.freelance.wallet.service.PayoutService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -67,5 +68,20 @@ public class PayoutController {
     public ResponseEntity<Void> deleteAllPayouts() {
         payoutService.deleteAllPayouts();
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * [S5-F2] Process a refund on a COMPLETED payout.
+     *
+     * @param id the payout ID
+     * @param request the refund request body containing the reason
+     * @return 200 with the updated payout, 404 if not found, 400 if not COMPLETED
+     */
+    @PutMapping("/{id}/refund")
+    public ResponseEntity<Payout> refundPayout(
+            @PathVariable Long id,
+            @RequestBody RefundRequest request) {
+        return ResponseEntity.ok(
+                payoutService.refundPayout(id, request.getReason()));
     }
 }
