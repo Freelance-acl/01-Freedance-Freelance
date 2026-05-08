@@ -2,13 +2,18 @@ package com.team01.freelance.wallet.service;
 
 import com.team01.freelance.contract.repository.ContractRepository;
 import com.team01.freelance.user.repository.UserRepository;
+import com.team01.freelance.wallet.dto.FreelancerPayoutSummaryDTO;
 import com.team01.freelance.wallet.model.Payout;
 import com.team01.freelance.wallet.repository.PayoutRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -77,5 +82,44 @@ public class PayoutService {
 
     public void deleteAllPayouts() {
         payoutRepository.deleteAll();
+    }
+
+    /**
+     * [S5-F3] Build a freelancer payout summary DTO aggregating COMPLETED
+     * payouts grouped by method.
+     *
+     * @param freelancerId the freelancer (user) ID
+     * @return summary with totalPayouts, totalAmount and per-method breakdown
+     * @throws ResponseStatusException 404 if the user does not exist
+     */
+    public FreelancerPayoutSummaryDTO getFreelancerPayoutSummary(Long freelancerId) {
+        if (!userRepository.existsById(freelancerId)) {
+            throw new ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "User not found with id: " + freelancerId);
+        }
+
+        List<Object[]> rows = payoutRepository.aggregateCompletedByMethodForFreelancer(freelancerId);
+
+        Map<String, Double> methodBreakdown = new LinkedHashMap<>();
+        long totalPayouts = 0L;
+        double totalAmount = 0.0;
+
+        for (Object[] row : rows) {
+            String method = (String) row[0];
+            long count = ((Number) row[1]).longValue();
+            double amount = ((Number) row[2]).doubleValue();
+
+            methodBreakdown.put(method, amount);
+            totalPayouts += count;
+            totalAmount += amount;
+        }
+
+        return new FreelancerPayoutSummaryDTO(
+                freelancerId,
+                totalPayouts,
+                totalAmount,
+                methodBreakdown
+        );
     }
 }

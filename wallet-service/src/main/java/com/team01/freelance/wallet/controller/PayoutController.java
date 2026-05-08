@@ -1,5 +1,6 @@
 package com.team01.freelance.wallet.controller;
 
+import com.team01.freelance.wallet.dto.FreelancerPayoutSummaryDTO;
 import com.team01.freelance.wallet.model.Payout;
 import com.team01.freelance.wallet.service.PayoutService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -67,5 +68,18 @@ public class PayoutController {
     public ResponseEntity<Void> deleteAllPayouts() {
         payoutService.deleteAllPayouts();
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * [S5-F3] Get a freelancer's payout summary aggregated by method.
+     *
+     * @param freelancerId the freelancer (user) ID
+     * @return 200 with the summary DTO, 404 if the user does not exist
+     */
+    @GetMapping("/freelancer/{freelancerId}/summary")
+    public ResponseEntity<FreelancerPayoutSummaryDTO> getFreelancerPayoutSummary(
+            @PathVariable Long freelancerId) {
+        return ResponseEntity.ok(
+                payoutService.getFreelancerPayoutSummary(freelancerId));
     }
 }

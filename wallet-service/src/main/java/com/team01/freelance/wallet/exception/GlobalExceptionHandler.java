@@ -2,10 +2,12 @@ package com.team01.freelance.wallet.exception;
 
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.server.ResponseStatusException;
 import jakarta.servlet.http.HttpServletRequest;
 
 import java.time.LocalDateTime;
@@ -60,6 +62,23 @@ public class GlobalExceptionHandler {
         body.put("path", request.getRequestURI());
 
         return new ResponseEntity<>(body, HttpStatus.CONFLICT);
+    }
+
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<Object> handleResponseStatusException(
+            ResponseStatusException ex, HttpServletRequest request) {
+
+        HttpStatusCode statusCode = ex.getStatusCode();
+        String errorPhrase = HttpStatus.valueOf(statusCode.value()).getReasonPhrase();
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("timestamp", LocalDateTime.now().toString());
+        body.put("status", statusCode.value());
+        body.put("error", errorPhrase);
+        body.put("message", ex.getReason() != null ? ex.getReason() : ex.getMessage());
+        body.put("path", request.getRequestURI());
+
+        return new ResponseEntity<>(body, statusCode);
     }
 
     @ExceptionHandler(Exception.class)
