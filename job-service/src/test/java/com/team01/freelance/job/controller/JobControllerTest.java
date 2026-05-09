@@ -1,10 +1,13 @@
 package com.team01.freelance.job.controller;
 
 import com.team01.freelance.job.exception.ForbiddenOperationException;
+import com.team01.freelance.job.model.JobAttachmentAlertDTO;
 import com.team01.freelance.job.model.JobAttachment;
 import com.team01.freelance.job.model.JobAttachmentVerificationRequest;
 import com.team01.freelance.job.model.JobRatingRequest;
+import com.team01.freelance.job.model.JobAttachmentType;
 import com.team01.freelance.job.model.Job;
+import com.team01.freelance.job.model.JobStatus;
 import com.team01.freelance.job.service.JobService;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
@@ -190,5 +193,57 @@ class JobControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"verifiedBy\":3}"))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void getExpiredAttachmentsReturnsOk() throws Exception {
+        JobAttachmentAlertDTO jobA = buildAlertDto(1L, "Job A", JobStatus.OPEN, 1);
+        JobAttachmentAlertDTO jobC = buildAlertDto(3L, "Job C", JobStatus.CLOSED, 2);
+        when(jobService.getJobsWithExpiredAttachments()).thenReturn(List.of(jobA, jobC));
+
+        mockMvc.perform(get("/api/jobs/attachments/expired"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].jobId").value(1))
+                .andExpect(jsonPath("$[0].jobTitle").value("Job A"))
+                .andExpect(jsonPath("$[0].jobStatus").value("OPEN"))
+                .andExpect(jsonPath("$[0].expiredCount").value(1))
+                .andExpect(jsonPath("$[0].expiredAttachments.length()").value(1))
+                .andExpect(jsonPath("$[1].jobId").value(3))
+                .andExpect(jsonPath("$[1].jobTitle").value("Job C"))
+                .andExpect(jsonPath("$[1].jobStatus").value("CLOSED"))
+                .andExpect(jsonPath("$[1].expiredCount").value(2))
+                .andExpect(jsonPath("$[1].expiredAttachments.length()").value(2));
+    }
+
+    @Test
+    void getExpiredAttachmentsReturnsEmptyList() throws Exception {
+        when(jobService.getJobsWithExpiredAttachments()).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/jobs/attachments/expired"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    private JobAttachmentAlertDTO buildAlertDto(Long jobId, String jobTitle, JobStatus jobStatus, int expiredCount) {
+        JobAttachmentAlertDTO dto = new JobAttachmentAlertDTO();
+        dto.setJobId(jobId);
+        dto.setJobTitle(jobTitle);
+        dto.setJobStatus(jobStatus);
+
+        List<JobAttachment> expiredAttachments = new ArrayList<>();
+        for (int i = 0; i < expiredCount; i++) {
+            JobAttachment attachment = new JobAttachment();
+            attachment.setId(jobId * 100 + i);
+            attachment.setType(JobAttachmentType.BRIEF);
+            attachment.setFileUrl("https://example.com/attachments/" + attachment.getId());
+            attachment.setExpiryDate(LocalDate.now().minusDays(i + 1L));
+            attachment.setVerified(false);
+            expiredAttachments.add(attachment);
+        }
+
+        dto.setExpiredAttachments(expiredAttachments);
+        dto.setExpiredCount(expiredCount);
+        return dto;
     }
 }
