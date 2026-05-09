@@ -1,7 +1,9 @@
 package com.team01.freelance.job.controller;
 
+import com.team01.freelance.job.model.JobRatingRequest;
 import com.team01.freelance.job.model.Job;
 import com.team01.freelance.job.service.JobService;
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -67,5 +69,23 @@ public class JobController {
     public ResponseEntity<Void> deleteAllJobs() {
         jobService.deleteAllJobs();
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Rates a job using a completed contract that references the job.
+     *
+     * @param id the job ID
+     * @param ratingRequest the rating payload
+     * @return 200 with updated job, 400 for invalid contract or rating, or 404 if job or contract is not found
+     */
+    @PostMapping("/{id}/rate")
+    public ResponseEntity<Job> rateJob(@PathVariable Long id, @RequestBody JobRatingRequest ratingRequest) {
+        try {
+            return ResponseEntity.ok(jobService.rateJob(id, ratingRequest));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        }
     }
 }

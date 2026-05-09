@@ -1,6 +1,9 @@
 package com.team01.freelance.job.service;
 
+import com.team01.freelance.job.client.ContractLookupClient;
+import com.team01.freelance.job.client.ContractSummary;
 import com.team01.freelance.job.model.Job;
+import com.team01.freelance.job.model.JobRatingRequest;
 import com.team01.freelance.job.repository.JobRepository;
 import com.team01.freelance.user.model.User;
 import com.team01.freelance.user.repository.UserRepository;
@@ -23,6 +26,9 @@ class JobServiceTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private ContractLookupClient contractLookupClient;
 
     @InjectMocks
     private JobService jobService;
@@ -107,5 +113,126 @@ class JobServiceTest {
 
         assertNotNull(result);
         verify(jobRepository).save(job);
+    }
+
+    @Test
+    void rateJobRecalculatesRunningAverage() {
+        Long jobId = 1L;
+        Job existingJob = new Job();
+        existingJob.setId(jobId);
+        existingJob.setRating(0.0);
+        existingJob.setTotalRatings(0);
+
+        JobRatingRequest firstRequest = new JobRatingRequest();
+        firstRequest.setContractId(1L);
+        firstRequest.setRating(5.0);
+
+        JobRatingRequest secondRequest = new JobRatingRequest();
+        secondRequest.setContractId(2L);
+        secondRequest.setRating(3.0);
+
+        ContractSummary firstContract = new ContractSummary();
+        firstContract.setJobId(jobId);
+        firstContract.setStatus("COMPLETED");
+
+        ContractSummary secondContract = new ContractSummary();
+        secondContract.setJobId(jobId);
+        secondContract.setStatus("COMPLETED");
+
+        when(jobRepository.findById(jobId)).thenReturn(Optional.of(existingJob));
+        when(jobRepository.save(any(Job.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(contractLookupClient.getContractById(1L)).thenReturn(firstContract);
+        when(contractLookupClient.getContractById(2L)).thenReturn(secondContract);
+
+        Job firstResult = jobService.rateJob(jobId, firstRequest);
+
+        assertNotNull(firstResult);
+        assertEquals(5.0, firstResult.getRating(), 0.0001);
+        assertEquals(1, firstResult.getTotalRatings());
+
+        Job secondResult = jobService.rateJob(jobId, secondRequest);
+
+        assertNotNull(secondResult);
+        assertEquals(4.0, secondResult.getRating(), 0.0001);
+        assertEquals(2, secondResult.getTotalRatings());
+        verify(contractLookupClient).getContractById(1L);
+        verify(contractLookupClient).getContractById(2L);
+        verify(jobRepository, times(2)).save(existingJob);
+    }
+
+    @Test
+    void rateJobRejectsOutOfRangeRating() {
+        Long jobId = 1L;
+        Job existingJob = new Job();
+        existingJob.setId(jobId);
+
+        JobRatingRequest request = new JobRatingRequest();
+        request.setContractId(1L);
+        request.setRating(6.0);
+
+        when(jobRepository.findById(jobId)).thenReturn(Optional.of(existingJob));
+
+        assertThrows(IllegalArgumentException.class, () -> jobService.rateJob(jobId, request));
+        verify(contractLookupClient, never()).getContractById(anyLong());
+        verify(jobRepository, never()).save(any(Job.class));
+    }
+
+    @Test
+    void rateJobRejectsNonCompletedContract() {
+        Long jobId = 1L;
+        Job existingJob = new Job();
+        existingJob.setId(jobId);
+
+        JobRatingRequest request = new JobRatingRequest();
+        request.setContractId(1L);
+        request.setRating(5.0);
+
+        ContractSummary contract = new ContractSummary();
+        contract.setJobId(jobId);
+        contract.setStatus("ACTIVE");
+
+        when(jobRepository.findById(jobId)).thenReturn(Optional.of(existingJob));
+        when(contractLookupClient.getContractById(1L)).thenReturn(contract);
+
+        assertThrows(IllegalArgumentException.class, () -> jobService.rateJob(jobId, request));
+        verify(jobRepository, never()).save(any(Job.class));
+    }
+
+    @Test
+    void rateJobRejectsContractForAnotherJob() {
+        Long jobId = 1L;
+        Job existingJob = new Job();
+        existingJob.setId(jobId);
+
+        JobRatingRequest request = new JobRatingRequest();
+        request.setContractId(1L);
+        request.setRating(5.0);
+
+        ContractSummary contract = new ContractSummary();
+        contract.setJobId(2L);
+        contract.setStatus("COMPLETED");
+
+        when(jobRepository.findById(jobId)).thenReturn(Optional.of(existingJob));
+        when(contractLookupClient.getContractById(1L)).thenReturn(contract);
+
+        assertThrows(IllegalArgumentException.class, () -> jobService.rateJob(jobId, request));
+        verify(jobRepository, never()).save(any(Job.class));
+    }
+
+    @Test
+    void rateJobThrowsWhenContractIsMissing() {
+        Long jobId = 1L;
+        Job existingJob = new Job();
+        existingJob.setId(jobId);
+
+        JobRatingRequest request = new JobRatingRequest();
+        request.setContractId(1L);
+        request.setRating(5.0);
+
+        when(jobRepository.findById(jobId)).thenReturn(Optional.of(existingJob));
+        when(contractLookupClient.getContractById(1L)).thenThrow(new EntityNotFoundException("Contract not found with id: 1"));
+
+        assertThrows(EntityNotFoundException.class, () -> jobService.rateJob(jobId, request));
+        verify(jobRepository, never()).save(any(Job.class));
     }
 }

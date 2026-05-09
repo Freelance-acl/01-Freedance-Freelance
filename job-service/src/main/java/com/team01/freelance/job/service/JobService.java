@@ -1,11 +1,15 @@
 package com.team01.freelance.job.service;
 
+import com.team01.freelance.job.client.ContractLookupClient;
+import com.team01.freelance.job.client.ContractSummary;
 import com.team01.freelance.job.model.Job;
+import com.team01.freelance.job.model.JobRatingRequest;
 import com.team01.freelance.job.repository.JobRepository;
 import com.team01.freelance.user.repository.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -18,6 +22,9 @@ public class JobService {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private ContractLookupClient contractLookupClient;
 
     public List<Job> getAllJobs() {
         return jobRepository.findAll();
@@ -82,5 +89,38 @@ public class JobService {
 
     public void deleteAllJobs() {
         jobRepository.deleteAll();
+    }
+
+    @Transactional
+    public Job rateJob(Long jobId, JobRatingRequest ratingRequest) {
+        Job job = jobRepository.findById(jobId)
+                .orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + jobId));
+
+        if (ratingRequest == null || ratingRequest.getContractId() == null || ratingRequest.getRating() == null) {
+            throw new IllegalArgumentException("Contract ID and rating are required to rate a Job");
+        }
+
+        if (ratingRequest.getRating() < 1 || ratingRequest.getRating() > 5) {
+            throw new IllegalArgumentException("Rating must be between 1 and 5");
+        }
+
+        ContractSummary contract = contractLookupClient.getContractById(ratingRequest.getContractId());
+
+        if (contract.getJobId() == null || !jobId.equals(contract.getJobId())) {
+            throw new IllegalArgumentException("Contract must reference the job being rated");
+        }
+
+        if (contract.getStatus() == null || !"COMPLETED".equalsIgnoreCase(contract.getStatus())) {
+            throw new IllegalArgumentException("Contract must be completed before rating a Job");
+        }
+
+        double currentRating = job.getRating() == null ? 0.0 : job.getRating();
+        int currentTotalRatings = job.getTotalRatings() == null ? 0 : job.getTotalRatings();
+
+        double newRating = ((currentRating * currentTotalRatings) + ratingRequest.getRating()) / (currentTotalRatings + 1);
+        job.setRating(newRating);
+        job.setTotalRatings(currentTotalRatings + 1);
+
+        return jobRepository.save(job);
     }
 }
