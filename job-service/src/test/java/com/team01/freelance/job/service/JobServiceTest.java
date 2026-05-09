@@ -2,10 +2,15 @@ package com.team01.freelance.job.service;
 
 import com.team01.freelance.job.client.ContractLookupClient;
 import com.team01.freelance.job.client.ContractSummary;
+import com.team01.freelance.job.exception.ForbiddenOperationException;
+import com.team01.freelance.job.model.JobAttachment;
+import com.team01.freelance.job.model.JobAttachmentVerificationRequest;
 import com.team01.freelance.job.model.Job;
 import com.team01.freelance.job.model.JobRatingRequest;
+import com.team01.freelance.job.repository.JobAttachmentRepository;
 import com.team01.freelance.job.repository.JobRepository;
 import com.team01.freelance.user.model.User;
+import com.team01.freelance.user.model.UserRole;
 import com.team01.freelance.user.repository.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
@@ -14,6 +19,11 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -29,6 +39,9 @@ class JobServiceTest {
 
     @Mock
     private ContractLookupClient contractLookupClient;
+
+    @Mock
+    private JobAttachmentRepository jobAttachmentRepository;
 
     @InjectMocks
     private JobService jobService;
@@ -234,5 +247,151 @@ class JobServiceTest {
 
         assertThrows(EntityNotFoundException.class, () -> jobService.rateJob(jobId, request));
         verify(jobRepository, never()).save(any(Job.class));
+    }
+
+    @Test
+    void verifyJobAttachmentUpdatesMetadataAndReturnsJobWithAttachments() {
+        Long jobId = 1L;
+        Long attachmentId = 10L;
+        Long verifierId = 3L;
+
+        Job job = new Job();
+        job.setId(jobId);
+
+        JobAttachment attachment = new JobAttachment();
+        attachment.setId(attachmentId);
+        attachment.setExpiryDate(LocalDate.now().plusDays(1));
+        attachment.setVerified(false);
+        attachment.setMetadata(new LinkedHashMap<>(Map.of("existing", "value")));
+        attachment.setJob(job);
+
+        List<JobAttachment> attachments = new ArrayList<>();
+        attachments.add(attachment);
+        job.setJobAttachments(attachments);
+
+        User verifier = new User();
+        verifier.setRole(UserRole.ADMIN);
+
+        JobAttachmentVerificationRequest request = new JobAttachmentVerificationRequest();
+        request.setVerifiedBy(verifierId);
+
+        when(jobRepository.findById(jobId)).thenReturn(Optional.of(job));
+        when(jobAttachmentRepository.findById(attachmentId)).thenReturn(Optional.of(attachment));
+        when(userRepository.findById(verifierId)).thenReturn(Optional.of(verifier));
+        when(jobAttachmentRepository.save(any(JobAttachment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Job result = jobService.verifyJobAttachment(jobId, attachmentId, request);
+
+        assertNotNull(result);
+        assertEquals(1, result.getJobAttachments().size());
+        assertTrue(result.getJobAttachments().get(0).getVerified());
+        assertEquals(verifierId, result.getJobAttachments().get(0).getMetadata().get("verifiedBy"));
+        assertTrue(result.getJobAttachments().get(0).getMetadata().containsKey("verifiedAt"));
+        verify(jobAttachmentRepository).save(attachment);
+    }
+
+    @Test
+    void verifyJobAttachmentRejectsExpiredAttachment() {
+        Long jobId = 1L;
+        Long attachmentId = 10L;
+
+        Job job = new Job();
+        job.setId(jobId);
+
+        JobAttachment attachment = new JobAttachment();
+        attachment.setId(attachmentId);
+        attachment.setExpiryDate(LocalDate.now().minusDays(1));
+        attachment.setJob(job);
+
+        JobAttachmentVerificationRequest request = new JobAttachmentVerificationRequest();
+        request.setVerifiedBy(3L);
+
+        when(jobRepository.findById(jobId)).thenReturn(Optional.of(job));
+        when(jobAttachmentRepository.findById(attachmentId)).thenReturn(Optional.of(attachment));
+
+        assertThrows(IllegalArgumentException.class, () -> jobService.verifyJobAttachment(jobId, attachmentId, request));
+        verify(jobAttachmentRepository, never()).save(any(JobAttachment.class));
+        verify(userRepository, never()).findById(anyLong());
+    }
+
+    @Test
+    void verifyJobAttachmentRejectsDifferentJob() {
+        Long jobId = 1L;
+        Long attachmentId = 10L;
+
+        Job job = new Job();
+        job.setId(jobId);
+
+        Job otherJob = new Job();
+        otherJob.setId(2L);
+
+        JobAttachment attachment = new JobAttachment();
+        attachment.setId(attachmentId);
+        attachment.setExpiryDate(LocalDate.now().plusDays(1));
+        attachment.setJob(otherJob);
+
+        JobAttachmentVerificationRequest request = new JobAttachmentVerificationRequest();
+        request.setVerifiedBy(3L);
+
+        when(jobRepository.findById(jobId)).thenReturn(Optional.of(job));
+        when(jobAttachmentRepository.findById(attachmentId)).thenReturn(Optional.of(attachment));
+
+        assertThrows(IllegalArgumentException.class, () -> jobService.verifyJobAttachment(jobId, attachmentId, request));
+        verify(jobAttachmentRepository, never()).save(any(JobAttachment.class));
+        verify(userRepository, never()).findById(anyLong());
+    }
+
+    @Test
+    void verifyJobAttachmentRejectsNonAdminVerifier() {
+        Long jobId = 1L;
+        Long attachmentId = 10L;
+
+        Job job = new Job();
+        job.setId(jobId);
+
+        JobAttachment attachment = new JobAttachment();
+        attachment.setId(attachmentId);
+        attachment.setExpiryDate(LocalDate.now().plusDays(1));
+        attachment.setJob(job);
+
+        User verifier = new User();
+        verifier.setRole(UserRole.CLIENT);
+
+        JobAttachmentVerificationRequest request = new JobAttachmentVerificationRequest();
+        request.setVerifiedBy(3L);
+
+        when(jobRepository.findById(jobId)).thenReturn(Optional.of(job));
+        when(jobAttachmentRepository.findById(attachmentId)).thenReturn(Optional.of(attachment));
+        when(userRepository.findById(3L)).thenReturn(Optional.of(verifier));
+
+        assertThrows(ForbiddenOperationException.class, () -> jobService.verifyJobAttachment(jobId, attachmentId, request));
+        verify(jobAttachmentRepository, never()).save(any(JobAttachment.class));
+    }
+
+    @Test
+    void verifyJobAttachmentThrowsWhenJobMissing() {
+        JobAttachmentVerificationRequest request = new JobAttachmentVerificationRequest();
+        request.setVerifiedBy(3L);
+
+        when(jobRepository.findById(1L)).thenReturn(Optional.empty());
+
+        assertThrows(EntityNotFoundException.class, () -> jobService.verifyJobAttachment(1L, 10L, request));
+        verify(jobAttachmentRepository, never()).findById(anyLong());
+    }
+
+    @Test
+    void verifyJobAttachmentThrowsWhenAttachmentMissing() {
+        Job job = new Job();
+        job.setId(1L);
+
+        JobAttachmentVerificationRequest request = new JobAttachmentVerificationRequest();
+        request.setVerifiedBy(3L);
+
+        when(jobRepository.findById(1L)).thenReturn(Optional.of(job));
+        when(jobAttachmentRepository.findById(10L)).thenReturn(Optional.empty());
+
+        assertThrows(EntityNotFoundException.class, () -> jobService.verifyJobAttachment(1L, 10L, request));
+        verify(userRepository, never()).findById(anyLong());
+        verify(jobAttachmentRepository, never()).save(any(JobAttachment.class));
     }
 }

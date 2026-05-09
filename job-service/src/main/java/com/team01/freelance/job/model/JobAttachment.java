@@ -1,6 +1,7 @@
 package com.team01.freelance.job.model;
 
 import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -38,6 +39,7 @@ public class JobAttachment {
     @JsonAlias({"uploadedAt", "uploaded_at"})
     private LocalDateTime uploadedAt;
 
+    @JsonBackReference
     @ManyToOne
     @JoinColumn(name = "job_id", nullable = false)
     private Job job;

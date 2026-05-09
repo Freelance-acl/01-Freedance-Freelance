@@ -2,17 +2,27 @@ package com.team01.freelance.job.service;
 
 import com.team01.freelance.job.client.ContractLookupClient;
 import com.team01.freelance.job.client.ContractSummary;
+import com.team01.freelance.job.exception.ForbiddenOperationException;
+import com.team01.freelance.job.model.JobAttachment;
+import com.team01.freelance.job.model.JobAttachmentVerificationRequest;
 import com.team01.freelance.job.model.Job;
 import com.team01.freelance.job.model.JobRatingRequest;
+import com.team01.freelance.job.repository.JobAttachmentRepository;
 import com.team01.freelance.job.repository.JobRepository;
+import com.team01.freelance.user.model.User;
+import com.team01.freelance.user.model.UserRole;
 import com.team01.freelance.user.repository.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Optional;
+import java.util.Map;
 
 @Service
 public class JobService {
@@ -25,6 +35,9 @@ public class JobService {
 
     @Autowired
     private ContractLookupClient contractLookupClient;
+
+    @Autowired
+    private JobAttachmentRepository jobAttachmentRepository;
 
     public List<Job> getAllJobs() {
         return jobRepository.findAll();
@@ -122,5 +135,54 @@ public class JobService {
         job.setTotalRatings(currentTotalRatings + 1);
 
         return jobRepository.save(job);
+    }
+
+    @Transactional
+    public Job verifyJobAttachment(Long jobId, Long attachmentId, JobAttachmentVerificationRequest request) {
+        if (request == null || request.getVerifiedBy() == null) {
+            throw new IllegalArgumentException("verifiedBy is required to verify a JobAttachment");
+        }
+
+        Job job = jobRepository.findById(jobId)
+                .orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + jobId));
+
+        JobAttachment attachment = jobAttachmentRepository.findById(attachmentId)
+                .orElseThrow(() -> new EntityNotFoundException("Job Attachment not found with id: " + attachmentId));
+
+        if (attachment.getJob() == null || !jobId.equals(attachment.getJob().getId())) {
+            throw new IllegalArgumentException("Job attachment does not belong to the specified job");
+        }
+
+        LocalDate expiryDate = attachment.getExpiryDate();
+        if (expiryDate == null || !expiryDate.isAfter(LocalDate.now())) {
+            throw new IllegalArgumentException("Job attachment has expired");
+        }
+
+        User verifier = userRepository.findById(request.getVerifiedBy())
+                .orElseThrow(() -> new ForbiddenOperationException("VerifiedBy user must be an admin user"));
+
+        if (verifier.getRole() != UserRole.ADMIN) {
+            throw new ForbiddenOperationException("VerifiedBy user must be an admin user");
+        }
+
+        attachment.setVerified(true);
+
+        Map<String, Object> metadata = attachment.getMetadata() == null
+                ? new LinkedHashMap<>()
+                : new LinkedHashMap<>(attachment.getMetadata());
+        metadata.put("verifiedAt", LocalDateTime.now().toString());
+        metadata.put("verifiedBy", request.getVerifiedBy());
+        attachment.setMetadata(metadata);
+
+        jobAttachmentRepository.save(attachment);
+
+        Job refreshedJob = jobRepository.findById(jobId)
+                .orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + jobId));
+
+        if (refreshedJob.getJobAttachments() != null) {
+            refreshedJob.getJobAttachments().size();
+        }
+
+        return refreshedJob;
     }
 }
