@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -25,6 +26,14 @@ public class JobController {
     @GetMapping
     public ResponseEntity<List<Job>> getAllJobs() {
         return ResponseEntity.ok(jobService.getAllJobs());
+    }
+
+    @GetMapping("/search")
+    public ResponseEntity<List<Job>> searchJobs(
+            @RequestParam(required = false) String status,
+            @RequestParam Double minBudget,
+            @RequestParam Double maxBudget) {
+        return ResponseEntity.ok(jobService.searchJobsByStatusAndBudgetRange(status, minBudget, maxBudget));
     }
 
     @GetMapping("/{id}")

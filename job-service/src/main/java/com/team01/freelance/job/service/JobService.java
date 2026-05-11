@@ -27,6 +27,19 @@ public class JobService {
         return jobRepository.findById(id);
     }
 
+    public List<Job> searchJobsByStatusAndBudgetRange(String status, Double minBudget, Double maxBudget) {
+        if (minBudget == null || maxBudget == null) {
+            throw new IllegalArgumentException("minBudget and maxBudget are required");
+        }
+
+        if (minBudget > maxBudget) {
+            throw new IllegalArgumentException("minBudget cannot be greater than maxBudget");
+        }
+
+        String normalizedStatus = (status == null || status.trim().isEmpty()) ? null : status.trim();
+        return jobRepository.searchJobsByStatusAndBudgetRange(normalizedStatus, minBudget, maxBudget);
+    }
+
     public Job createJob(Job job) {
         if (job.getClientId() == null) {
             throw new IllegalArgumentException("Client ID is required to create a Job");
