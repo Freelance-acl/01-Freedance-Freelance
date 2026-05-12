@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
-set -e
+set -euo pipefail
+
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT"
 
-# Milestone 1 / team: use repo-managed hooks (each clone runs setup once)
+# Use repo-managed hooks (each clone runs setup once)
 git config core.hooksPath .githooks
 
-# INSTALL PACKAGES
-./mvnw.cmd clean install
+echo "[setup] Clean install..."
+./mvnw clean install
 
-# TO BUILD PROJECT -> creates .jar file
-./mvnw.cmd package -DskipTests
+echo "[setup] Packaging services (skip tests)..."
+./mvnw package -DskipTests
+
+echo "[setup] Done."
