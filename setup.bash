@@ -8,4 +8,3 @@ echo "[setup] Packaging services (skip tests)..."
 ./mvnw package -DskipTests
 
 echo "[setup] Done."
-
