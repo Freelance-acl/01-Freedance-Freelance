@@ -1,4 +1,4 @@
-package com.team01.freelance.contract.controllers;
+package com.team01.freelance.contract.controller;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
