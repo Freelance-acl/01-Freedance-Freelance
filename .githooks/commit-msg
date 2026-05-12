@@ -9,6 +9,31 @@ fi
 
 MSG=$(cat "$MSG_FILE")
 FIRST=$(printf '%s\n' "$MSG" | sed -n '1p' | tr -d '\015')
+SERVICES=$(python3 - <<'PY'
+import ast
+from pathlib import Path
+
+script = Path(".githooks/validate_team_json.py")
+tree = ast.parse(script.read_text(encoding="utf-8"))
+allowed = []
+for node in tree.body:
+    if isinstance(node, ast.Assign):
+        for target in node.targets:
+            if isinstance(target, ast.Name) and target.id == "ALLOWED_SERVICES":
+                call = node.value
+                if isinstance(call, ast.Call) and call.args:
+                    arg0 = call.args[0]
+                    if isinstance(arg0, (ast.Set, ast.Tuple, ast.List)):
+                        for elt in arg0.elts:
+                            if isinstance(elt, ast.Constant) and isinstance(elt.value, str):
+                                allowed.append(elt.value)
+                break
+print("|".join(sorted(allowed)))
+PY
+)
+if [ -z "$SERVICES" ]; then
+  SERVICES="user-service|job-service|proposal-service|contract-service|wallet-service"
+fi
 
 case "$FIRST" in
   Merge\ *) exit 0 ;;
@@ -19,14 +44,15 @@ case "$FIRST" in
   init:\ project\ setup\ by\ *) exit 0 ;;
 esac
 
-if echo "$FIRST" | grep -Eq '^(feat|fix)\((user-service|job-service|proposal-service|contract-service|wallet-service)\): .+ \([^)]+\)$'; then
+if echo "$FIRST" | grep -Eq "^(feat|fix)\\(($SERVICES)\\): .+ \\([^)]+\\)$"; then
   exit 0
 fi
 
 echo "commit-msg: message must match milestone format:" >&2
 echo "  feat(<service>): <description> (<studentId>)" >&2
 echo "  fix(<service>): <description> (<studentId>)" >&2
-echo "Services: user-service, job-service, proposal-service, contract-service, wallet-service" >&2
+SERVICES_DISPLAY=$(printf '%s' "$SERVICES" | tr '|' ',' | sed 's/,/, /g')
+echo "Services: $SERVICES_DISPLAY" >&2
 echo "Also allowed: Merge ... / Revert ... / init: project setup by (...)" >&2
 echo "First line was: $FIRST" >&2
 exit 1

@@ -3,6 +3,10 @@ FROM eclipse-temurin:25.0.2_10-jdk-noble
 RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends unzip \
     && rm -rf /var/lib/apt/lists/*
+RUN groupadd --system app && useradd --system --gid app --create-home --home-dir /home/app app
 WORKDIR /workspace
+RUN chown -R app:app /workspace
 ENV JAVA_TOOL_OPTIONS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
+ENV HOME=/home/app
+USER app
 CMD ["sh", "-c", "set -e && sed -i 's/\\r$//' mvnw && chmod +x mvnw && exec ./mvnw spring-boot:run"]

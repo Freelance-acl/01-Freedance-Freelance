@@ -12,7 +12,7 @@ public class HealthController extends BaseApiController {
         return ResponseEntity.ok("OK");
     }
 
-    @GetMapping("/")
+    @GetMapping({"", "/"})
     public ResponseEntity<String> index() {
         return ResponseEntity.ok("Welcome to Freelance Contract Service");
     }

@@ -2,6 +2,20 @@
 # Usage: docker compose -f docker-compose.dev.yml up --build
 # Stop prod compose first if both use host port 5432.
 
+x-maven-cache-volume: &maven-cache-volume maven_repo:/home/app/.m2
+
+x-common-service: &common-service
+  environment:
+    SPRING_PROFILES_ACTIVE: dev
+    SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/freelancedb
+    SPRING_DATASOURCE_USERNAME: postgres
+    SPRING_DATASOURCE_PASSWORD: postgres
+  depends_on:
+    postgres:
+      condition: service_healthy
+  networks:
+    - freelance-dev
+
 services:
   postgres:
     image: postgres:15-alpine
@@ -24,104 +38,59 @@ services:
       retries: 5
 
   user-service:
+    <<: *common-service
     build:
       context: ./user-service
       dockerfile: Dockerfile.dev
     ports:
       - "8081:8080"
-    environment:
-      SPRING_PROFILES_ACTIVE: dev
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/freelancedb
-      SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: postgres
     volumes:
       - ./user-service:/workspace
-      - maven_repo:/root/.m2
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - freelance-dev
+      - *maven-cache-volume
 
   job-service:
+    <<: *common-service
     build:
       context: ./job-service
       dockerfile: Dockerfile.dev
     ports:
       - "8082:8080"
-    environment:
-      SPRING_PROFILES_ACTIVE: dev
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/freelancedb
-      SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: postgres
     volumes:
       - ./job-service:/workspace
-      - maven_repo:/root/.m2
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - freelance-dev
+      - *maven-cache-volume
 
   proposal-service:
+    <<: *common-service
     build:
       context: ./proposal-service
       dockerfile: Dockerfile.dev
     ports:
       - "8083:8080"
-    environment:
-      SPRING_PROFILES_ACTIVE: dev
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/freelancedb
-      SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: postgres
     volumes:
       - ./proposal-service:/workspace
-      - maven_repo:/root/.m2
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - freelance-dev
+      - *maven-cache-volume
 
   contract-service:
+    <<: *common-service
     build:
       context: ./contract-service
       dockerfile: Dockerfile.dev
     ports:
       - "8084:8080"
-    environment:
-      SPRING_PROFILES_ACTIVE: dev
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/freelancedb
-      SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: postgres
     volumes:
       - ./contract-service:/workspace
-      - maven_repo:/root/.m2
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - freelance-dev
+      - *maven-cache-volume
 
   wallet-service:
+    <<: *common-service
     build:
       context: ./wallet-service
       dockerfile: Dockerfile.dev
     ports:
       - "8085:8080"
-    environment:
-      SPRING_PROFILES_ACTIVE: dev
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/freelancedb
-      SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: postgres
     volumes:
       - ./wallet-service:/workspace
-      - maven_repo:/root/.m2
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - freelance-dev
+      - *maven-cache-volume
 
 volumes:
   pgdata_dev:

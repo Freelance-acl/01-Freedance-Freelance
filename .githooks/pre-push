@@ -44,10 +44,10 @@ validate_feat_branch() {
   fi
 
   if [ "$nf" -eq 4 ]; then
-    if printf '%s' "$b" | grep -Eq '^feat/(user|job|proposal|contract|wallet)/S[1-5]-F[1-9]/[^/]+$'; then
+    if printf '%s' "$b" | grep -Eq '^feat/(user|job|proposal|contract|wallet|user-service|job-service|proposal-service|contract-service|wallet-service)/S[1-5]-F[1-9]/[^/]+$'; then
       return 0
     fi
-    echo "pre-push: feat branch with 4 segments must match feat/(user|job|proposal|contract|wallet)/S#-F#/<id>, got: $b" >&2
+    echo "pre-push: feat branch with 4 segments must match feat/<service>/S#-F#/<id> for a known service, got: $b" >&2
     return 1
   fi
 

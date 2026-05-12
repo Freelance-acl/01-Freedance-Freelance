@@ -10,8 +10,11 @@ RUN sed -i 's/\r$//' mvnw && chmod +x mvnw \
 
 FROM eclipse-temurin:25.0.2_10-jre-noble
 WORKDIR /app
+RUN groupadd --system --gid 10001 appgroup && useradd --system --uid 10001 --gid appgroup --create-home appuser
 COPY --from=build /workspace/target/*.jar app.jar
+RUN chown -R appuser:appgroup /app
 EXPOSE 8080
 # Respect cgroup memory limits; faster secure RNG init in containers
 ENV JAVA_TOOL_OPTIONS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
+USER appuser
 CMD ["java", "-jar", "app.jar"]

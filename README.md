@@ -30,9 +30,9 @@ To skip the test gate on a push when needed: `SKIP_TESTS=1 git push` or `NO_VERI
 # Copy environment configuration (do this once)
 cp .env.example .env
 
-# Then run setup (either script enables Git hooks for this clone)
+# Then run setup
 ./setup.bash
-# or: sh ./setup.sh
+# or: sh ./setup.bash
 ```
 This runs:
 - `./mvnw.cmd clean install` - Install packages
@@ -48,7 +48,7 @@ This runs:
 
 `docker-compose.yaml` sets **`SPRING_DATASOURCE_URL`** (and credentials) on each app service so JDBC uses the hostname **`postgres`** on the Compose network. `application.properties` still uses **`localhost`** for running **`./mvnw spring-boot:run`** on your machine.
 
-Each service **Dockerfile** is **multi-stage**: it runs `./mvnw package -DskipTests` in a **JDK** layer, then ships a **JRE-only** runtime (`eclipse-temurin:25.0.2_10-jre-noble` on Ubuntu Noble—smaller than carrying the JDK). `JAVA_TOOL_OPTIONS` enables **container CPU/memory awareness** and a faster RNG init. You do **not** need a local `target/*.jar` before `docker compose build`.
+Each service **Dockerfile** is **multi-stage**: it runs `./mvnw package -DskipTests` in a **JDK** layer, then ships a **JRE-only** runtime from the service Dockerfile base image (smaller than carrying the JDK). `JAVA_TOOL_OPTIONS` enables **container CPU/memory awareness** and a faster RNG init. You do **not** need a local `target/*.jar` before `docker compose build`.
 
 #### 3. Stop the Application
 ```bash

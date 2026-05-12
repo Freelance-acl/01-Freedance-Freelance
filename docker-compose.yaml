@@ -1,5 +1,9 @@
 version: '3.8'
 
+x-db-env: &db-env
+  SPRING_DATASOURCE_URL: ${DB_URL:-jdbc:postgresql://postgres:5432/freelancedb}
+  SPRING_DATASOURCE_USERNAME: ${DB_USER:-postgres}
+  SPRING_DATASOURCE_PASSWORD: ${DB_PASS:-postgres}
 
 services:
   # PostgreSQL Database
@@ -27,13 +31,11 @@ services:
   user-service:
     build: ./user-service
     ports:
-      - "8086:8080"
+      - "8081:8080"
     environment:
       PORT: 8080
       SERVICE_NAME: "user-service"
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/freelancedb
-      SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: postgres
+      <<: *db-env
     depends_on:
       postgres:
         condition: service_healthy
@@ -47,9 +49,7 @@ services:
     environment:
       PORT: 8080
       SERVICE_NAME: "job-service"
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/freelancedb
-      SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: postgres
+      <<: *db-env
     depends_on:
       postgres:
         condition: service_healthy
@@ -65,9 +65,7 @@ services:
     environment:
       PORT: 8080
       SERVICE_NAME: "proposal-service"
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/freelancedb
-      SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: postgres
+      <<: *db-env
     depends_on:
       postgres:
         condition: service_healthy
@@ -85,9 +83,7 @@ services:
     environment:
       PORT: 8080
       SERVICE_NAME: "contract-service"
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/freelancedb
-      SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: postgres
+      <<: *db-env
     depends_on:
       postgres:
         condition: service_healthy
@@ -107,9 +103,7 @@ services:
     environment:
       PORT: 8080
       SERVICE_NAME: "wallet-service"
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/freelancedb
-      SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: postgres
+      <<: *db-env
     depends_on:
       postgres:
         condition: service_healthy

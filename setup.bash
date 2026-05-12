@@ -7,10 +7,19 @@ cd "$ROOT"
 # Use repo-managed hooks (each clone runs setup once)
 git config core.hooksPath .githooks
 
+if [ -x "$ROOT/mvnw" ]; then
+  MVNW="./mvnw"
+elif [ -f "$ROOT/mvnw.cmd" ]; then
+  MVNW="./mvnw.cmd"
+else
+  echo "setup: neither ./mvnw nor ./mvnw.cmd was found." >&2
+  exit 1
+fi
+
 echo "[setup] Clean install..."
-./mvnw clean install
+"$MVNW" clean install
 
 echo "[setup] Packaging services (skip tests)..."
-./mvnw package -DskipTests
+"$MVNW" package -DskipTests
 
 echo "[setup] Done."
