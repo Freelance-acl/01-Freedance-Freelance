@@ -14,8 +14,4 @@ public class HealthController {
         return ResponseEntity.ok("OK");
     }
 
-    @GetMapping({"", "/"})
-    public ResponseEntity<String> index() {
-        return ResponseEntity.ok("Welcome to Freelance Contract Service");
-    }
 }
