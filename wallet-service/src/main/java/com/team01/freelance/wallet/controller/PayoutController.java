@@ -68,4 +68,9 @@ public class PayoutController {
         payoutService.deleteAllPayouts();
         return ResponseEntity.noContent().build();
     }
+
+    @PutMapping("/{id}/retry")
+    public ResponseEntity<Payout> retryPayout(@PathVariable Long id) {
+        return ResponseEntity.ok(payoutService.retryPayout(id));
+    }
 }

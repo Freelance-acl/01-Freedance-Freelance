@@ -3,12 +3,15 @@ package com.team01.freelance.wallet.service;
 import com.team01.freelance.contract.repository.ContractRepository;
 import com.team01.freelance.user.repository.UserRepository;
 import com.team01.freelance.wallet.model.Payout;
+import com.team01.freelance.wallet.model.PayoutStatus;
 import com.team01.freelance.wallet.repository.PayoutRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -77,5 +80,45 @@ public class PayoutService {
 
     public void deleteAllPayouts() {
         payoutRepository.deleteAll();
+    }
+
+    @Transactional
+    public Payout retryPayout(Long id) {
+
+        Payout payout = payoutRepository.findById(id)
+                .orElseThrow(() ->
+                        new EntityNotFoundException("Payout not found with id: " + id));
+
+        if (payout.getStatus() != PayoutStatus.FAILED) {
+            throw new IllegalArgumentException(
+                    "Only FAILED payouts can be retried");
+        }
+
+        Map<String, Object> transactionDetails = payout.getTransactionDetails();
+
+        if (transactionDetails == null) {
+            throw new IllegalArgumentException(
+                    "Transaction details are missing");
+        }
+
+        int retryAttempt = 0;
+
+        Object retryValue = transactionDetails.get("retryAttempt");
+
+        if (retryValue instanceof Number) {
+            retryAttempt = ((Number) retryValue).intValue();
+        }
+
+        // Placeholder auto-complete after retrial
+        // Prerequisite: 9.5.4 [S5-F4] POST /api/payouts/contract/{contractId}
+
+        transactionDetails.put("retryAttempt", retryAttempt + 1);
+        transactionDetails.put("gatewayResponse", "approved");
+
+        payout.setStatus(PayoutStatus.COMPLETED);
+
+        payout.setTransactionDetails(transactionDetails);
+
+        return payoutRepository.save(payout);
     }
 }
