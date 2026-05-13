@@ -1,5 +1,6 @@
 package com.team01.freelance.wallet.controller;
 
+import com.team01.freelance.wallet.dto.PayoutDetailsDTO;
 import com.team01.freelance.wallet.model.Payout;
 import com.team01.freelance.wallet.service.PayoutService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -67,5 +68,15 @@ public class PayoutController {
     public ResponseEntity<Void> deleteAllPayouts() {
         payoutService.deleteAllPayouts();
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/{payoutId:\\d+}/details")
+    public ResponseEntity<PayoutDetailsDTO> getDetails(@PathVariable Long payoutId) {
+        return ResponseEntity.ok(payoutService.getPayoutDetails(payoutId));
+    }
+
+    @GetMapping("/ping-details")
+    public String ping() {
+        return "DETAILS WORKING";
     }
 }

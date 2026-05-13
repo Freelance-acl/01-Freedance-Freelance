@@ -2,12 +2,17 @@ package com.team01.freelance.wallet.service;
 
 import com.team01.freelance.contract.repository.ContractRepository;
 import com.team01.freelance.user.repository.UserRepository;
+import com.team01.freelance.wallet.dto.AppliedPromoCodeDTO;
+import com.team01.freelance.wallet.dto.PayoutDetailsDTO;
 import com.team01.freelance.wallet.model.Payout;
+import com.team01.freelance.wallet.model.PayoutPromo;
 import com.team01.freelance.wallet.repository.PayoutRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -77,5 +82,48 @@ public class PayoutService {
 
     public void deleteAllPayouts() {
         payoutRepository.deleteAll();
+    }
+
+    public PayoutDetailsDTO getPayoutDetails(Long payoutId) {
+
+        Payout payout = payoutRepository.findByIdWithPromos(payoutId)
+                .orElseThrow(() ->
+                        new EntityNotFoundException("Payout not found with id: " + payoutId));
+
+        PayoutDetailsDTO dto = new PayoutDetailsDTO();
+
+        dto.payoutId = payout.getId();
+        dto.contractId = payout.getContractId();
+        dto.freelancerId = payout.getFreelancerId();
+
+        dto.originalAmount = payout.getAmount();
+        dto.method = payout.getMethod();
+        dto.status = payout.getStatus();
+        dto.transactionDetails = payout.getTransactionDetails();
+
+        List<AppliedPromoCodeDTO> promoList = new ArrayList<>();
+        double totalDiscount = 0.0;
+
+        List<PayoutPromo> promos = Optional.ofNullable(payout.getPayoutPromos())
+                .orElse(Collections.emptyList());
+
+        for (PayoutPromo pp : promos) {
+
+            AppliedPromoCodeDTO p = new AppliedPromoCodeDTO();
+
+            p.promoCode = pp.getPromoCode().getCode();
+            p.discountType = pp.getPromoCode().getDiscountType().toString();
+            p.discountApplied = pp.getDiscountApplied();
+            p.appliedAt = pp.getAppliedAt();
+
+            totalDiscount += pp.getDiscountApplied();
+            promoList.add(p);
+        }
+
+        dto.appliedPromoCodes = promoList;
+        dto.totalDiscount = totalDiscount;
+        dto.finalAmount = dto.originalAmount - totalDiscount;
+
+        return dto;
     }
 }
