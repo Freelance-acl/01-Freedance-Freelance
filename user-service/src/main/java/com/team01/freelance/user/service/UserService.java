@@ -5,7 +5,7 @@ import com.team01.freelance.user.repository.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-
+import com.team01.freelance.user.dto.UserContractSummaryDTO;
 import java.util.List;
 import java.util.Optional;
 
@@ -62,5 +62,28 @@ public class UserService {
 
     public void deleteAllUsers() {
         userRepository.deleteAll();
+    }
+    public UserContractSummaryDTO getUserContractSummary(Long id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("User not found with id: " + id));
+
+        Object result = userRepository.getUserContractSummary(id);
+        Object[] row = (Object[]) result;
+
+        Long totalContracts = ((Number) row[0]).longValue();
+        Long completedContracts = ((Number) row[1]).longValue();
+        Long terminatedContracts = ((Number) row[2]).longValue();
+        Double totalEarnings = ((Number) row[3]).doubleValue();
+        Double averageContractValue = ((Number) row[4]).doubleValue();
+
+        return new UserContractSummaryDTO(
+                user.getId(),
+                user.getName(),
+                totalContracts,
+                completedContracts,
+                terminatedContracts,
+                totalEarnings,
+                averageContractValue
+        );
     }
 }
