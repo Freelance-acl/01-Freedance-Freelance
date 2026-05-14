@@ -4,87 +4,125 @@ Microservices backend for a freelance marketplace, using Spring Boot + PostgreSQ
 
 ## Services and Ports
 
-- `user-service` -> `http://localhost:8081`
-- `job-service` -> `http://localhost:8082`
-- `proposal-service` -> `http://localhost:8083`
-- `contract-service` -> `http://localhost:8084`
-- `wallet-service` -> `http://localhost:8085`
-- `postgres` -> `localhost:5432` (`freelancedb`)
+| Service | Internal Port | Docker Port | Base URL |
+|---------|---------------|-------------|----------|
+| user-service | 8080 | 8081 | http://localhost:8081 |
+| job-service | 8080 | 8082 | http://localhost:8082 |
+| proposal-service | 8080 | 8083 | http://localhost:8083 |
+| contract-service | 8080 | 8084 | http://localhost:8084 |
+| wallet-service | 8080 | 8085 | http://localhost:8085 |
+| PostgreSQL | 5432 | 5432 | postgresql://postgres:postgres@localhost:5432/freelancedb |
 
-All services run on internal container port `8080` and are mapped to host ports `8081..8085`.
+---
 
 ## Prerequisites
 
 - Java 25+
-- Docker + Docker Compose
-- Bash shell (`bash`) for running `*.bash` scripts
-  - macOS/Linux: already available
-  - Windows PowerShell: use `bash .\script.bash` (Git Bash/WSL)
+- **Maven uses `JAVA_HOME` for compilation.** If `./mvnw.cmd` fails with **release version 25 not supported**, run **`. .\scripts\use-jdk25.ps1`** once per session on PowerShell (or set `JAVA_HOME` permanently to your JDK 25 install, e.g. `C:\Program Files\Java\jdk-25`).
+- Maven (included as `./mvnw` or `./mvnw.cmd`)
+- Docker & Docker Compose
+- PostgreSQL (runs in Docker container)
+
+---
 
 ## Setup and Run
 
-### 1) First-time setup
+### 1. First-time setup
 
 ```bash
-bash ./setup.bash
+# Copy environment configuration (do this once)
+cp .env.example .env
+
+# Then run setup
+./setup.bash
 ```
 
-### 2) Start all services
+This runs:
+- `git config core.hooksPath .githooks` — enables repo-managed git hooks
+- `./mvnw clean install` — install packages
+- `./mvnw package -DskipTests` — build all modules
+
+### 2. Start all services
 
 ```bash
-bash ./run.bash
+./run.bash
 ```
 
-### 3) Stop all services
+`docker-compose.yaml` sets `SPRING_DATASOURCE_URL` (and credentials) on each service so JDBC uses the hostname `postgres` on the Compose network. `application.properties` uses `localhost` for running `./mvnw spring-boot:run` directly on your machine.
+
+Each service **Dockerfile** is **multi-stage**: builds in a JDK layer, ships a JRE-only runtime (smaller image). You do **not** need a local `target/*.jar` before `docker compose build`.
+
+### 3. Stop all services
 
 ```bash
-bash ./stop.bash
+docker-compose down
 ```
 
-## Script Usage by OS
-
-### macOS / Linux (bash)
+### Dev with hot reload (Docker)
 
 ```bash
-bash ./setup.bash
-bash ./run.bash
-bash ./stop.bash
+docker compose -f docker-compose.dev.yml up --build
 ```
 
-### Windows PowerShell
+Bind-mounts each service's source into the container and runs `spring-boot:run` with DevTools. After editing `.java` files, trigger a compile in your IDE (or `./mvnw compile -pl <service>`) so `target/classes` updates and DevTools restarts.
 
-```powershell
-bash .\setup.bash
-bash .\run.bash
-bash .\stop.bash
+**Do not** run both `docker-compose up` and `docker-compose -f docker-compose.dev.yml up` simultaneously if both publish Postgres on port 5432.
+
+---
+
+## Git Hooks
+
+Hooks live under `.githooks/` and are activated by `setup.bash`. They:
+- Enforce `team.json` membership for the committing user
+- Block committing `target/` output
+- Validate commit messages: `feat(<service>): <description> (<studentId>)` or `fix(...)`
+- Check `feat/*` branch naming conventions
+- Run `mvn test` for all five services before each push
+
+To skip the test gate when needed: `SKIP_TESTS=1 git push` or `NO_VERIFY=1 git push`.
+
+Git for Windows runs hooks with **sh** — keep them executable (`chmod +x .githooks/*` on Unix, or `git update-index --chmod=+x .githooks/*`).
+
+---
+
+## Automated Tests (JUnit 5)
+
+Each service has `spring-boot-starter-test`, H2 (test scope), `src/test/resources/application-test.properties`, and a base class `…/support/AbstractIntegrationTest` (`@SpringBootTest` + `@ActiveProfiles("test")`). Full-context tests run against an in-memory H2 DB — **no Docker required**.
+
+```bash
+# All services
+./mvnw test
+
+# Single service
+./mvnw test -pl job-service
+
+# Specific test class
+./mvnw test -pl user-service -Dtest=UserControllerTest
 ```
 
-If `bash` is not recognized, install Git for Windows (Git Bash) or use WSL.
+---
 
 ## Health Endpoints
 
-- `GET http://localhost:8081/api/users/health`
-- `GET http://localhost:8082/api/jobs/health`
-- `GET http://localhost:8083/api/proposals/health2`
-- `GET http://localhost:8084/api/contracts/health`
-- `GET http://localhost:8085/api/payouts/health`
+| Service | URL |
+|---------|-----|
+| user-service | `GET http://localhost:8081/api/users/health` |
+| job-service | `GET http://localhost:8082/api/jobs/health` |
+| proposal-service | `GET http://localhost:8083/api/proposals/health` |
+| contract-service | `GET http://localhost:8084/api/contracts/health` |
+| wallet-service | `GET http://localhost:8085/api/payouts/health` |
 
-## Public Instructions Endpoint
-
-- `GET http://localhost:8085/api/instructions`
-
-Returns quick-start payloads and notes for the core flow:
-`User -> Job -> Proposal -> Contract -> Payout`
+---
 
 ## Core API Endpoints (CRUD)
 
-Each group supports:
-- `GET /` (list)
-- `GET /{id}` (details)
-- `POST /` (create)
-- `PUT /{id}` (update)
-- `DELETE /{id}` (delete one)
-- `DELETE /all` (delete all)
+Each resource supports:
+- `GET /` — list all
+- `GET /{id}` — get by id
+- `POST /` — create
+- `PUT /{id}` — update
+- `DELETE /{id}` — delete one
+- `DELETE /all` — delete all
 
 ### User Service (`8081`)
 
@@ -111,15 +149,13 @@ Each group supports:
 - `http://localhost:8085/api/promo-codes`
 - `http://localhost:8085/api/payout-promos`
 
+---
+
 ## Recommended Creation Flow (with sample payloads)
 
-Create records in this order to satisfy foreign-key checks:
+Create records in this order to satisfy foreign-key constraints:
 
-1. User
-2. Job
-3. Proposal
-4. Contract
-5. Payout
+1. User → 2. Job → 3. Proposal → 4. Contract → 5. Payout
 
 ### 1) Create User
 
@@ -233,6 +269,8 @@ Create records in this order to satisfy foreign-key checks:
 }
 ```
 
+---
+
 ## Important Field Notes
 
 - Use `freelancerId` (not `freeLancerId`).
@@ -243,9 +281,11 @@ Create records in this order to satisfy foreign-key checks:
   - `conractId` (typo alias)
   - `freelancer_id`
 
+---
+
 ## Helpful Commands
 
-### Rebuild only one service
+### Rebuild a single service
 
 ```bash
 ./mvnw -pl wallet-service -am compile
@@ -257,10 +297,33 @@ Create records in this order to satisfy foreign-key checks:
 ./mvnw clean install
 ```
 
-### Container status/logs
+### Container status / logs
 
 ```bash
 docker-compose ps
 docker-compose logs -f
 ```
 
+---
+
+## Troubleshooting
+
+### JAVA_HOME points to wrong JDK
+Run `. .\scripts\use-jdk25.ps1` on PowerShell, or set `JAVA_HOME` permanently to your JDK 25 install.
+
+### Port already in use
+```bash
+docker-compose down
+```
+
+### Database connection issues
+```bash
+docker ps
+docker logs freelance-db
+```
+
+### Service won't start after code change
+```bash
+./mvnw clean package -DskipTests -pl <service-name>
+docker-compose up -d --build <service-name>
+```

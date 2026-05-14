@@ -2,8 +2,10 @@ package com.team01.freelance.wallet.controller;
 
 import com.team01.freelance.wallet.dto.RefundRequest;
 import com.team01.freelance.wallet.model.Payout;
+import com.team01.freelance.wallet.model.PayoutStatus;
 import com.team01.freelance.wallet.service.PayoutService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -12,8 +14,10 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -69,6 +73,15 @@ public class PayoutController {
         payoutService.deleteAllPayouts();
         return ResponseEntity.noContent().build();
     }
+    
+    @GetMapping("/search")
+    public ResponseEntity<List<Payout>> searchPayouts(
+            @RequestParam(required = false) PayoutStatus status,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate
+    ) {
+        return ResponseEntity.ok(payoutService.searchPayouts(status, startDate, endDate));
+    }
 
     /**
      * [S5-F2] Process a refund on a COMPLETED payout.
@@ -84,4 +97,5 @@ public class PayoutController {
         return ResponseEntity.ok(
                 payoutService.refundPayout(id, request.getReason()));
     }
+
 }
