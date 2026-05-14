@@ -96,6 +96,7 @@ public class PayoutController {
         return ResponseEntity.ok(
                 payoutService.getFreelancerPayoutSummary(freelancerId));
     }
+    /**
      * [S5-F2] Process a refund on a COMPLETED payout.
      *
      * @param id the payout ID

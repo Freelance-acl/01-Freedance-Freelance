@@ -149,6 +149,9 @@ public class PayoutService {
                 totalAmount,
                 methodBreakdown
         );
+    }
+
+    /**
      * [S5-F2] Process a refund on a COMPLETED payout.
      * Transitions status to REFUNDED and merges refundReason / refundedAt
      * into the JSONB transactionDetails (does not overwrite other keys).
