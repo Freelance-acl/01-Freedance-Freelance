@@ -29,7 +29,9 @@ services:
     restart: unless-stopped
 
   user-service:
-    build: ./user-service
+    build:
+      context: .
+      dockerfile: user-service/Dockerfile
     ports:
       - "8081:8080"
     environment:
@@ -43,7 +45,9 @@ services:
       - freelance-network
 
   job-service:
-    build: ./job-service
+    build:
+      context: .
+      dockerfile: job-service/Dockerfile
     ports:
       - "8082:8080"
     environment:
@@ -59,7 +63,9 @@ services:
       - freelance-network
 
   proposal-service:
-    build: ./proposal-service
+    build:
+      context: .
+      dockerfile: proposal-service/Dockerfile
     ports:
       - "8083:8080"
     environment:
@@ -77,7 +83,9 @@ services:
       - freelance-network
 
   contract-service:
-    build: ./contract-service
+    build:
+      context: .
+      dockerfile: contract-service/Dockerfile
     ports:
       - "8084:8080"
     environment:
@@ -97,7 +105,9 @@ services:
       - freelance-network
 
   wallet-service:
-    build: ./wallet-service
+    build:
+      context: .
+      dockerfile: wallet-service/Dockerfile
     ports:
       - "8085:8080"
     environment:
@@ -108,6 +118,8 @@ services:
       postgres:
         condition: service_healthy
       user-service:
+        condition: service_started
+      contract-service:
         condition: service_started
     networks:
       - freelance-network
