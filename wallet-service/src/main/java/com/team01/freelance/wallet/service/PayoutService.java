@@ -5,6 +5,7 @@ import com.team01.freelance.user.repository.UserRepository;
 import com.team01.freelance.wallet.dto.FreelancerPayoutSummaryDTO;
 import com.team01.freelance.wallet.model.Payout;
 import com.team01.freelance.wallet.model.PayoutStatus;
+
 import com.team01.freelance.wallet.repository.PayoutRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,6 +18,13 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import org.springframework.web.server.ResponseStatusException;
+
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -141,5 +149,37 @@ public class PayoutService {
                 totalAmount,
                 methodBreakdown
         );
+     * [S5-F2] Process a refund on a COMPLETED payout.
+     * Transitions status to REFUNDED and merges refundReason / refundedAt
+     * into the JSONB transactionDetails (does not overwrite other keys).
+     *
+     * @param id the payout ID
+     * @param reason the human-readable refund reason
+     * @return the updated payout
+     * @throws ResponseStatusException 404 if not found, 400 if not COMPLETED
+     */
+    @Transactional
+    public Payout refundPayout(Long id, String reason) {
+        Payout payout = payoutRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Payout not found with id: " + id));
+
+        if (payout.getStatus() != PayoutStatus.COMPLETED) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Only COMPLETED payouts can be refunded (current status: "
+                            + payout.getStatus() + ")");
+        }
+
+        payout.setStatus(PayoutStatus.REFUNDED);
+
+        Map<String, Object> details = payout.getTransactionDetails() != null
+                ? new HashMap<>(payout.getTransactionDetails())
+                : new HashMap<>();
+        details.put("refundReason", reason);
+        details.put("refundedAt", LocalDateTime.now().toString());
+        payout.setTransactionDetails(details);
+
+        return payoutRepository.save(payout);
     }
 }
