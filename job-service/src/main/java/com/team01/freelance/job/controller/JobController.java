@@ -1,10 +1,13 @@
 package com.team01.freelance.job.controller;
 
+import com.team01.freelance.job.exception.ForbiddenOperationException;
+import com.team01.freelance.job.model.JobAttachmentVerificationRequest;
 import com.team01.freelance.job.model.JobRatingRequest;
 import com.team01.freelance.job.model.Job;
 import com.team01.freelance.job.service.JobService;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -15,7 +18,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/jobs")
@@ -87,5 +92,47 @@ public class JobController {
         } catch (EntityNotFoundException e) {
             return ResponseEntity.notFound().build();
         }
+    }
+
+    /**
+     * Verifies a job attachment for a specific job.
+     *
+     * @param jobId the job ID
+     * @param attachmentId the attachment ID
+     * @param request the verification payload
+     * @return 200 with updated job, 400 for invalid attachment or expiry, 403 if verifier is not an admin, or 404 if job or attachment is not found
+     */
+    @PutMapping("/{jobId}/attachments/{attachmentId}/verify")
+    public ResponseEntity<Map<String, Object>> verifyJobAttachment(
+            @PathVariable Long jobId,
+            @PathVariable Long attachmentId,
+            @RequestBody JobAttachmentVerificationRequest request) {
+        try {
+            return ResponseEntity.ok(toJobWithAttachmentsResponse(jobService.verifyJobAttachment(jobId, attachmentId, request)));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        } catch (ForbiddenOperationException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    private Map<String, Object> toJobWithAttachmentsResponse(Job job) {
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("id", job.getId());
+        response.put("clientId", job.getClientId());
+        response.put("title", job.getTitle());
+        response.put("description", job.getDescription());
+        response.put("category", job.getCategory());
+        response.put("status", job.getStatus());
+        response.put("budgetMin", job.getBudgetMin());
+        response.put("budgetMax", job.getBudgetMax());
+        response.put("rating", job.getRating());
+        response.put("totalRatings", job.getTotalRatings());
+        response.put("requirements", job.getRequirements());
+        response.put("createdAt", job.getCreatedAt());
+        response.put("jobAttachments", job.getJobAttachments() == null ? List.of() : job.getJobAttachments());
+        return response;
     }
 }
