@@ -1,8 +1,10 @@
 package com.team01.freelance.wallet.controller;
 
+import com.team01.freelance.wallet.dto.ProcessPayoutRequest;
 import com.team01.freelance.wallet.model.Payout;
 import com.team01.freelance.wallet.service.PayoutService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -67,5 +69,13 @@ public class PayoutController {
     public ResponseEntity<Void> deleteAllPayouts() {
         payoutService.deleteAllPayouts();
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/contract/{contractId}")
+    public ResponseEntity<Payout> processContractPayout(
+            @PathVariable Long contractId,
+            @RequestBody ProcessPayoutRequest request) {
+        Payout payout = payoutService.processContractPayout(contractId, request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(payout);
     }
 }

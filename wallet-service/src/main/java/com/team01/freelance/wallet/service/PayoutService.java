@@ -1,27 +1,25 @@
 package com.team01.freelance.wallet.service;
 
-import com.team01.freelance.contract.repository.ContractRepository;
-import com.team01.freelance.user.repository.UserRepository;
+import com.team01.freelance.wallet.dto.ProcessPayoutRequest;
 import com.team01.freelance.wallet.model.Payout;
+import com.team01.freelance.wallet.model.PayoutStatus;
 import com.team01.freelance.wallet.repository.PayoutRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 @Service
 public class PayoutService {
 
     @Autowired
     private PayoutRepository payoutRepository;
-
-    @Autowired
-    private ContractRepository contractRepository;
-
-    @Autowired
-    private UserRepository userRepository;
 
     public List<Payout> getAllPayouts() {
         return payoutRepository.findAll();
@@ -36,11 +34,11 @@ public class PayoutService {
             throw new IllegalArgumentException("Contract and Freelancer IDs are required to create a Payout");
         }
 
-        if (contractRepository.findById(payout.getContractId()).isEmpty()){
+        if (payoutRepository.countContractById(payout.getContractId()) == 0) {
             throw new EntityNotFoundException("Contract not found with id: " + payout.getContractId());
         }
 
-        if (userRepository.findById(payout.getFreelancerId()).isEmpty()){
+        if (payoutRepository.countUserById(payout.getFreelancerId()) == 0) {
             throw new EntityNotFoundException("Freelancer not found with id: " + payout.getFreelancerId());
         }
 
@@ -50,11 +48,6 @@ public class PayoutService {
     /**
      * Updates editable fields on an existing payout.
      * Link fields (contractId, freelancerId) are immutable after creation.
-     *
-     * @param id The ID of the payout to update
-     * @param payoutDetails The object containing updated fields
-     * @return The updated payout
-     * @throws EntityNotFoundException if the payout is not found
      */
     public Payout updatePayout(Long id, Payout payoutDetails) {
         return payoutRepository.findById(id).map(existingPayout -> {
@@ -77,5 +70,37 @@ public class PayoutService {
 
     public void deleteAllPayouts() {
         payoutRepository.deleteAll();
+    }
+
+    public Payout processContractPayout(Long contractId, ProcessPayoutRequest request) {
+        if (payoutRepository.countContractById(contractId) == 0) {
+            throw new EntityNotFoundException("Contract not found with id: " + contractId);
+        }
+
+        String contractStatus = payoutRepository.findContractStatusById(contractId);
+        if (!"COMPLETED".equalsIgnoreCase(contractStatus)) {
+            throw new IllegalStateException("Contract " + contractId + " is not COMPLETED");
+        }
+
+        if (payoutRepository.existsByContractIdAndStatus(contractId, PayoutStatus.COMPLETED)) {
+            throw new IllegalStateException("Payout already paid for contract: " + contractId);
+        }
+
+        Payout payout = payoutRepository.findByContractIdAndStatus(contractId, PayoutStatus.PENDING)
+                .orElseThrow(() -> new EntityNotFoundException("No pending payout found for contract: " + contractId));
+
+        payout.setStatus(PayoutStatus.COMPLETED);
+        payout.setMethod(request.getMethod());
+
+        Map<String, Object> txDetails = new LinkedHashMap<>();
+        txDetails.put("transactionId", UUID.randomUUID().toString());
+        txDetails.put("method", request.getMethod().name());
+        if (request.getAccountLastFour() != null) {
+            txDetails.put("accountLastFour", request.getAccountLastFour());
+        }
+        txDetails.put("processedAt", LocalDateTime.now().toString());
+        payout.setTransactionDetails(txDetails);
+
+        return payoutRepository.save(payout);
     }
 }
