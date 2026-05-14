@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/users")
@@ -44,9 +45,20 @@ public class UserController {
      * Updates a user by ID.
      *
      * @param id the user ID
-     * @param user the update payload
+
      * @return 200 with updated user, or 404 if not found
      */
+    @PutMapping("/{id}/preferences")
+    public ResponseEntity<User> updatePreferences(
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> preferences) {
+        try {
+            return ResponseEntity.ok(userService.updatePreferences(id, preferences));
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
     @PutMapping("/{id}")
     public ResponseEntity<User> updateUser(@PathVariable Long id, @RequestBody User user) {
         try {

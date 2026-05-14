@@ -5,7 +5,9 @@ import com.team01.freelance.user.repository.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-
+import jakarta.transaction.Transactional;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.List;
 import java.util.Optional;
 
@@ -63,4 +65,24 @@ public class UserService {
     public void deleteAllUsers() {
         userRepository.deleteAll();
     }
+
+
+@Transactional
+public User updatePreferences(Long id, Map<String, Object> incomingPreferences) {
+    User user = userRepository.findById(id)
+            .orElseThrow(() -> new EntityNotFoundException("User not found with id: " + id));
+
+    Map<String, Object> currentPreferences = user.getPreferences();
+
+    if (currentPreferences == null) {
+        currentPreferences = new HashMap<>();
+    }
+
+    if (incomingPreferences != null) {
+        currentPreferences.putAll(incomingPreferences);
+    }
+
+    user.setPreferences(currentPreferences);
+    return userRepository.save(user);
+}
 }
