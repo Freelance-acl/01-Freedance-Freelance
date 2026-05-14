@@ -5,6 +5,7 @@ import jakarta.persistence.*;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 
 @Entity
@@ -38,7 +39,10 @@ public class Payout {
     @JsonAlias({"transactionDetails", "transaction_details"})
     @JdbcTypeCode(SqlTypes.JSON)
     private Map<String, Object> transactionDetails;
-    
+
+    @OneToMany(mappedBy = "payout", fetch = FetchType.EAGER)
+    private List<PayoutPromo> payoutPromos;
+
     @Column(name = "created_at", nullable = false)
     @JsonAlias({"createdAt", "created_at"})
     private LocalDateTime createdAt;
@@ -113,5 +117,13 @@ public class Payout {
 
     public void setTransactionDetails(Map<String, Object> transactionDetails) {
         this.transactionDetails = transactionDetails;
+    }
+
+    public List<PayoutPromo> getPayoutPromos() {
+        return payoutPromos;
+    }
+
+    public void setPayoutPromos(List<PayoutPromo> payoutPromos) {
+        this.payoutPromos = payoutPromos;
     }
 }

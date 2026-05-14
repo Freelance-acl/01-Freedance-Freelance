@@ -1,8 +1,10 @@
 package com.team01.freelance.wallet.controller;
 
+import com.team01.freelance.wallet.dto.ProcessPayoutRequest;
 import com.team01.freelance.wallet.model.Payout;
 import com.team01.freelance.wallet.service.PayoutService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -39,13 +41,6 @@ public class PayoutController {
         return ResponseEntity.ok(payoutService.createPayout(payout));
     }
 
-    /**
-     * Updates a payout by ID.
-     *
-     * @param id the payout ID
-     * @param payout the update payload
-     * @return 200 with updated payout, or 404 if not found
-     */
     @PutMapping("/{id}")
     public ResponseEntity<Payout> updatePayout(@PathVariable Long id, @RequestBody Payout payout) {
         try {
@@ -67,5 +62,23 @@ public class PayoutController {
     public ResponseEntity<Void> deleteAllPayouts() {
         payoutService.deleteAllPayouts();
         return ResponseEntity.noContent().build();
+    }
+
+    // S5-F4
+    @PostMapping("/contract/{contractId}")
+    public ResponseEntity<Payout> processContractPayout(
+            @PathVariable Long contractId,
+            @RequestBody ProcessPayoutRequest request) {
+        Payout payout = payoutService.processContractPayout(contractId, request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(payout);
+    }
+
+    // S5-F5
+    @PostMapping("/{payoutId}/promos/{promoCodeId}")
+    public ResponseEntity<Payout> applyPromoCode(
+            @PathVariable Long payoutId,
+            @PathVariable Long promoCodeId) {
+        Payout payout = payoutService.applyPromoCode(payoutId, promoCodeId);
+        return ResponseEntity.status(HttpStatus.CREATED).body(payout);
     }
 }

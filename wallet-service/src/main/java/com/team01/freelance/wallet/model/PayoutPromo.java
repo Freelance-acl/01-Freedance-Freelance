@@ -1,6 +1,7 @@
 package com.team01.freelance.wallet.model;
 
 import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
@@ -19,6 +20,7 @@ public class PayoutPromo {
     @JsonAlias({"appliedAt", "applied_at"})
     private LocalDateTime appliedAt;
 
+    @JsonIgnore
     @ManyToOne
     @JoinColumn(name = "payout_id", nullable = false)
     private Payout payout;
