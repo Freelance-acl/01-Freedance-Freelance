@@ -1,14 +1,16 @@
 package com.team01.freelance.contract.service;
 
+import com.team01.freelance.contract.dto.FreelancerPerformanceDTO;
+import com.team01.freelance.contract.dto.StalledContractDTO;
 import com.team01.freelance.contract.model.Contract;
 import com.team01.freelance.contract.repository.ContractRepository;
-import com.team01.freelance.job.repository.JobRepository;
-import com.team01.freelance.proposal.repository.ProposalRepository;
-import com.team01.freelance.user.repository.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -17,15 +19,6 @@ public class ContractService {
 
     @Autowired
     private ContractRepository contractRepository;
-
-    @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
-    private JobRepository jobRepository;
-
-    @Autowired
-    private ProposalRepository proposalRepository;
 
     public List<Contract> getAllContracts() {
         return contractRepository.findAll();
@@ -41,17 +34,13 @@ public class ContractService {
             throw new IllegalArgumentException("Freelancer, Job, Client, and Proposal IDs are required to create a Contract");
         }
 
-        userRepository.findById(contract.getFreelancerId())
-                .orElseThrow(() -> new EntityNotFoundException("Freelancer not found with id: " + contract.getFreelancerId()));
+        if (contract.getAgreedAmount() == null || contract.getAgreedAmount() <= 0) {
+            throw new IllegalArgumentException("Agreed amount must be greater than 0");
+        }
 
-        jobRepository.findById(contract.getJobId())
-                .orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + contract.getJobId()));
-
-        userRepository.findById(contract.getClientId())
-                .orElseThrow(() -> new EntityNotFoundException("Client not found with id: " + contract.getClientId()));
-
-        proposalRepository.findById(contract.getProposalId())
-                .orElseThrow(() -> new EntityNotFoundException("Proposal not found with id: " + contract.getProposalId()));
+        if (contract.getStartDate() == null) {
+            throw new IllegalArgumentException("Start date is required");
+        }
 
         return contractRepository.save(contract);
     }
@@ -88,5 +77,89 @@ public class ContractService {
 
     public void deleteAllContracts() {
         contractRepository.deleteAll();
+    }
+
+    @Transactional
+    public long purgeOldContractData(int olderThanDays) {
+        if (olderThanDays <= 0) {
+            throw new IllegalArgumentException("olderThanDays must be greater than 0");
+        }
+
+        LocalDateTime cutoff = LocalDateTime.now().minusDays(olderThanDays);
+        long deletedCount = contractRepository.countPurgeCandidates(cutoff);
+        contractRepository.purgeOldContracts(cutoff);
+        return deletedCount;
+    }
+
+    public FreelancerPerformanceDTO getFreelancerPerformanceSummary(
+            Long freelancerId,
+            LocalDate startDate,
+            LocalDate endDate
+    ) {
+        if (startDate == null || endDate == null) {
+            throw new IllegalArgumentException("startDate and endDate are required");
+        }
+        if (endDate.isBefore(startDate)) {
+            throw new IllegalArgumentException("endDate must be on or after startDate");
+        }
+        if (!contractRepository.freelancerExists(freelancerId)) {
+            throw new EntityNotFoundException("Freelancer not found with id: " + freelancerId);
+        }
+
+        LocalDateTime start = startDate.atStartOfDay();
+        LocalDateTime endExclusive = endDate.plusDays(1).atStartOfDay();
+        Object[] raw = contractRepository.getFreelancerPerformance(freelancerId, start, endExclusive);
+
+        long totalContracts = toLong(raw[0]);
+        long completedContracts = toLong(raw[1]);
+        double totalEarnings = toDouble(raw[2]);
+        double averageContractValue = toDouble(raw[3]);
+        double averageDurationDays = toDouble(raw[4]);
+        double completionRate = totalContracts == 0 ? 0.0 : (completedContracts * 100.0) / totalContracts;
+
+        return new FreelancerPerformanceDTO(
+                freelancerId,
+                totalContracts,
+                averageContractValue,
+                completionRate,
+                averageDurationDays,
+                totalEarnings
+        );
+    }
+
+    public List<StalledContractDTO> findStalledContracts(Double maxProgress, Integer stalledDays) {
+        if (maxProgress == null || stalledDays == null) {
+            throw new IllegalArgumentException("maxProgress and stalledDays are required");
+        }
+        if (maxProgress < 0 || maxProgress > 100) {
+            throw new IllegalArgumentException("maxProgress must be between 0 and 100");
+        }
+        if (stalledDays < 0) {
+            throw new IllegalArgumentException("stalledDays must be 0 or greater");
+        }
+
+        List<Object[]> rows = contractRepository.findStalledContracts(maxProgress, stalledDays);
+        return rows.stream().map(row -> new StalledContractDTO(
+                toLong(row[0]),
+                row[1] == null ? null : row[1].toString(),
+                row[2] == null ? null : row[2].toString(),
+                toDouble(row[3]),
+                toDouble(row[4]),
+                toLong(row[5])
+        )).toList();
+    }
+
+    private long toLong(Object value) {
+        if (value == null) {
+            return 0L;
+        }
+        return ((Number) value).longValue();
+    }
+
+    private double toDouble(Object value) {
+        if (value == null) {
+            return 0.0;
+        }
+        return ((Number) value).doubleValue();
     }
 }

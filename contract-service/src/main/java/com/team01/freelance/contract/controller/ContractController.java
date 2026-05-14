@@ -1,19 +1,26 @@
 package com.team01.freelance.contract.controller;
 
 import com.team01.freelance.contract.model.Contract;
+import com.team01.freelance.contract.dto.FreelancerPerformanceDTO;
+import com.team01.freelance.contract.dto.StalledContractDTO;
 import com.team01.freelance.contract.service.ContractService;
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/contracts")
@@ -74,5 +81,42 @@ public class ContractController {
     public ResponseEntity<Void> deleteAllContracts() {
         contractService.deleteAllContracts();
         return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/purge")
+    public ResponseEntity<Map<String, Long>> purgeOldContractData(@RequestParam Integer olderThanDays) {
+        try {
+            long deletedCount = contractService.purgeOldContractData(olderThanDays);
+            return ResponseEntity.ok(Map.of("deletedCount", deletedCount));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @GetMapping("/freelancer/{freelancerId}/summary")
+    public ResponseEntity<FreelancerPerformanceDTO> getFreelancerPerformanceSummary(
+            @PathVariable Long freelancerId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate
+    ) {
+        try {
+            return ResponseEntity.ok(contractService.getFreelancerPerformanceSummary(freelancerId, startDate, endDate));
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @GetMapping("/stalled")
+    public ResponseEntity<List<StalledContractDTO>> getStalledContracts(
+            @RequestParam Double maxProgress,
+            @RequestParam Integer stalledDays
+    ) {
+        try {
+            return ResponseEntity.ok(contractService.findStalledContracts(maxProgress, stalledDays));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
     }
 }
