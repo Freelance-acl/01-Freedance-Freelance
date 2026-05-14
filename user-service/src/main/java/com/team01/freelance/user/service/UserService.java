@@ -1,11 +1,16 @@
 package com.team01.freelance.user.service;
 
+import com.team01.freelance.user.dto.TopFreelancerDTO;
 import com.team01.freelance.user.model.User;
 import com.team01.freelance.user.repository.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -25,6 +30,25 @@ public class UserService {
 
     public User createUser(User user) {
         return userRepository.save(user);
+    }
+
+    public List<TopFreelancerDTO> getTopFreelancersByEarnings(LocalDate startDate, LocalDate endDate, Integer limit) {
+        if (startDate == null || endDate == null || startDate.isAfter(endDate)) {
+            throw new IllegalArgumentException("startDate must be on or before endDate");
+        }
+
+        int queryLimit = limit == null ? 10 : limit;
+        if (queryLimit <= 0) {
+            throw new IllegalArgumentException("limit must be greater than zero");
+        }
+
+        return userRepository.findTopFreelancersByEarnings(
+                        startDate.atStartOfDay(),
+                        endDate.atTime(LocalTime.MAX),
+                        queryLimit)
+                .stream()
+                .map(this::toTopFreelancerDTO)
+                .toList();
     }
 
     /**
@@ -62,5 +86,45 @@ public class UserService {
 
     public void deleteAllUsers() {
         userRepository.deleteAll();
+    }
+
+    private TopFreelancerDTO toTopFreelancerDTO(Object[] row) {
+        return new TopFreelancerDTO(
+                toLong(row[0]),
+                (String) row[1],
+                toBigDecimal(row[2]),
+                toLong(row[3]));
+    }
+
+    private Long toLong(Object value) {
+        if (value instanceof Long longValue) {
+            return longValue;
+        }
+        if (value instanceof Integer integerValue) {
+            return integerValue.longValue();
+        }
+        if (value instanceof BigInteger bigIntegerValue) {
+            return bigIntegerValue.longValue();
+        }
+        if (value instanceof BigDecimal bigDecimalValue) {
+            return bigDecimalValue.longValue();
+        }
+        if (value instanceof Number numberValue) {
+            return numberValue.longValue();
+        }
+        return Long.valueOf(value.toString());
+    }
+
+    private BigDecimal toBigDecimal(Object value) {
+        if (value instanceof BigDecimal bigDecimalValue) {
+            return bigDecimalValue;
+        }
+        if (value instanceof BigInteger bigIntegerValue) {
+            return new BigDecimal(bigIntegerValue);
+        }
+        if (value instanceof Number numberValue) {
+            return BigDecimal.valueOf(numberValue.doubleValue());
+        }
+        return new BigDecimal(value.toString());
     }
 }

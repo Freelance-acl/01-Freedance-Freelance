@@ -1,5 +1,6 @@
 package com.team01.freelance.user.controller;
 
+import com.team01.freelance.user.dto.TopFreelancerDTO;
 import com.team01.freelance.user.model.User;
 import com.team01.freelance.user.service.UserService;
 import org.junit.jupiter.api.BeforeEach;
@@ -9,7 +10,10 @@ import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -74,6 +78,56 @@ class UserControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void topFreelancersReturnsRequestedLimitInEarningsOrder() throws Exception {
+        TopFreelancerDTO userB = new TopFreelancerDTO(2L, "User B", new BigDecimal("8000"), 2L);
+        TopFreelancerDTO userA = new TopFreelancerDTO(1L, "User A", new BigDecimal("3000"), 1L);
+        when(userService.getTopFreelancersByEarnings(
+                LocalDate.parse("2026-03-01"),
+                LocalDate.parse("2026-03-31"),
+                2)).thenReturn(List.of(userB, userA));
+
+        mockMvc.perform(get("/api/users/reports/top-freelancers")
+                        .param("startDate", "2026-03-01")
+                        .param("endDate", "2026-03-31")
+                        .param("limit", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].name").value("User B"))
+                .andExpect(jsonPath("$[0].totalEarnings").value(8000))
+                .andExpect(jsonPath("$[1].name").value("User A"))
+                .andExpect(jsonPath("$[1].totalEarnings").value(3000));
+    }
+
+    @Test
+    void topFreelancersReturnsEmptyListWhenNoContractsExist() throws Exception {
+        when(userService.getTopFreelancersByEarnings(
+                LocalDate.parse("2026-04-01"),
+                LocalDate.parse("2026-04-30"),
+                2)).thenReturn(Collections.emptyList());
+
+        mockMvc.perform(get("/api/users/reports/top-freelancers")
+                        .param("startDate", "2026-04-01")
+                        .param("endDate", "2026-04-30")
+                        .param("limit", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    void topFreelancersReturnsBadRequestWhenStartDateIsAfterEndDate() throws Exception {
+        when(userService.getTopFreelancersByEarnings(
+                LocalDate.parse("2026-03-31"),
+                LocalDate.parse("2026-03-01"),
+                2)).thenThrow(new IllegalArgumentException("startDate must be on or before endDate"));
+
+        mockMvc.perform(get("/api/users/reports/top-freelancers")
+                        .param("startDate", "2026-03-31")
+                        .param("endDate", "2026-03-01")
+                        .param("limit", "2"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
