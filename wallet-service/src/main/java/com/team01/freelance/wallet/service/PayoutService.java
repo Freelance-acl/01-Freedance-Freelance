@@ -3,11 +3,16 @@ package com.team01.freelance.wallet.service;
 import com.team01.freelance.contract.repository.ContractRepository;
 import com.team01.freelance.user.repository.UserRepository;
 import com.team01.freelance.wallet.model.Payout;
+import com.team01.freelance.wallet.model.PayoutStatus;
 import com.team01.freelance.wallet.repository.PayoutRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -29,6 +34,21 @@ public class PayoutService {
 
     public Optional<Payout> getPayoutById(Long id) {
         return payoutRepository.findById(id);
+    }
+
+    public List<Payout> searchPayouts(PayoutStatus status, LocalDate startDate, LocalDate endDate) {
+        if (startDate != null && endDate != null && startDate.isAfter(endDate)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "startDate cannot be after endDate");
+        }
+
+        // Half-open interval: [startOfStart, startOfDayAfterEnd). Using the
+        // day-after midnight as an exclusive upper bound keeps the comparison
+        // precision-agnostic regardless of how the JDBC driver handles
+        // sub-microsecond fractions.
+        LocalDateTime startDateTime = startDate != null ? startDate.atStartOfDay() : null;
+        LocalDateTime endExclusive = endDate != null ? endDate.plusDays(1).atStartOfDay() : null;
+        String statusName = status != null ? status.name() : null;
+        return payoutRepository.searchByStatusAndCreatedAtRange(statusName, startDateTime, endExclusive);
     }
 
     public Payout createPayout(Payout payout) {
