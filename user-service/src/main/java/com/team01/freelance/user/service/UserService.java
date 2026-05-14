@@ -5,7 +5,9 @@ import com.team01.freelance.user.repository.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-
+import com.team01.freelance.user.model.UserSkill;
+import com.team01.freelance.user.repository.UserSkillRepository;
+import jakarta.transaction.Transactional;
 import java.util.List;
 import java.util.Optional;
 
@@ -14,6 +16,8 @@ public class UserService {
 
     @Autowired
     private UserRepository userRepository;
+    @Autowired
+    private UserSkillRepository userSkillRepository;
 
     public List<User> getAllUsers() {
         return userRepository.findAll();
@@ -58,6 +62,26 @@ public class UserService {
         }
         userRepository.deleteById(id);
         return true;
+    }
+    @Transactional
+    public User setPrimarySkill(Long userId, Long skillId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new EntityNotFoundException("User not found with id: " + userId));
+
+        UserSkill targetSkill = userSkillRepository.findById(skillId)
+                .orElseThrow(() -> new EntityNotFoundException("UserSkill not found with id: " + skillId));
+
+        if (targetSkill.getUser() == null || !targetSkill.getUser().getId().equals(userId)) {
+            throw new IllegalArgumentException("Skill does not belong to this user");
+        }
+
+        if (user.getUserSkills() != null) {
+            user.getUserSkills().forEach(skill -> skill.setIsPrimary(false));
+        }
+
+        targetSkill.setIsPrimary(true);
+
+        return userRepository.save(user);
     }
 
     public void deleteAllUsers() {

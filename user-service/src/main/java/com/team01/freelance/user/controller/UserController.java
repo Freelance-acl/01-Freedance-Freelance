@@ -40,6 +40,7 @@ public class UserController {
         return ResponseEntity.ok(userService.createUser(user));
     }
 
+
     /**
      * Updates a user by ID.
      *
@@ -47,6 +48,16 @@ public class UserController {
      * @param user the update payload
      * @return 200 with updated user, or 404 if not found
      */
+    @PutMapping("/{userId}/skills/{skillId}/primary")
+    public ResponseEntity<User> setPrimarySkill(@PathVariable Long userId, @PathVariable Long skillId) {
+        try {
+            return ResponseEntity.ok(userService.setPrimarySkill(userId, skillId));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
     @PutMapping("/{id}")
     public ResponseEntity<User> updateUser(@PathVariable Long id, @RequestBody User user) {
         try {
