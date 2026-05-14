@@ -1,7 +1,9 @@
 package com.team01.freelance.job.controller;
 
+import com.team01.freelance.job.model.JobRatingRequest;
 import com.team01.freelance.job.model.Job;
 import com.team01.freelance.job.service.JobService;
+import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -89,5 +91,36 @@ class JobControllerTest {
 
         mockMvc.perform(delete("/api/jobs/all"))
                 .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void rateReturnsOk() throws Exception {
+        Job job = new Job();
+        when(jobService.rateJob(eq(1L), any(JobRatingRequest.class))).thenReturn(job);
+
+        mockMvc.perform(post("/api/jobs/{id}/rate", 1L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"contractId\":1,\"rating\":5}"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void rateReturnsBadRequest() throws Exception {
+        when(jobService.rateJob(eq(1L), any(JobRatingRequest.class))).thenThrow(new IllegalArgumentException("Invalid rating"));
+
+        mockMvc.perform(post("/api/jobs/{id}/rate", 1L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"contractId\":1,\"rating\":6}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void rateReturnsNotFound() throws Exception {
+        when(jobService.rateJob(eq(1L), any(JobRatingRequest.class))).thenThrow(new EntityNotFoundException("Not found"));
+
+        mockMvc.perform(post("/api/jobs/{id}/rate", 1L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"contractId\":1,\"rating\":5}"))
+                .andExpect(status().isNotFound());
     }
 }
