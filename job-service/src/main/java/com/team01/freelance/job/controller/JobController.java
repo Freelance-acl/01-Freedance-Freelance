@@ -1,6 +1,7 @@
 package com.team01.freelance.job.controller;
 
 import com.team01.freelance.job.exception.ForbiddenOperationException;
+import com.team01.freelance.job.model.JobAttachmentAlertDTO;
 import com.team01.freelance.job.model.JobAttachmentVerificationRequest;
 import com.team01.freelance.job.model.JobRatingRequest;
 import com.team01.freelance.job.model.Job;
@@ -74,6 +75,16 @@ public class JobController {
     public ResponseEntity<Void> deleteAllJobs() {
         jobService.deleteAllJobs();
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Returns a report of jobs that have expired attachments.
+     *
+     * @return 200 with job attachment alert DTOs
+     */
+    @GetMapping("/attachments/expired")
+    public ResponseEntity<List<JobAttachmentAlertDTO>> getJobsWithExpiredAttachments() {
+        return ResponseEntity.ok(jobService.getJobsWithExpiredAttachments());
     }
 
     /**

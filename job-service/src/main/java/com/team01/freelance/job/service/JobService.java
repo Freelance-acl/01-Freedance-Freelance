@@ -3,6 +3,7 @@ package com.team01.freelance.job.service;
 import com.team01.freelance.job.client.ContractLookupClient;
 import com.team01.freelance.job.client.ContractSummary;
 import com.team01.freelance.job.exception.ForbiddenOperationException;
+import com.team01.freelance.job.model.JobAttachmentAlertDTO;
 import com.team01.freelance.job.model.JobAttachment;
 import com.team01.freelance.job.model.JobAttachmentVerificationRequest;
 import com.team01.freelance.job.model.Job;
@@ -21,6 +22,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Map;
 
@@ -102,6 +104,35 @@ public class JobService {
 
     public void deleteAllJobs() {
         jobRepository.deleteAll();
+    }
+
+    @Transactional(readOnly = true)
+    public List<JobAttachmentAlertDTO> getJobsWithExpiredAttachments() {
+        LocalDate today = LocalDate.now();
+
+        return jobRepository.findJobsWithExpiredAttachments().stream()
+                .map(job -> {
+                    List<JobAttachment> expiredAttachments = job.getJobAttachments() == null
+                            ? List.of()
+                            : job.getJobAttachments().stream()
+                                    .filter(attachment -> attachment.getExpiryDate() != null
+                                            && attachment.getExpiryDate().isBefore(today))
+                                    .toList();
+
+                    if (expiredAttachments.isEmpty()) {
+                        return null;
+                    }
+
+                    JobAttachmentAlertDTO dto = new JobAttachmentAlertDTO();
+                    dto.setJobId(job.getId());
+                    dto.setJobTitle(job.getTitle());
+                    dto.setJobStatus(job.getStatus());
+                    dto.setExpiredAttachments(expiredAttachments);
+                    dto.setExpiredCount(expiredAttachments.size());
+                    return dto;
+                })
+                .filter(Objects::nonNull)
+                .toList();
     }
 
     @Transactional

@@ -3,10 +3,13 @@ package com.team01.freelance.job.service;
 import com.team01.freelance.job.client.ContractLookupClient;
 import com.team01.freelance.job.client.ContractSummary;
 import com.team01.freelance.job.exception.ForbiddenOperationException;
+import com.team01.freelance.job.model.JobAttachmentAlertDTO;
 import com.team01.freelance.job.model.JobAttachment;
 import com.team01.freelance.job.model.JobAttachmentVerificationRequest;
+import com.team01.freelance.job.model.JobAttachmentType;
 import com.team01.freelance.job.model.Job;
 import com.team01.freelance.job.model.JobRatingRequest;
+import com.team01.freelance.job.model.JobStatus;
 import com.team01.freelance.job.repository.JobAttachmentRepository;
 import com.team01.freelance.job.repository.JobRepository;
 import com.team01.freelance.user.model.User;
@@ -393,5 +396,74 @@ class JobServiceTest {
         assertThrows(EntityNotFoundException.class, () -> jobService.verifyJobAttachment(1L, 10L, request));
         verify(userRepository, never()).findById(anyLong());
         verify(jobAttachmentRepository, never()).save(any(JobAttachment.class));
+    }
+
+    @Test
+    void getJobsWithExpiredAttachmentsReturnsExpiredReportsOnly() {
+        Job jobA = createJobWithAttachments(1L, "Job A", JobStatus.OPEN,
+                createAttachment(101L, LocalDate.now().minusDays(1)),
+                createAttachment(102L, LocalDate.now().plusDays(1)));
+
+        Job jobB = createJobWithAttachments(2L, "Job B", JobStatus.IN_PROGRESS,
+                createAttachment(201L, LocalDate.now().plusDays(2)),
+                createAttachment(202L, LocalDate.now().plusDays(3)));
+
+        Job jobC = createJobWithAttachments(3L, "Job C", JobStatus.CLOSED,
+                createAttachment(301L, LocalDate.now().minusDays(1)),
+                createAttachment(302L, LocalDate.now().minusDays(2)));
+
+        when(jobRepository.findJobsWithExpiredAttachments()).thenReturn(List.of(jobA, jobB, jobC));
+
+        List<JobAttachmentAlertDTO> result = jobService.getJobsWithExpiredAttachments();
+
+        assertEquals(2, result.size());
+        assertEquals(1L, result.get(0).getJobId());
+        assertEquals("Job A", result.get(0).getJobTitle());
+        assertEquals(JobStatus.OPEN, result.get(0).getJobStatus());
+        assertEquals(1, result.get(0).getExpiredCount());
+        assertEquals(1, result.get(0).getExpiredAttachments().size());
+
+        assertEquals(3L, result.get(1).getJobId());
+        assertEquals("Job C", result.get(1).getJobTitle());
+        assertEquals(JobStatus.CLOSED, result.get(1).getJobStatus());
+        assertEquals(2, result.get(1).getExpiredCount());
+        assertEquals(2, result.get(1).getExpiredAttachments().size());
+
+        assertTrue(result.stream().noneMatch(dto -> dto.getJobId().equals(2L)));
+        verify(jobRepository).findJobsWithExpiredAttachments();
+    }
+
+    @Test
+    void getJobsWithExpiredAttachmentsReturnsEmptyListWhenNoneExist() {
+        when(jobRepository.findJobsWithExpiredAttachments()).thenReturn(List.of());
+
+        List<JobAttachmentAlertDTO> result = jobService.getJobsWithExpiredAttachments();
+
+        assertTrue(result.isEmpty());
+        verify(jobRepository).findJobsWithExpiredAttachments();
+    }
+
+    private Job createJobWithAttachments(Long id, String title, JobStatus status, JobAttachment... attachments) {
+        Job job = new Job();
+        job.setId(id);
+        job.setTitle(title);
+        job.setStatus(status);
+
+        List<JobAttachment> jobAttachments = new ArrayList<>();
+        for (JobAttachment attachment : attachments) {
+            jobAttachments.add(attachment);
+        }
+        job.setJobAttachments(jobAttachments);
+        return job;
+    }
+
+    private JobAttachment createAttachment(Long id, LocalDate expiryDate) {
+        JobAttachment attachment = new JobAttachment();
+        attachment.setId(id);
+        attachment.setType(JobAttachmentType.BRIEF);
+        attachment.setFileUrl("https://example.com/attachments/" + id);
+        attachment.setExpiryDate(expiryDate);
+        attachment.setVerified(false);
+        return attachment;
     }
 }
