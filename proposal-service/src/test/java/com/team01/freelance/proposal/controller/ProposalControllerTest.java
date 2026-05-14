@@ -9,11 +9,14 @@ import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import java.time.LocalDate;
 import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -34,6 +37,29 @@ class ProposalControllerTest {
         proposalService = mock(ProposalService.class);
         ReflectionTestUtils.setField(controller, "proposalService", proposalService);
         mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
+    }
+
+    @Test
+    void searchReturnsOk() throws Exception {
+        when(proposalService.searchProposals(isNull(), eq(LocalDate.of(2026, 3, 1)), eq(LocalDate.of(2026, 3, 31))))
+                .thenReturn(List.of());
+
+        mockMvc.perform(get("/api/proposals/search")
+                        .param("startDate", "2026-03-01")
+                        .param("endDate", "2026-03-31"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void searchWithStatusDelegatesToService() throws Exception {
+        when(proposalService.searchProposals(eq("ACCEPTED"), eq(LocalDate.of(2026, 3, 1)), eq(LocalDate.of(2026, 3, 31))))
+                .thenReturn(List.of());
+
+        mockMvc.perform(get("/api/proposals/search")
+                        .param("status", "ACCEPTED")
+                        .param("startDate", "2026-03-01")
+                        .param("endDate", "2026-03-31"))
+                .andExpect(status().isOk());
     }
 
     @Test
