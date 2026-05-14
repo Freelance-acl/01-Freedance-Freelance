@@ -1,18 +1,12 @@
 package com.team01.freelance.wallet.controller;
 
 import com.team01.freelance.wallet.dto.PayoutDetailsDTO;
+import com.team01.freelance.wallet.dto.PromoCodeUsageDTO;
 import com.team01.freelance.wallet.model.Payout;
 import com.team01.freelance.wallet.service.PayoutService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -75,8 +69,11 @@ public class PayoutController {
         return ResponseEntity.ok(payoutService.getPayoutDetails(payoutId));
     }
 
-    @GetMapping("/ping-details")
-    public String ping() {
-        return "DETAILS WORKING";
+    // Create promo code task is required to complete getTopUsedPromos
+    @GetMapping("/promos/top-used")
+    public ResponseEntity<List<PromoCodeUsageDTO>> getTopUsedPromos(
+            @RequestParam int limit) {
+
+        return ResponseEntity.ok(payoutService.getTopUsedPromoCodes(limit));
     }
 }

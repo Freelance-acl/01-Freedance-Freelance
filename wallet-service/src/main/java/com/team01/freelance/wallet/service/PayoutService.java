@@ -4,6 +4,7 @@ import com.team01.freelance.contract.repository.ContractRepository;
 import com.team01.freelance.user.repository.UserRepository;
 import com.team01.freelance.wallet.dto.AppliedPromoCodeDTO;
 import com.team01.freelance.wallet.dto.PayoutDetailsDTO;
+import com.team01.freelance.wallet.dto.PromoCodeUsageDTO;
 import com.team01.freelance.wallet.model.Payout;
 import com.team01.freelance.wallet.model.PayoutPromo;
 import com.team01.freelance.wallet.repository.PayoutRepository;
@@ -125,5 +126,34 @@ public class PayoutService {
         dto.finalAmount = dto.originalAmount - totalDiscount;
 
         return dto;
+    }
+
+    public List<PromoCodeUsageDTO> getTopUsedPromoCodes(int limit) {
+
+        List<Object[]> rows = payoutRepository.findTopUsedPromoCodes(limit);
+
+        List<PromoCodeUsageDTO> result = new ArrayList<>();
+
+        for (Object[] r : rows) {
+
+            PromoCodeUsageDTO dto = new PromoCodeUsageDTO();
+
+            dto.promoCodeId = ((Number) r[0]).longValue();
+            dto.code = (String) r[1];
+            dto.discountType = String.valueOf(r[2]);
+            dto.discountValue = r[3] != null ? ((Number) r[3]).doubleValue() : 0;
+
+            dto.timesUsed = r[4] != null ? ((Number) r[4]).intValue() : 0;
+            dto.totalDiscountGiven = r[5] != null ? ((Number) r[5]).doubleValue() : 0;
+
+            dto.active = (Boolean) r[6];
+
+            java.sql.Timestamp expiry = (java.sql.Timestamp) r[7];
+            dto.expired = expiry != null && expiry.toLocalDateTime().isBefore(java.time.LocalDateTime.now());
+
+            result.add(dto);
+        }
+
+        return result;
     }
 }
