@@ -27,6 +27,13 @@ public class UserService {
         return userRepository.save(user);
     }
 
+    public List<User> findUsersByPreference(String key, String value) {
+        if (isBlank(key) || isBlank(value)) {
+            throw new IllegalArgumentException("Preference key and value must not be blank");
+        }
+        return userRepository.findByPreference(key.trim(), value.trim());
+    }
+
     /**
      * Updates an existing user and throws if it does not exist.
      *
@@ -62,5 +69,9 @@ public class UserService {
 
     public void deleteAllUsers() {
         userRepository.deleteAll();
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.trim().isEmpty();
     }
 }

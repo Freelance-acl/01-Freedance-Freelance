@@ -10,6 +10,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -74,6 +75,43 @@ class UserControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void searchByPreferenceReturnsMatchingUsers() throws Exception {
+        User first = new User();
+        first.setName("Arabic User 1");
+        User second = new User();
+        second.setName("Arabic User 2");
+        when(userService.findUsersByPreference("language", "ar")).thenReturn(List.of(first, second));
+
+        mockMvc.perform(get("/api/users/preferences/search")
+                        .param("key", "language")
+                        .param("value", "ar"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2));
+    }
+
+    @Test
+    void searchByPreferenceReturnsEmptyListWhenNoUsersMatch() throws Exception {
+        when(userService.findUsersByPreference("language", "fr")).thenReturn(Collections.emptyList());
+
+        mockMvc.perform(get("/api/users/preferences/search")
+                        .param("key", "language")
+                        .param("value", "fr"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    void searchByPreferenceReturnsBadRequestWhenKeyIsBlank() throws Exception {
+        when(userService.findUsersByPreference("", "ar"))
+                .thenThrow(new IllegalArgumentException("Preference key and value must not be blank"));
+
+        mockMvc.perform(get("/api/users/preferences/search")
+                        .param("key", "")
+                        .param("value", "ar"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
