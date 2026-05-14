@@ -1,5 +1,6 @@
 package com.team01.freelance.wallet.controller;
 
+import com.team01.freelance.wallet.dto.FreelancerPayoutSummaryDTO;
 import com.team01.freelance.wallet.dto.RefundRequest;
 import com.team01.freelance.wallet.model.Payout;
 import com.team01.freelance.wallet.model.PayoutStatus;
@@ -84,6 +85,17 @@ public class PayoutController {
     }
 
     /**
+     * [S5-F3] Get a freelancer's payout summary aggregated by method.
+     *
+     * @param freelancerId the freelancer (user) ID
+     * @return 200 with the summary DTO, 404 if the user does not exist
+     */
+    @GetMapping("/freelancer/{freelancerId}/summary")
+    public ResponseEntity<FreelancerPayoutSummaryDTO> getFreelancerPayoutSummary(
+            @PathVariable Long freelancerId) {
+        return ResponseEntity.ok(
+                payoutService.getFreelancerPayoutSummary(freelancerId));
+    }
      * [S5-F2] Process a refund on a COMPLETED payout.
      *
      * @param id the payout ID
