@@ -3,6 +3,7 @@ package com.team01.freelance.wallet.controller;
 import com.team01.freelance.wallet.dto.FreelancerPayoutSummaryDTO;
 import com.team01.freelance.wallet.exception.GlobalExceptionHandler;
 import com.team01.freelance.wallet.model.Payout;
+import com.team01.freelance.wallet.model.PayoutStatus;
 import com.team01.freelance.wallet.service.PayoutService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -13,6 +14,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDate;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -101,6 +103,19 @@ class PayoutControllerTest {
         mockMvc.perform(delete("/api/payouts/all"))
                 .andExpect(status().isNoContent());
     }
+
+    @Test
+    void searchReturnsOk() throws Exception {
+        when(payoutService.searchPayouts(PayoutStatus.COMPLETED, LocalDate.parse("2026-03-01"), LocalDate.parse("2026-03-31")))
+                .thenReturn(Collections.emptyList());
+
+        mockMvc.perform(get("/api/payouts/search")
+                        .param("status", "COMPLETED")
+                        .param("startDate", "2026-03-01")
+                        .param("endDate", "2026-03-31"))
+                .andExpect(status().isOk());
+    }
+
 
     // -----------------------------------------------------------------------
     // [S5-F3] Freelancer Payout Summary
