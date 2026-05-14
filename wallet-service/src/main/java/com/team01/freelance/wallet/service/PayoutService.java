@@ -1,13 +1,14 @@
 package com.team01.freelance.wallet.service;
 
-import com.team01.freelance.contract.repository.ContractRepository;
-import com.team01.freelance.user.repository.UserRepository;
+import com.team01.freelance.wallet.dto.RevenueReportDTO;
 import com.team01.freelance.wallet.model.Payout;
 import com.team01.freelance.wallet.repository.PayoutRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -16,12 +17,6 @@ public class PayoutService {
 
     @Autowired
     private PayoutRepository payoutRepository;
-
-    @Autowired
-    private ContractRepository contractRepository;
-
-    @Autowired
-    private UserRepository userRepository;
 
     public List<Payout> getAllPayouts() {
         return payoutRepository.findAll();
@@ -36,11 +31,11 @@ public class PayoutService {
             throw new IllegalArgumentException("Contract and Freelancer IDs are required to create a Payout");
         }
 
-        if (contractRepository.findById(payout.getContractId()).isEmpty()){
+        if (payoutRepository.countContractById(payout.getContractId()) == 0) {
             throw new EntityNotFoundException("Contract not found with id: " + payout.getContractId());
         }
 
-        if (userRepository.findById(payout.getFreelancerId()).isEmpty()){
+        if (payoutRepository.countUserById(payout.getFreelancerId()) == 0) {
             throw new EntityNotFoundException("Freelancer not found with id: " + payout.getFreelancerId());
         }
 
@@ -77,5 +72,33 @@ public class PayoutService {
 
     public void deleteAllPayouts() {
         payoutRepository.deleteAll();
+    }
+
+    // S5-F6
+    public RevenueReportDTO getRevenueReport(LocalDate startDate, LocalDate endDate) {
+        if (startDate.isAfter(endDate)) {
+            throw new IllegalArgumentException("startDate must not be after endDate");
+        }
+
+        LocalDateTime start = startDate.atStartOfDay();
+        LocalDateTime end = endDate.atTime(23, 59, 59, 999_999_999);
+
+        Double totalRevenue = payoutRepository.sumCompletedAmountBetween(start, end);
+        Long totalTransactions = payoutRepository.countCompletedBetween(start, end);
+
+        double averagePayout = (totalTransactions == null || totalTransactions == 0)
+                ? 0.0
+                : totalRevenue / totalTransactions;
+
+        Double refundedAmount = payoutRepository.sumRefundedAmountBetween(start, end);
+        Long refundCount = payoutRepository.countRefundedBetween(start, end);
+
+        return new RevenueReportDTO(
+                totalRevenue == null ? 0.0 : totalRevenue,
+                totalTransactions == null ? 0L : totalTransactions,
+                averagePayout,
+                refundedAmount == null ? 0.0 : refundedAmount,
+                refundCount == null ? 0L : refundCount
+        );
     }
 }
