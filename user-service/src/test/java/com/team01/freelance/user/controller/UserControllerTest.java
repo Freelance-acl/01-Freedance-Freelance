@@ -1,6 +1,7 @@
 package com.team01.freelance.user.controller;
 
 import com.team01.freelance.user.model.User;
+import com.team01.freelance.user.model.UserStatus;
 import com.team01.freelance.user.service.UserService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -74,6 +75,26 @@ class UserControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void deactivateReturnsOk() throws Exception {
+        User user = new User();
+        user.setStatus(UserStatus.DEACTIVATED);
+        when(userService.deactivateUser(1L)).thenReturn(user);
+
+        mockMvc.perform(put("/api/users/{id}/deactivate", 1L))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("DEACTIVATED"));
+    }
+
+    @Test
+    void deactivateReturnsBadRequestWhenActiveContractExists() throws Exception {
+        when(userService.deactivateUser(1L))
+                .thenThrow(new IllegalStateException("Cannot deactivate user with active contracts"));
+
+        mockMvc.perform(put("/api/users/{id}/deactivate", 1L))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
