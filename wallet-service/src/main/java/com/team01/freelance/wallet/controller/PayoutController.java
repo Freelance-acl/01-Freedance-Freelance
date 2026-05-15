@@ -17,6 +17,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.HttpStatus;
+import com.team01.freelance.wallet.dto.ProcessPayoutRequest;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -109,6 +111,14 @@ public class PayoutController {
             @RequestBody RefundRequest request) {
         return ResponseEntity.ok(
                 payoutService.refundPayout(id, request.getReason()));
+    }
+
+    @PostMapping("/contract/{contractId}")
+    public ResponseEntity<Payout> processContractPayout(
+            @PathVariable Long contractId,
+            @RequestBody ProcessPayoutRequest request) {
+        Payout payout = payoutService.processContractPayout(contractId, request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(payout);
     }
 
 }

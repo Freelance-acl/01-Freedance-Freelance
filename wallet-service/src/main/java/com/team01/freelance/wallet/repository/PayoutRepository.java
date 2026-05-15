@@ -4,8 +4,9 @@ import com.team01.freelance.wallet.model.Payout;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import com.team01.freelance.wallet.model.PayoutStatus;
 import org.springframework.stereotype.Repository;
-
+import java.util.Optional;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -50,5 +51,34 @@ public interface PayoutRepository extends JpaRepository<Payout, Long> {
             ORDER BY method
             """, nativeQuery = true)
     List<Object[]> aggregateCompletedByMethodForFreelancer(@Param("freelancerId") Long freelancerId);
+
+    Optional<Payout> findByContractIdAndStatus(Long contractId, PayoutStatus status);
+
+    boolean existsByContractIdAndStatus(Long contractId, PayoutStatus status);
+
+    /**
+     * Loads a payout row with a row-level write lock (FOR UPDATE). Uses native SQL so
+     * H2 (tests) and PostgreSQL (runtime) both accept the lock clause.
+     */
+    @Query(value = """
+            SELECT *
+            FROM payouts
+            WHERE contract_id = :contractId
+              AND status = :status
+            FOR UPDATE
+            """, nativeQuery = true)
+    Optional<Payout> findByContractIdAndStatusForUpdate(
+            @Param("contractId") Long contractId,
+            @Param("status") String status);
+
+    @Query(value = "SELECT COUNT(*) FROM contracts WHERE id = :id", nativeQuery = true)
+    Long countContractById(@Param("id") Long id);
+
+    @Query(value = "SELECT status FROM contracts WHERE id = :id", nativeQuery = true)
+    String findContractStatusById(@Param("id") Long id);
+
+    @Query(value = "SELECT COUNT(*) FROM users WHERE id = :id", nativeQuery = true)
+    Long countUserById(@Param("id") Long id);
+
 }
 

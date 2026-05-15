@@ -1,10 +1,13 @@
 package com.team01.freelance.wallet.controller;
 
 import com.team01.freelance.wallet.dto.FreelancerPayoutSummaryDTO;
+import com.team01.freelance.wallet.dto.ProcessPayoutRequest;
 import com.team01.freelance.wallet.exception.GlobalExceptionHandler;
 import com.team01.freelance.wallet.model.Payout;
+import com.team01.freelance.wallet.model.PayoutMethod;
 import com.team01.freelance.wallet.model.PayoutStatus;
 import com.team01.freelance.wallet.service.PayoutService;
+import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -20,6 +23,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
@@ -154,5 +158,70 @@ class PayoutControllerTest {
 
         mockMvc.perform(get("/api/payouts/freelancer/{freelancerId}/summary", freelancerId))
                 .andExpect(status().isNotFound());
+    }
+
+    // -----------------------------------------------------------------------
+    // [S5-F4] Process Payout for Contract
+    // -----------------------------------------------------------------------
+
+    @Test
+    void processContractPayout_returns201() throws Exception {
+        Long contractId = 42L;
+        Payout payout = new Payout();
+        payout.setId(10L);
+        payout.setContractId(contractId);
+        payout.setStatus(PayoutStatus.COMPLETED);
+        payout.setMethod(PayoutMethod.BANK_TRANSFER);
+
+        when(payoutService.processContractPayout(eq(contractId), any(ProcessPayoutRequest.class)))
+                .thenReturn(payout);
+
+        mockMvc.perform(post("/api/payouts/contract/{contractId}", contractId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"method":"BANK_TRANSFER","accountLastFour":"9876"}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("COMPLETED"))
+                .andExpect(jsonPath("$.method").value("BANK_TRANSFER"));
+    }
+
+    @Test
+    void processContractPayout_alreadyPaid_returns400() throws Exception {
+        Long contractId = 42L;
+        when(payoutService.processContractPayout(eq(contractId), any(ProcessPayoutRequest.class)))
+                .thenThrow(new IllegalStateException("Payout already paid for contract: " + contractId));
+
+        mockMvc.perform(post("/api/payouts/contract/{contractId}", contractId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"method\":\"BANK_TRANSFER\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("already paid")));
+    }
+
+    @Test
+    void processContractPayout_contractNotCompleted_returns400() throws Exception {
+        Long contractId = 7L;
+        when(payoutService.processContractPayout(eq(contractId), any(ProcessPayoutRequest.class)))
+                .thenThrow(new IllegalStateException("Contract " + contractId + " is not COMPLETED"));
+
+        mockMvc.perform(post("/api/payouts/contract/{contractId}", contractId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"method\":\"PAYPAL\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("not COMPLETED")));
+    }
+
+    @Test
+    void processContractPayout_contractNotFound_returns404() throws Exception {
+        Long contractId = 999L;
+        when(payoutService.processContractPayout(eq(contractId), any(ProcessPayoutRequest.class)))
+                .thenThrow(new EntityNotFoundException("Contract not found with id: " + contractId));
+
+        mockMvc.perform(post("/api/payouts/contract/{contractId}", contractId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"method\":\"BANK_TRANSFER\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message", containsString("Contract not found")));
     }
 }

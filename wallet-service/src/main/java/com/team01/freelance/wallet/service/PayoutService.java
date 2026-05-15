@@ -5,7 +5,8 @@ import com.team01.freelance.user.repository.UserRepository;
 import com.team01.freelance.wallet.dto.FreelancerPayoutSummaryDTO;
 import com.team01.freelance.wallet.model.Payout;
 import com.team01.freelance.wallet.model.PayoutStatus;
-
+import com.team01.freelance.wallet.dto.ProcessPayoutRequest;
+import com.team01.freelance.wallet.model.PayoutStatus;
 import com.team01.freelance.wallet.repository.PayoutRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,13 +22,14 @@ import java.util.LinkedHashMap;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import org.springframework.web.server.ResponseStatusException;
-
-import org.springframework.transaction.annotation.Transactional;
-
-import java.util.HashMap;
+import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
+import org.springframework.transaction.annotation.Transactional;
+import java.util.HashMap;
 
 @Service
 public class PayoutService {
@@ -182,6 +184,47 @@ public class PayoutService {
         details.put("refundReason", reason);
         details.put("refundedAt", LocalDateTime.now().toString());
         payout.setTransactionDetails(details);
+
+        return payoutRepository.save(payout);
+    }
+
+    @Transactional
+    public Payout processContractPayout(Long contractId, ProcessPayoutRequest request) {
+        if (payoutRepository.countContractById(contractId) == 0) {
+            throw new EntityNotFoundException("Contract not found with id: " + contractId);
+        }
+
+        String contractStatus = payoutRepository.findContractStatusById(contractId);
+        if (!"COMPLETED".equalsIgnoreCase(contractStatus)) {
+            throw new IllegalStateException("Contract " + contractId + " is not COMPLETED");
+        }
+
+        Payout payout = payoutRepository
+                .findByContractIdAndStatusForUpdate(contractId, PayoutStatus.PENDING.name())
+                .orElseThrow(() -> {
+                    if (payoutRepository.existsByContractIdAndStatus(
+                            contractId, PayoutStatus.COMPLETED)) {
+                        return new IllegalStateException(
+                                "Payout already paid for contract: " + contractId);
+                    }
+                    return new EntityNotFoundException(
+                            "No pending payout found for contract: " + contractId);
+                });
+
+        if (request == null || request.getMethod() == null) {
+            throw new IllegalArgumentException("Payout method is required");
+        }
+        payout.setStatus(PayoutStatus.COMPLETED);
+        payout.setMethod(request.getMethod());
+
+        Map<String, Object> txDetails = new LinkedHashMap<>();
+        txDetails.put("transactionId", UUID.randomUUID().toString());
+        txDetails.put("method", request.getMethod().name());
+        if (request.getAccountLastFour() != null) {
+            txDetails.put("accountLastFour", request.getAccountLastFour());
+        }
+        txDetails.put("processedAt", LocalDateTime.now().toString());
+        payout.setTransactionDetails(txDetails);
 
         return payoutRepository.save(payout);
     }
