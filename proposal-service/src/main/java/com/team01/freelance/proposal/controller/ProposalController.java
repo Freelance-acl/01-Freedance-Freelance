@@ -1,5 +1,6 @@
 package com.team01.freelance.proposal.controller;
 
+import com.team01.freelance.proposal.dto.ProposalDetailsDTO;
 import com.team01.freelance.proposal.model.Proposal;
 import com.team01.freelance.proposal.service.ProposalService;
 import jakarta.persistence.EntityNotFoundException;
@@ -47,6 +48,15 @@ public class ProposalController {
         return proposalService.getProposalById(id)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/{proposalId}/details")
+    public ResponseEntity<ProposalDetailsDTO> getProposalDetails(@PathVariable Long proposalId) {
+        try {
+            return ResponseEntity.ok(proposalService.getProposalDetails(proposalId));
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        }
     }
 
     @PostMapping
