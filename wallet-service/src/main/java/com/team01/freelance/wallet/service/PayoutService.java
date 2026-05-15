@@ -6,22 +6,18 @@ import com.team01.freelance.wallet.dto.FreelancerPayoutSummaryDTO;
 import com.team01.freelance.wallet.model.Payout;
 import com.team01.freelance.wallet.model.PayoutStatus;
 import com.team01.freelance.wallet.dto.ProcessPayoutRequest;
-import com.team01.freelance.wallet.model.PayoutStatus;
+import com.team01.freelance.wallet.model.PromoCode;
+import com.team01.freelance.wallet.model.PayoutPromo;
 import com.team01.freelance.wallet.repository.PayoutRepository;
+import com.team01.freelance.wallet.repository.PayoutPromoRepository;
+import com.team01.freelance.wallet.repository.PromoCodeRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
-import org.springframework.web.server.ResponseStatusException;
-
+import com.team01.freelance.wallet.model.DiscountType;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.util.LinkedHashMap;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -42,6 +38,12 @@ public class PayoutService {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private PayoutPromoRepository payoutPromoRepository;
+
+    @Autowired
+    private PromoCodeRepository promoCodeRepository;
 
     public List<Payout> getAllPayouts() {
         return payoutRepository.findAll();
@@ -187,7 +189,17 @@ public class PayoutService {
 
         return payoutRepository.save(payout);
     }
-
+    // [S5-F4] Process a payout for a COMPLETED contract.
+    /**
+     * [S5-F4] Process a payout for a COMPLETED contract.
+     *
+     * @param contractId the contract ID
+     * @param request the payout request body containing the method and account last four
+     * @return the updated payout
+     * @throws EntityNotFoundException if the contract is not found
+     * @throws IllegalStateException if the contract is not COMPLETED
+     * @throws IllegalArgumentException if the payout method is not provided
+     */
     @Transactional
     public Payout processContractPayout(Long contractId, ProcessPayoutRequest request) {
         if (payoutRepository.countContractById(contractId) == 0) {
@@ -228,4 +240,55 @@ public class PayoutService {
 
         return payoutRepository.save(payout);
     }
+
+    // S5-F5
+    @Transactional
+    public Payout applyPromoCode(Long payoutId, Long promoCodeId) {
+        Payout payout = payoutRepository.findById(payoutId)
+                .orElseThrow(() -> new EntityNotFoundException("Payout not found with id: " + payoutId));
+
+        if (payout.getStatus() != PayoutStatus.PENDING) {
+            throw new IllegalStateException("Cannot apply promo code to a completed/cancelled payout");
+        }
+
+        PromoCode promoCode = promoCodeRepository.findById(promoCodeId)
+                .orElseThrow(() -> new EntityNotFoundException("Promo code not found with id: " + promoCodeId));
+
+        if (!Boolean.TRUE.equals(promoCode.getActive())) {
+            throw new IllegalStateException("Promo code is not active");
+        }
+
+        if (promoCode.getExpiryDate().isBefore(LocalDateTime.now())) {
+            throw new IllegalStateException("Promo code has expired");
+        }
+
+        if (promoCode.getCurrentUses() >= promoCode.getMaxUses()) {
+            throw new IllegalStateException("Promo code has reached its maximum number of uses");
+        }
+
+        if (payoutPromoRepository.existsByPayoutIdAndPromoCodeId(payoutId, promoCodeId)) {
+            throw new IllegalStateException("Promo code already applied to this payout");
+        }
+
+        double discount;
+        if (promoCode.getDiscountType() == DiscountType.PERCENTAGE) {
+            discount = payout.getAmount() * promoCode.getDiscountValue() / 100.0;
+        } else {
+            discount = promoCode.getDiscountValue();
+        }
+        discount = Math.min(discount, payout.getAmount());
+
+        PayoutPromo payoutPromo = new PayoutPromo();
+        payoutPromo.setPayout(payout);
+        payoutPromo.setPromoCode(promoCode);
+        payoutPromo.setDiscountApplied(discount);
+        payoutPromo.setAppliedAt(LocalDateTime.now());
+        payoutPromoRepository.save(payoutPromo);
+
+        promoCode.setCurrentUses(promoCode.getCurrentUses() + 1);
+        promoCodeRepository.save(promoCode);
+
+        return payoutRepository.findById(payoutId).orElseThrow();
+    }
+    
 }

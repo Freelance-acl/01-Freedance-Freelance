@@ -121,4 +121,20 @@ public class PayoutController {
         return ResponseEntity.status(HttpStatus.CREATED).body(payout);
     }
 
+    /**
+     * [S5-F5] Apply a promo code to a payout.
+     *
+     * @param payoutId the payout ID
+     * @param promoCodeId the promo code ID
+     * @return the updated payout
+     * @throws EntityNotFoundException if the payout or promo code is not found
+     */
+    @PostMapping("/{payoutId}/promos/{promoCodeId}")
+    public ResponseEntity<Payout> applyPromoCode(
+            @PathVariable Long payoutId,
+            @PathVariable Long promoCodeId) {
+        Payout payout = payoutService.applyPromoCode(payoutId, promoCodeId);
+        return ResponseEntity.status(HttpStatus.CREATED).body(payout);
+    }
+
 }
