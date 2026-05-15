@@ -8,6 +8,9 @@ import org.springframework.stereotype.Service;
 import com.team01.freelance.user.model.UserRole;
 import java.util.List;
 import java.util.Optional;
+import java.util.Map;
+import java.util.HashMap;
+import jakarta.transaction.Transactional;
 
 @Service
 public class UserService {
@@ -66,5 +69,22 @@ public class UserService {
 
     public List<User> searchUsers(String name, String email, UserRole role) {
         return userRepository.searchUsers(name, email, role);
+    }
+
+    @Transactional
+    public User updatePreferences(Long id, Map<String, Object> incomingPreferences) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("User not found with id: " + id));
+
+        Map<String, Object> merged = user.getPreferences() != null
+                ? new HashMap<>(user.getPreferences())
+                : new HashMap<>();
+
+        if (incomingPreferences != null) {
+            merged.putAll(incomingPreferences);
+        }
+
+        user.setPreferences(merged);
+        return userRepository.save(user);
     }
 }

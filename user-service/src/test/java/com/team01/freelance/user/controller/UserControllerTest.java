@@ -11,8 +11,12 @@ import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import jakarta.persistence.EntityNotFoundException;
+
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.hamcrest.Matchers.containsString;
@@ -151,5 +155,44 @@ class UserControllerTest {
                 .andExpect(jsonPath("$.message", containsString("role")))
                 .andExpect(jsonPath("$.message", containsString("FREELANCER")))
                 .andExpect(jsonPath("$.message", containsString("CLIENT")));
+    }
+
+    // -----------------------------------------------------------------------
+    // [S1-F2] Update User Preferences
+    // -----------------------------------------------------------------------
+
+    @Test
+    void updatePreferences_returnsOkWithMergedPreferences() throws Exception {
+        Long userId = 1L;
+        User user = new User();
+        user.setId(userId);
+        Map<String, Object> merged = new LinkedHashMap<>();
+        merged.put("language", "en");
+        merged.put("timezone", "Africa/Cairo");
+        merged.put("hourlyRate", 45);
+        user.setPreferences(merged);
+
+        when(userService.updatePreferences(eq(userId), any())).thenReturn(user);
+
+        mockMvc.perform(put("/api/users/{id}/preferences", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"timezone":"Africa/Cairo","hourlyRate":45}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.preferences.language").value("en"))
+                .andExpect(jsonPath("$.preferences.timezone").value("Africa/Cairo"))
+                .andExpect(jsonPath("$.preferences.hourlyRate").value(45));
+    }
+
+    @Test
+    void updatePreferences_userNotFound_returns404() throws Exception {
+        when(userService.updatePreferences(eq(999L), any()))
+                .thenThrow(new EntityNotFoundException("User not found with id: 999"));
+
+        mockMvc.perform(put("/api/users/{id}/preferences", 999L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"timezone\":\"UTC\"}"))
+                .andExpect(status().isNotFound());
     }
 }
