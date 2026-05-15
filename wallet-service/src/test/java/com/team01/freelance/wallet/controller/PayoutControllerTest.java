@@ -1,10 +1,14 @@
 package com.team01.freelance.wallet.controller;
 
 import com.team01.freelance.wallet.dto.FreelancerPayoutSummaryDTO;
+import com.team01.freelance.wallet.dto.ProcessPayoutRequest;
+import com.team01.freelance.wallet.dto.RevenueReportDTO;
 import com.team01.freelance.wallet.exception.GlobalExceptionHandler;
 import com.team01.freelance.wallet.model.Payout;
+import com.team01.freelance.wallet.model.PayoutMethod;
 import com.team01.freelance.wallet.model.PayoutStatus;
 import com.team01.freelance.wallet.service.PayoutService;
+import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -20,6 +24,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
@@ -154,5 +159,138 @@ class PayoutControllerTest {
 
         mockMvc.perform(get("/api/payouts/freelancer/{freelancerId}/summary", freelancerId))
                 .andExpect(status().isNotFound());
+    }
+
+    // -----------------------------------------------------------------------
+    // [S5-F4] Process Payout for Contract
+    // -----------------------------------------------------------------------
+
+    @Test
+    void processContractPayout_returns201() throws Exception {
+        Long contractId = 42L;
+        Payout payout = new Payout();
+        payout.setId(10L);
+        payout.setContractId(contractId);
+        payout.setStatus(PayoutStatus.COMPLETED);
+        payout.setMethod(PayoutMethod.BANK_TRANSFER);
+
+        when(payoutService.processContractPayout(eq(contractId), any(ProcessPayoutRequest.class)))
+                .thenReturn(payout);
+
+        mockMvc.perform(post("/api/payouts/contract/{contractId}", contractId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"method":"BANK_TRANSFER","accountLastFour":"9876"}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("COMPLETED"))
+                .andExpect(jsonPath("$.method").value("BANK_TRANSFER"));
+    }
+
+    @Test
+    void processContractPayout_alreadyPaid_returns400() throws Exception {
+        Long contractId = 42L;
+        when(payoutService.processContractPayout(eq(contractId), any(ProcessPayoutRequest.class)))
+                .thenThrow(new IllegalStateException("Payout already paid for contract: " + contractId));
+
+        mockMvc.perform(post("/api/payouts/contract/{contractId}", contractId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"method\":\"BANK_TRANSFER\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("already paid")));
+    }
+
+    @Test
+    void processContractPayout_contractNotCompleted_returns400() throws Exception {
+        Long contractId = 7L;
+        when(payoutService.processContractPayout(eq(contractId), any(ProcessPayoutRequest.class)))
+                .thenThrow(new IllegalStateException("Contract " + contractId + " is not COMPLETED"));
+
+        mockMvc.perform(post("/api/payouts/contract/{contractId}", contractId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"method\":\"PAYPAL\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("not COMPLETED")));
+    }
+
+    @Test
+    void processContractPayout_contractNotFound_returns404() throws Exception {
+        Long contractId = 999L;
+        when(payoutService.processContractPayout(eq(contractId), any(ProcessPayoutRequest.class)))
+                .thenThrow(new EntityNotFoundException("Contract not found with id: " + contractId));
+
+        mockMvc.perform(post("/api/payouts/contract/{contractId}", contractId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"method\":\"BANK_TRANSFER\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message", containsString("Contract not found")));
+    }
+
+    // -----------------------------------------------------------------------
+    // [S5-F5] Apply Promo Code to Payout
+    // -----------------------------------------------------------------------
+
+    @Test
+    void applyPromoCode_returns201() throws Exception {
+        Long payoutId = 1L;
+        Long promoCodeId = 2L;
+        Payout payout = new Payout();
+        payout.setId(payoutId);
+        payout.setStatus(PayoutStatus.PENDING);
+        payout.setAmount(3000.0);
+
+        when(payoutService.applyPromoCode(payoutId, promoCodeId)).thenReturn(payout);
+
+        mockMvc.perform(post("/api/payouts/{payoutId}/promos/{promoCodeId}", payoutId, promoCodeId))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.status").value("PENDING"));
+    }
+
+    @Test
+    void applyPromoCode_alreadyApplied_returns400() throws Exception {
+        Long payoutId = 1L;
+        Long promoCodeId = 2L;
+        when(payoutService.applyPromoCode(payoutId, promoCodeId))
+                .thenThrow(new IllegalStateException("Promo code already applied to this payout"));
+
+        mockMvc.perform(post("/api/payouts/{payoutId}/promos/{promoCodeId}", payoutId, promoCodeId))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("already applied")));
+    }
+
+    // -----------------------------------------------------------------------
+    // [S5-F6] Revenue Report
+    // -----------------------------------------------------------------------
+
+    @Test
+    void getRevenueReport_returnsOkWithMetrics() throws Exception {
+        RevenueReportDTO dto = new RevenueReportDTO(10000.0, 5L, 2000.0, 2000.0, 2L);
+        when(payoutService.getRevenueReport(
+                LocalDate.parse("2026-03-01"), LocalDate.parse("2026-03-31")))
+                .thenReturn(dto);
+
+        mockMvc.perform(get("/api/payouts/reports/revenue")
+                        .param("startDate", "2026-03-01")
+                        .param("endDate", "2026-03-31"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalRevenue").value(10000.0))
+                .andExpect(jsonPath("$.totalTransactions").value(5))
+                .andExpect(jsonPath("$.averagePayout").value(2000.0))
+                .andExpect(jsonPath("$.refundedAmount").value(2000.0))
+                .andExpect(jsonPath("$.refundCount").value(2));
+    }
+
+    @Test
+    void getRevenueReport_invalidDateRange_returns400() throws Exception {
+        when(payoutService.getRevenueReport(
+                LocalDate.parse("2026-03-31"), LocalDate.parse("2026-03-01")))
+                .thenThrow(new IllegalStateException("startDate cannot be after endDate"));
+
+        mockMvc.perform(get("/api/payouts/reports/revenue")
+                        .param("startDate", "2026-03-31")
+                        .param("endDate", "2026-03-01"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("startDate")));
     }
 }

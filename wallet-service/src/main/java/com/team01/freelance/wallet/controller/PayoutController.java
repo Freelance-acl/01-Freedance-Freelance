@@ -2,6 +2,7 @@ package com.team01.freelance.wallet.controller;
 
 import com.team01.freelance.wallet.dto.FreelancerPayoutSummaryDTO;
 import com.team01.freelance.wallet.dto.RefundRequest;
+import com.team01.freelance.wallet.dto.RevenueReportDTO;
 import com.team01.freelance.wallet.model.Payout;
 import com.team01.freelance.wallet.model.PayoutStatus;
 import com.team01.freelance.wallet.service.PayoutService;
@@ -17,6 +18,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.HttpStatus;
+import com.team01.freelance.wallet.dto.ProcessPayoutRequest;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -110,5 +113,43 @@ public class PayoutController {
         return ResponseEntity.ok(
                 payoutService.refundPayout(id, request.getReason()));
     }
+
+    @PostMapping("/contract/{contractId}")
+    public ResponseEntity<Payout> processContractPayout(
+            @PathVariable Long contractId,
+            @RequestBody ProcessPayoutRequest request) {
+        Payout payout = payoutService.processContractPayout(contractId, request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(payout);
+    }
+
+    /**
+     * [S5-F5] Apply a promo code to a payout.
+     *
+     * @param payoutId the payout ID
+     * @param promoCodeId the promo code ID
+     * @return the updated payout
+     * @throws EntityNotFoundException if the payout or promo code is not found
+     */
+    @PostMapping("/{payoutId}/promos/{promoCodeId}")
+    public ResponseEntity<Payout> applyPromoCode(
+            @PathVariable Long payoutId,
+            @PathVariable Long promoCodeId) {
+        Payout payout = payoutService.applyPromoCode(payoutId, promoCodeId);
+        return ResponseEntity.status(HttpStatus.CREATED).body(payout);
+    }
+
+     /**
+      * [S5-F6] Get a revenue report for a given date range.
+      *
+      * @param startDate the start date
+      * @param endDate the end date
+      * @return the revenue report
+      */
+     @GetMapping("/reports/revenue")
+     public ResponseEntity<RevenueReportDTO> getRevenueReport(
+             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+         return ResponseEntity.ok(payoutService.getRevenueReport(startDate, endDate));
+     }
 
 }
