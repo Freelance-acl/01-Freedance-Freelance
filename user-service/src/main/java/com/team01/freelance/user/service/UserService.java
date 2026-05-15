@@ -11,6 +11,7 @@ import java.util.Optional;
 import java.util.Map;
 import java.util.HashMap;
 import jakarta.transaction.Transactional;
+import com.team01.freelance.user.dto.UserContractSummaryDTO;
 
 @Service
 public class UserService {
@@ -86,5 +87,44 @@ public class UserService {
 
         user.setPreferences(merged);
         return userRepository.save(user);
+    }
+
+    public UserContractSummaryDTO getUserContractSummary(Long id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("User not found with id: " + id));
+
+        Object result = userRepository.getUserContractSummary(id);
+        if (result == null) {
+            return zeroContractSummary(user);
+        }
+        Object[] row = (Object[]) result;
+
+        Long totalContracts = ((Number) row[0]).longValue();
+        Long completedContracts = ((Number) row[1]).longValue();
+        Long terminatedContracts = ((Number) row[2]).longValue();
+        Double totalEarnings = ((Number) row[3]).doubleValue();
+        Double averageContractValue = ((Number) row[4]).doubleValue();
+
+        return new UserContractSummaryDTO(
+                user.getId(),
+                user.getName(),
+                totalContracts,
+                completedContracts,
+                terminatedContracts,
+                totalEarnings,
+                averageContractValue
+        );
+    }
+
+    private static UserContractSummaryDTO zeroContractSummary(User user) {
+        return new UserContractSummaryDTO(
+                user.getId(),
+                user.getName(),
+                0L,
+                0L,
+                0L,
+                0.0,
+                0.0
+        );
     }
 }

@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.team01.freelance.user.model.UserRole;
 import java.util.Map;
 import java.util.List;
+import com.team01.freelance.user.dto.UserContractSummaryDTO;
 
 @RestController
 @RequestMapping("/api/users")
@@ -88,6 +89,15 @@ public class UserController {
             @RequestBody Map<String, Object> preferences) {
         try {
             return ResponseEntity.ok(userService.updatePreferences(id, preferences));
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    @GetMapping("/{id}/contract-summary")
+    public ResponseEntity<UserContractSummaryDTO> getUserContractSummary(@PathVariable Long id) {
+        try {
+            return ResponseEntity.ok(userService.getUserContractSummary(id));
         } catch (EntityNotFoundException e) {
             return ResponseEntity.notFound().build();
         }

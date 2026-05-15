@@ -1,5 +1,6 @@
 package com.team01.freelance.user.controller;
 
+import com.team01.freelance.user.dto.UserContractSummaryDTO;
 import com.team01.freelance.user.exception.GlobalExceptionHandler;
 import com.team01.freelance.user.model.User;
 import com.team01.freelance.user.model.UserRole;
@@ -193,6 +194,38 @@ class UserControllerTest {
         mockMvc.perform(put("/api/users/{id}/preferences", 999L)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"timezone\":\"UTC\"}"))
+                .andExpect(status().isNotFound());
+    }
+
+    // -----------------------------------------------------------------------
+    // [S1-F3] User Contract Summary
+    // -----------------------------------------------------------------------
+
+    @Test
+    void getUserContractSummary_returnsOkWithMetrics() throws Exception {
+        Long userId = 1L;
+        UserContractSummaryDTO dto = new UserContractSummaryDTO(
+                userId, "Freelancer", 5L, 3L, 1L, 3000.0, 1000.0);
+
+        when(userService.getUserContractSummary(userId)).thenReturn(dto);
+
+        mockMvc.perform(get("/api/users/{id}/contract-summary", userId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.userId").value(1))
+                .andExpect(jsonPath("$.name").value("Freelancer"))
+                .andExpect(jsonPath("$.totalContracts").value(5))
+                .andExpect(jsonPath("$.completedContracts").value(3))
+                .andExpect(jsonPath("$.terminatedContracts").value(1))
+                .andExpect(jsonPath("$.totalEarnings").value(3000.0))
+                .andExpect(jsonPath("$.averageContractValue").value(1000.0));
+    }
+
+    @Test
+    void getUserContractSummary_userNotFound_returns404() throws Exception {
+        when(userService.getUserContractSummary(999L))
+                .thenThrow(new EntityNotFoundException("User not found with id: 999"));
+
+        mockMvc.perform(get("/api/users/{id}/contract-summary", 999L))
                 .andExpect(status().isNotFound());
     }
 }

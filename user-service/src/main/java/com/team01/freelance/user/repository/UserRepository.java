@@ -23,5 +23,18 @@ public interface UserRepository extends JpaRepository<User, Long> {
             @Param("role") UserRole role
     );
 
+    @Query(value = """
+        SELECT
+            COUNT(c.id) AS total_contracts,
+            COALESCE(SUM(CASE WHEN c.status = 'COMPLETED' THEN 1 ELSE 0 END), 0) AS completed_contracts,
+            COALESCE(SUM(CASE WHEN c.status = 'TERMINATED' THEN 1 ELSE 0 END), 0) AS terminated_contracts,
+            COALESCE(SUM(CASE WHEN c.status = 'COMPLETED' THEN c.agreed_amount ELSE 0 END), 0) AS total_earnings,
+            COALESCE(AVG(CASE WHEN c.status = 'COMPLETED' THEN c.agreed_amount END), 0) AS average_contract_value
+        FROM contracts c
+        WHERE c.freelancer_id = :userId OR c.client_id = :userId
+        """, nativeQuery = true)
+    Object getUserContractSummary(@Param("userId") Long userId);
+
+
 }
 
