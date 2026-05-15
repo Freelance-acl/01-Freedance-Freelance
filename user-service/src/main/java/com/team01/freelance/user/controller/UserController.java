@@ -12,9 +12,12 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-
+import com.team01.freelance.user.model.UserRole;
+import java.util.Map;
 import java.util.List;
+import com.team01.freelance.user.dto.UserContractSummaryDTO;
 
 @RestController
 @RequestMapping("/api/users")
@@ -70,5 +73,33 @@ public class UserController {
     public ResponseEntity<Void> deleteAllUsers() {
         userService.deleteAllUsers();
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/search")
+    public ResponseEntity<List<User>> searchUsers(
+            @RequestParam(required = false) String name,
+            @RequestParam(required = false) String email,
+            @RequestParam(required = false) UserRole role) {
+        return ResponseEntity.ok(userService.searchUsers(name, email, role));
+    }
+
+    @PutMapping("/{id}/preferences")
+    public ResponseEntity<User> updatePreferences(
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> preferences) {
+        try {
+            return ResponseEntity.ok(userService.updatePreferences(id, preferences));
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    @GetMapping("/{id}/contract-summary")
+    public ResponseEntity<UserContractSummaryDTO> getUserContractSummary(@PathVariable Long id) {
+        try {
+            return ResponseEntity.ok(userService.getUserContractSummary(id));
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        }
     }
 }
