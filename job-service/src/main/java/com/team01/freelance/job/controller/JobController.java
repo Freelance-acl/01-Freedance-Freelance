@@ -4,6 +4,7 @@ import com.team01.freelance.job.exception.ForbiddenOperationException;
 import com.team01.freelance.job.model.JobAttachmentAlertDTO;
 import com.team01.freelance.job.model.JobAttachmentVerificationRequest;
 import com.team01.freelance.job.model.JobRatingRequest;
+import com.team01.freelance.job.model.JobCloseRequest;
 import com.team01.freelance.job.model.Job;
 import com.team01.freelance.job.service.JobService;
 import jakarta.persistence.EntityNotFoundException;
@@ -124,6 +125,25 @@ public class JobController {
             return ResponseEntity.badRequest().build();
         } catch (ForbiddenOperationException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    /**
+     * Closes a job and rejects all related SUBMITTED proposals.
+     * Prevents closure if there is an ACTIVE contract for the job.
+     *
+     * @param id the job ID
+     * @param closeRequest the close request payload
+     * @return 200 with closed job, 400 if an ACTIVE contract exists, or 404 if job is not found
+     */
+    @PutMapping("/{id}/close")
+    public ResponseEntity<Job> closeJob(@PathVariable Long id, @RequestBody JobCloseRequest closeRequest) {
+        try {
+            return ResponseEntity.ok(jobService.closeJob(id));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
         } catch (EntityNotFoundException e) {
             return ResponseEntity.notFound().build();
         }
