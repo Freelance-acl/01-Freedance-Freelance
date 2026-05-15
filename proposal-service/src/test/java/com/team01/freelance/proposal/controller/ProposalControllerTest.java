@@ -1,7 +1,9 @@
 package com.team01.freelance.proposal.controller;
 
 import com.team01.freelance.proposal.model.Proposal;
+import com.team01.freelance.proposal.model.ProposalStatus;
 import com.team01.freelance.proposal.service.ProposalService;
+import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -99,6 +101,34 @@ class ProposalControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void withdrawReturnsOk() throws Exception {
+        Proposal proposal = new Proposal();
+        proposal.setStatus(ProposalStatus.WITHDRAWN);
+        when(proposalService.withdrawProposal(1L)).thenReturn(proposal);
+
+        mockMvc.perform(put("/api/proposals/{id}/withdraw", 1L))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void withdrawReturnsNotFoundWhenProposalMissing() throws Exception {
+        when(proposalService.withdrawProposal(404L))
+                .thenThrow(new EntityNotFoundException("Proposal not found"));
+
+        mockMvc.perform(put("/api/proposals/{id}/withdraw", 404L))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void withdrawReturnsBadRequestWhenStatusCannotBeWithdrawn() throws Exception {
+        when(proposalService.withdrawProposal(2L))
+                .thenThrow(new IllegalArgumentException("Only SUBMITTED or SHORTLISTED proposals can be withdrawn"));
+
+        mockMvc.perform(put("/api/proposals/{id}/withdraw", 2L))
+                .andExpect(status().isBadRequest());
     }
 
     @Test

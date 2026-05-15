@@ -5,6 +5,7 @@ import com.team01.freelance.proposal.model.ProposalStatus;
 import com.team01.freelance.proposal.repository.ProposalRepository;
 import com.team01.freelance.job.repository.JobRepository;
 import com.team01.freelance.user.repository.UserRepository;
+import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -15,11 +16,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -153,5 +156,77 @@ class ProposalServiceTest {
                 LocalDateTime.of(2026, 6, 1, 0, 0),
                 LocalDateTime.of(2026, 6, 16, 0, 0),
                 ProposalStatus.SUBMITTED);
+    }
+
+    @Test
+    void withdrawProposalSetsSubmittedProposalWithdrawnAndReopensOnlyActiveInProgressJob() {
+        Proposal proposal = proposalWithStatus(10L, 25L, ProposalStatus.SUBMITTED);
+        when(proposalRepository.findById(10L)).thenReturn(Optional.of(proposal));
+        when(proposalRepository.countByJobIdAndStatusIn(eq(25L), eq(List.of(ProposalStatus.SUBMITTED, ProposalStatus.SHORTLISTED))))
+                .thenReturn(1L);
+        when(proposalRepository.save(proposal)).thenReturn(proposal);
+
+        Proposal result = proposalService.withdrawProposal(10L);
+
+        assertThat(result.getStatus()).isEqualTo(ProposalStatus.WITHDRAWN);
+        verify(proposalRepository).save(proposal);
+        verify(jobRepository).reopenIfInProgress(25L);
+    }
+
+    @Test
+    void withdrawProposalAllowsShortlistedProposal() {
+        Proposal proposal = proposalWithStatus(11L, 30L, ProposalStatus.SHORTLISTED);
+        when(proposalRepository.findById(11L)).thenReturn(Optional.of(proposal));
+        when(proposalRepository.countByJobIdAndStatusIn(eq(30L), eq(List.of(ProposalStatus.SUBMITTED, ProposalStatus.SHORTLISTED))))
+                .thenReturn(2L);
+        when(proposalRepository.save(proposal)).thenReturn(proposal);
+
+        Proposal result = proposalService.withdrawProposal(11L);
+
+        assertThat(result.getStatus()).isEqualTo(ProposalStatus.WITHDRAWN);
+        verify(jobRepository, never()).reopenIfInProgress(30L);
+    }
+
+    @Test
+    void withdrawProposalRejectsAcceptedProposal() {
+        Proposal proposal = proposalWithStatus(12L, 40L, ProposalStatus.ACCEPTED);
+        when(proposalRepository.findById(12L)).thenReturn(Optional.of(proposal));
+
+        assertThatThrownBy(() -> proposalService.withdrawProposal(12L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("SUBMITTED or SHORTLISTED");
+
+        verify(proposalRepository, never()).save(proposal);
+        verify(jobRepository, never()).reopenIfInProgress(40L);
+    }
+
+    @Test
+    void withdrawProposalRejectsRejectedProposal() {
+        Proposal proposal = proposalWithStatus(13L, 41L, ProposalStatus.REJECTED);
+        when(proposalRepository.findById(13L)).thenReturn(Optional.of(proposal));
+
+        assertThatThrownBy(() -> proposalService.withdrawProposal(13L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("SUBMITTED or SHORTLISTED");
+
+        verify(proposalRepository, never()).save(proposal);
+        verify(jobRepository, never()).reopenIfInProgress(41L);
+    }
+
+    @Test
+    void withdrawProposalThrowsNotFoundWhenProposalMissing() {
+        when(proposalRepository.findById(404L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> proposalService.withdrawProposal(404L))
+                .isInstanceOf(EntityNotFoundException.class)
+                .hasMessageContaining("Proposal not found");
+    }
+
+    private Proposal proposalWithStatus(Long id, Long jobId, ProposalStatus status) {
+        Proposal proposal = new Proposal();
+        proposal.setId(id);
+        proposal.setJobId(jobId);
+        proposal.setStatus(status);
+        return proposal;
     }
 }

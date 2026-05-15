@@ -24,5 +24,6 @@ public interface ProposalRepository extends JpaRepository<Proposal, Long> {
             @Param("start") LocalDateTime start,
             @Param("endExclusive") LocalDateTime endExclusive,
             @Param("status") ProposalStatus status);
-}
 
+    long countByJobIdAndStatusIn(Long jobId, List<ProposalStatus> statuses);
+}

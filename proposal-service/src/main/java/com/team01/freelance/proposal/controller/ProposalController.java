@@ -77,6 +77,17 @@ public class ProposalController {
         }
     }
 
+    @PutMapping("/{id}/withdraw")
+    public ResponseEntity<Proposal> withdrawProposal(@PathVariable Long id) {
+        try {
+            return ResponseEntity.ok(proposalService.withdrawProposal(id));
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteProposalById(@PathVariable Long id) {
         if (proposalService.deleteProposalById(id)) {
