@@ -1,12 +1,13 @@
 package com.team01.freelance.proposal.model;
 
-import com.fasterxml.jackson.annotation.JsonManagedReference;
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
@@ -53,7 +54,8 @@ public class Proposal {
     @JsonAlias({"acceptedAt", "accepted_at"})
     private LocalDateTime acceptedAt;
 
-    @JsonIgnore
+    @JsonManagedReference
+    @OrderBy("milestoneOrder ASC")
     @OneToMany(mappedBy = "proposal", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ProposalMilestone> proposalMilestones;
 
@@ -64,6 +66,9 @@ public class Proposal {
         }
         if (submittedAt == null) {
             submittedAt = LocalDateTime.now();
+        }
+        if (proposalMilestones == null) {
+            proposalMilestones = new ArrayList<>();
         }
     }
 
@@ -149,11 +154,24 @@ public class Proposal {
     }
 
     public List<ProposalMilestone> getProposalMilestones() {
+        if (proposalMilestones != null) {
+            proposalMilestones.sort(Comparator.comparing(ProposalMilestone::getMilestoneOrder));
+        }
         return proposalMilestones;
     }
 
     public void setProposalMilestones(List<ProposalMilestone> proposalMilestones) {
         this.proposalMilestones = proposalMilestones;
+        if (this.proposalMilestones != null) {
+            this.proposalMilestones.forEach(milestone -> milestone.setProposal(this));
+        }
+    }
+
+    public void addProposalMilestone(ProposalMilestone proposalMilestone) {
+        if (proposalMilestones == null) {
+            proposalMilestones = new ArrayList<>();
+        }
+        proposalMilestone.setProposal(this);
+        proposalMilestones.add(proposalMilestone);
     }
 }
-
