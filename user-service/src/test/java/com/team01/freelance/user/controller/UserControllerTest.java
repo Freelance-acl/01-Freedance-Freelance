@@ -1,6 +1,8 @@
 package com.team01.freelance.user.controller;
 
+import com.team01.freelance.user.exception.GlobalExceptionHandler;
 import com.team01.freelance.user.model.User;
+import com.team01.freelance.user.model.UserRole;
 import com.team01.freelance.user.service.UserService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -10,10 +12,14 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.hasSize;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -34,12 +40,15 @@ class UserControllerTest {
         UserController controller = new UserController();
         userService = mock(UserService.class);
         ReflectionTestUtils.setField(controller, "userService", userService);
-        mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
+        mockMvc = MockMvcBuilders.standaloneSetup(controller)
+                .setControllerAdvice(new GlobalExceptionHandler())
+                .build();
     }
 
     @Test
     void getAllReturnsOk() throws Exception {
-        when(userService.getAllUsers()).thenReturn(Collections.emptyList());
+        when(userService.searchUsers(isNull(), isNull(), isNull()))
+                .thenReturn(Collections.emptyList());
 
         mockMvc.perform(get("/api/users"))
                 .andExpect(status().isOk());
@@ -103,5 +112,44 @@ class UserControllerTest {
 
         mockMvc.perform(delete("/api/users/all"))
                 .andExpect(status().isNoContent());
+    }
+
+    // -----------------------------------------------------------------------
+    // [S1-F1] Search Users
+    // -----------------------------------------------------------------------
+
+    @Test
+    void searchUsers_returnsOkWithResults() throws Exception {
+        User ahmed = new User();
+        ahmed.setName("Ahmed");
+        ahmed.setRole(UserRole.FREELANCER);
+
+        when(userService.searchUsers(eq("Ahmed"), isNull(), isNull()))
+                .thenReturn(List.of(ahmed));
+
+        mockMvc.perform(get("/api/users/search").param("name", "Ahmed"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].name").value("Ahmed"));
+    }
+
+    @Test
+    void searchUsers_noMatches_returnsEmptyList() throws Exception {
+        when(userService.searchUsers(eq("xyz"), isNull(), isNull()))
+                .thenReturn(Collections.emptyList());
+
+        mockMvc.perform(get("/api/users/search").param("name", "xyz"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(0)));
+    }
+
+    @Test
+    void searchUsers_invalidRole_returns400WithValidValues() throws Exception {
+        mockMvc.perform(get("/api/users/search").param("role", "INVALID_ROLE"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("INVALID_ROLE")))
+                .andExpect(jsonPath("$.message", containsString("role")))
+                .andExpect(jsonPath("$.message", containsString("FREELANCER")))
+                .andExpect(jsonPath("$.message", containsString("CLIENT")));
     }
 }

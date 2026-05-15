@@ -5,7 +5,7 @@ import com.team01.freelance.user.repository.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-
+import com.team01.freelance.user.model.UserRole;
 import java.util.List;
 import java.util.Optional;
 
@@ -62,5 +62,9 @@ public class UserService {
 
     public void deleteAllUsers() {
         userRepository.deleteAll();
+    }
+
+    public List<User> searchUsers(String name, String email, UserRole role) {
+        return userRepository.searchUsers(name, email, role);
     }
 }
