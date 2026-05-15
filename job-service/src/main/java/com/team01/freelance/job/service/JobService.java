@@ -1,5 +1,6 @@
 package com.team01.freelance.job.service;
 
+import com.team01.freelance.job.dto.TopBudgetJobDTO;
 import com.team01.freelance.job.model.Job;
 import com.team01.freelance.job.repository.JobRepository;
 import com.team01.freelance.user.repository.UserRepository;
@@ -82,5 +83,16 @@ public class JobService {
 
     public void deleteAllJobs() {
         jobRepository.deleteAll();
+    }
+
+    /**
+     * Retrieves the top jobs ordered by budgetMax in descending order.
+     * Includes the count of proposals for each job.
+     *
+     * @param limit the maximum number of jobs to return
+     * @return a list of TopBudgetJobDTO with job details and proposal counts
+     */
+    public List<TopBudgetJobDTO> getTopBudgetJobs(int limit) {
+        return jobRepository.findTopBudgetJobs(limit);
     }
 }
