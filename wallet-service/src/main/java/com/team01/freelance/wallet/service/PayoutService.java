@@ -3,6 +3,7 @@ package com.team01.freelance.wallet.service;
 import com.team01.freelance.contract.repository.ContractRepository;
 import com.team01.freelance.user.repository.UserRepository;
 import com.team01.freelance.wallet.dto.FreelancerPayoutSummaryDTO;
+import com.team01.freelance.wallet.dto.RevenueReportDTO;
 import com.team01.freelance.wallet.model.Payout;
 import com.team01.freelance.wallet.model.PayoutStatus;
 import com.team01.freelance.wallet.dto.ProcessPayoutRequest;
@@ -289,6 +290,34 @@ public class PayoutService {
         promoCodeRepository.save(promoCode);
 
         return payoutRepository.findById(payoutId).orElseThrow();
+    }
+
+    // S5-F6
+    public RevenueReportDTO getRevenueReport(LocalDate startDate, LocalDate endDate) {
+        if (startDate.isAfter(endDate)) {
+            throw new IllegalStateException("startDate cannot be after endDate");
+        }
+
+        LocalDateTime start = startDate.atStartOfDay();
+        LocalDateTime end = endDate.atTime(23, 59, 59, 999_999_999);
+
+        Double totalRevenue = payoutRepository.sumCompletedAmountBetween(start, end);
+        Long totalTransactions = payoutRepository.countCompletedBetween(start, end);
+
+        double averagePayout = (totalTransactions == null || totalTransactions == 0)
+                ? 0.0
+                : totalRevenue / totalTransactions;
+
+        Double refundedAmount = payoutRepository.sumRefundedAmountBetween(start, end);
+        Long refundCount = payoutRepository.countRefundedBetween(start, end);
+
+        return new RevenueReportDTO(
+                totalRevenue == null ? 0.0 : totalRevenue,
+                totalTransactions == null ? 0L : totalTransactions,
+                averagePayout,
+                refundedAmount == null ? 0.0 : refundedAmount,
+                refundCount == null ? 0L : refundCount
+        );
     }
     
 }

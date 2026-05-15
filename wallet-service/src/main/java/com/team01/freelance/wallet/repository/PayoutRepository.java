@@ -80,5 +80,17 @@ public interface PayoutRepository extends JpaRepository<Payout, Long> {
     @Query(value = "SELECT COUNT(*) FROM users WHERE id = :id", nativeQuery = true)
     Long countUserById(@Param("id") Long id);
 
+    @Query(value = "SELECT COALESCE(SUM(amount), 0) FROM payouts WHERE status = 'COMPLETED' AND created_at BETWEEN :start AND :end", nativeQuery = true)
+    Double sumCompletedAmountBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    @Query(value = "SELECT COUNT(*) FROM payouts WHERE status = 'COMPLETED' AND created_at BETWEEN :start AND :end", nativeQuery = true)
+    Long countCompletedBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    @Query(value = "SELECT COALESCE(SUM(amount), 0) FROM payouts WHERE status = 'REFUNDED' AND created_at BETWEEN :start AND :end", nativeQuery = true)
+    Double sumRefundedAmountBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    @Query(value = "SELECT COUNT(*) FROM payouts WHERE status = 'REFUNDED' AND created_at BETWEEN :start AND :end", nativeQuery = true)
+    Long countRefundedBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
 }
 

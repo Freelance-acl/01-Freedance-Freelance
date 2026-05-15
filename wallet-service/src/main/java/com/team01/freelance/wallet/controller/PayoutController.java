@@ -2,6 +2,7 @@ package com.team01.freelance.wallet.controller;
 
 import com.team01.freelance.wallet.dto.FreelancerPayoutSummaryDTO;
 import com.team01.freelance.wallet.dto.RefundRequest;
+import com.team01.freelance.wallet.dto.RevenueReportDTO;
 import com.team01.freelance.wallet.model.Payout;
 import com.team01.freelance.wallet.model.PayoutStatus;
 import com.team01.freelance.wallet.service.PayoutService;
@@ -136,5 +137,19 @@ public class PayoutController {
         Payout payout = payoutService.applyPromoCode(payoutId, promoCodeId);
         return ResponseEntity.status(HttpStatus.CREATED).body(payout);
     }
+
+     /**
+      * [S5-F6] Get a revenue report for a given date range.
+      *
+      * @param startDate the start date
+      * @param endDate the end date
+      * @return the revenue report
+      */
+     @GetMapping("/reports/revenue")
+     public ResponseEntity<RevenueReportDTO> getRevenueReport(
+             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+         return ResponseEntity.ok(payoutService.getRevenueReport(startDate, endDate));
+     }
 
 }
