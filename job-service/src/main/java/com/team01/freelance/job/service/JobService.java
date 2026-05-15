@@ -216,4 +216,21 @@ public class JobService {
 
         return refreshedJob;
     }
+
+    /**
+     * Searches jobs by a key-value pair in the requirements JSONB column.
+     * Optionally filters by job status.
+     *
+     * @param key the JSON key to search for in requirements
+     * @param value the value to match
+     * @param status the optional job status filter
+     * @return a list of jobs matching the criteria
+     */
+    public List<Job> searchByRequirements(String key, String value, String status) {
+        if (status != null && !status.isEmpty()) {
+            return jobRepository.searchByRequirements(key, value, status);
+        } else {
+            return jobRepository.searchByRequirements(key, value);
+        }
+    }
 }

@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.LinkedHashMap;
@@ -127,6 +128,23 @@ public class JobController {
         } catch (EntityNotFoundException e) {
             return ResponseEntity.notFound().build();
         }
+    }
+
+    /**
+     * Searches jobs by a key-value pair in the requirements JSONB column.
+     * Optionally filters by job status.
+     *
+     * @param key the JSON key to search for in requirements
+     * @param value the value to match
+     * @param status the optional job status filter
+     * @return 200 with list of matching jobs
+     */
+    @GetMapping("/requirements/search")
+    public ResponseEntity<List<Job>> searchByRequirements(
+            @RequestParam String key,
+            @RequestParam String value,
+            @RequestParam(required = false) String status) {
+        return ResponseEntity.ok(jobService.searchByRequirements(key, value, status));
     }
 
     private Map<String, Object> toJobWithAttachmentsResponse(Job job) {
