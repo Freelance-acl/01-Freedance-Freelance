@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Map;
 import java.util.HashMap;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import com.team01.freelance.user.dto.UserContractSummaryDTO;
 
 @Service
@@ -99,11 +99,11 @@ public class UserService {
         }
         Object[] row = (Object[]) result;
 
-        Long totalContracts = ((Number) row[0]).longValue();
-        Long completedContracts = ((Number) row[1]).longValue();
-        Long terminatedContracts = ((Number) row[2]).longValue();
-        Double totalEarnings = ((Number) row[3]).doubleValue();
-        Double averageContractValue = ((Number) row[4]).doubleValue();
+        Long totalContracts = row[0] != null ? ((Number) row[0]).longValue() : 0L;
+        Long completedContracts = row[1] != null ? ((Number) row[1]).longValue() : 0L;
+        Long terminatedContracts = row[2] != null ? ((Number) row[2]).longValue() : 0L;
+        Double totalEarnings = row[3] != null ? ((Number) row[3]).doubleValue() : 0.0;
+        Double averageContractValue = row[4] != null ? ((Number) row[4]).doubleValue() : 0.0;
 
         return new UserContractSummaryDTO(
                 user.getId(),
