@@ -167,4 +167,9 @@ public class PayoutController {
 
         return ResponseEntity.ok(payoutService.getTopUsedPromoCodes(limit));
     }
+
+    @PutMapping("/{id}/retry")
+    public ResponseEntity<Payout> retryPayout(@PathVariable Long id) {
+        return ResponseEntity.ok(payoutService.retryPayout(id));
+    }
 }

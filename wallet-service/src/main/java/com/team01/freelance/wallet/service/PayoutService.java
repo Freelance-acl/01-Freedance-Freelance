@@ -19,6 +19,7 @@ import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -31,7 +32,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import org.springframework.transaction.annotation.Transactional;
 import java.util.HashMap;
 
 @Service
@@ -121,6 +121,43 @@ public class PayoutService {
 
     public void deleteAllPayouts() {
         payoutRepository.deleteAll();
+    }
+
+    @Transactional
+    public Payout retryPayout(Long id) {
+
+        Payout payout = payoutRepository.findById(id)
+                .orElseThrow(() ->
+                        new EntityNotFoundException("Payout not found with id: " + id));
+
+        if (payout.getStatus() != PayoutStatus.FAILED) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only FAILED payouts can be retried");
+        }
+
+        Map<String, Object> transactionDetails = payout.getTransactionDetails();
+
+        if (transactionDetails == null) {
+            throw new IllegalArgumentException("Transaction details are missing");
+        }
+
+        int retryAttempt = 0;
+
+        Object retryValue = transactionDetails.get("retryAttempt");
+
+        if (retryValue instanceof Number) {
+            retryAttempt = ((Number) retryValue).intValue();
+        }
+
+        // Hardcoded to COMPLETED as there does not exist payments.
+
+        transactionDetails.put("retryAttempt", retryAttempt + 1);
+        transactionDetails.put("gatewayResponse", "approved");
+
+        payout.setStatus(PayoutStatus.COMPLETED);
+
+        payout.setTransactionDetails(transactionDetails);
+
+        return payoutRepository.save(payout);
     }
 
     public PayoutDetailsDTO getPayoutDetails(Long payoutId) {
