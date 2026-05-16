@@ -3,9 +3,11 @@ package com.team01.freelance.job.controller;
 import com.team01.freelance.job.exception.ForbiddenOperationException;
 import com.team01.freelance.job.model.JobAttachmentAlertDTO;
 import com.team01.freelance.job.model.JobAttachmentVerificationRequest;
+import com.team01.freelance.job.model.JobCloseRequest;
 import com.team01.freelance.job.model.JobRatingRequest;
 import com.team01.freelance.job.model.JobCloseRequest;
 import com.team01.freelance.job.model.Job;
+import com.team01.freelance.job.model.JobStatus;
 import com.team01.freelance.job.model.JobStatus;
 import com.team01.freelance.job.service.JobService;
 import jakarta.persistence.EntityNotFoundException;
@@ -19,6 +21,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.LinkedHashMap;
@@ -152,6 +155,45 @@ public class JobController {
         } catch (EntityNotFoundException e) {
             return ResponseEntity.notFound().build();
         }
+    }
+
+    /**
+     * Searches jobs by a key-value pair in the requirements JSONB column.
+     * Optionally filters by job status.
+     *
+     * @param key the JSON key to search for in requirements
+     * @param value the value to match
+     * @param status the optional job status filter
+     * @return 200 with list of matching jobs
+     */
+    /**
+     * Closes a job and rejects all related SUBMITTED proposals.
+     *
+     * @param id the job ID
+     * @param closeRequest must contain {@code status: "CLOSED"}
+     * @return 200 with closed job, 400 if an ACTIVE contract exists or status is invalid, or 404 if not found
+     */
+    @PutMapping("/{id}/close")
+    public ResponseEntity<Job> closeJob(@PathVariable Long id, @RequestBody JobCloseRequest closeRequest) {
+        if (closeRequest == null || closeRequest.getStatus() == null
+                || !JobStatus.CLOSED.name().equalsIgnoreCase(closeRequest.getStatus())) {
+            return ResponseEntity.badRequest().build();
+        }
+        try {
+            return ResponseEntity.ok(jobService.closeJob(id));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    @GetMapping("/requirements/search")
+    public ResponseEntity<List<Job>> searchByRequirements(
+            @RequestParam String key,
+            @RequestParam String value,
+            @RequestParam(required = false) String status) {
+        return ResponseEntity.ok(jobService.searchByRequirements(key, value, status));
     }
 
     private Map<String, Object> toJobWithAttachmentsResponse(Job job) {

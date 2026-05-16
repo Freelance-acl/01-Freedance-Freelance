@@ -3,7 +3,9 @@ package com.team01.freelance.job.repository;
 import com.team01.freelance.job.model.Job;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
@@ -16,21 +18,50 @@ public interface JobRepository extends JpaRepository<Job, Long> {
 	List<Job> findJobsWithExpiredAttachments();
 
 	/**
-	 * Atomically sets job status to CLOSED only when no ACTIVE contract exists for the job.
+	 * Searches jobs by a key-value pair in the requirements JSONB column.
+	 * Filters by status if provided.
 	 *
-	 * @return number of rows updated (0 if job not found or an ACTIVE contract exists)
+	 * @param key the JSON key to search for
+	 * @param value the value to match
+	 * @param status the job status filter (optional)
+	 * @return a list of jobs matching the criteria
+	 */
+	@Query(value = "SELECT j.* FROM jobs j " +
+			"WHERE j.requirements #>> ARRAY[:key] = :value " +
+			"AND (:status IS NULL OR j.status = CAST(:status AS VARCHAR))",
+			nativeQuery = true)
+	List<Job> searchByRequirements(@Param("key") String key, @Param("value") String value, @Param("status") String status);
+
+	/**
+	 * Searches jobs by a key-value pair in the requirements JSONB column.
+	 * Returns all jobs regardless of status.
+	 *
+	 * @param key the JSON key to search for
+	 * @param value the value to match
+	 * @return a list of jobs matching the criteria
+	 */
+	@Query(value = "SELECT j.* FROM jobs j " +
+			"WHERE j.requirements #>> ARRAY[:key] = :value",
+			nativeQuery = true)
+	List<Job> searchByRequirements(@Param("key") String key, @Param("value") String value);
+
+	/**
+	 * Atomically closes a job only when no ACTIVE contract exists for it.
+	 *
+	 * @return number of rows updated (1 = closed, 0 = blocked or already closed)
 	 */
 	@Modifying(clearAutomatically = true)
 	@Query(value = """
-			UPDATE jobs j
+			UPDATE jobs
 			SET status = 'CLOSED'
-			WHERE j.id = :jobId
+			WHERE id = :jobId
+			  AND status <> 'CLOSED'
 			  AND NOT EXISTS (
-			      SELECT 1 FROM contracts c
-			      WHERE c.job_id = j.id AND c.status = 'ACTIVE'
+			    SELECT 1 FROM contracts c
+			    WHERE c.job_id = :jobId AND c.status = 'ACTIVE'
 			  )
 			""", nativeQuery = true)
-	int closeJobIfNoActiveContract(@Param("jobId") Long jobId);
+	int closeJobIfEligible(@Param("jobId") Long jobId);
 
 	@Modifying(clearAutomatically = true)
 	@Query(value = """

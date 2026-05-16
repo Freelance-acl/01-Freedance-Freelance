@@ -8,6 +8,7 @@ import com.team01.freelance.job.model.JobAttachment;
 import com.team01.freelance.job.model.JobAttachmentVerificationRequest;
 import com.team01.freelance.job.model.Job;
 import com.team01.freelance.job.model.JobRatingRequest;
+import com.team01.freelance.job.model.JobStatus;
 import com.team01.freelance.job.repository.JobAttachmentRepository;
 import com.team01.freelance.job.repository.JobRepository;
 import com.team01.freelance.user.model.User;
@@ -218,8 +219,26 @@ public class JobService {
     }
 
     /**
+     * Searches jobs by a key-value pair in the requirements JSONB column.
+     * Optionally filters by job status.
+     *
+     * @param key the JSON key to search for in requirements
+     * @param value the value to match
+     * @param status the optional job status filter
+     * @return a list of jobs matching the criteria
+     */
+    public List<Job> searchByRequirements(String key, String value, String status) {
+        if (status != null && !status.isEmpty()) {
+            return jobRepository.searchByRequirements(key, value, status);
+        } else {
+            return jobRepository.searchByRequirements(key, value);
+        }
+    }
+
+    /**
      * Closes a job and rejects all related SUBMITTED proposals.
-     * Prevents closure if there is an ACTIVE contract for the job.
+     * Eligibility and status transition are enforced in one conditional UPDATE so a
+     * concurrent contract activation cannot slip in between check and write.
      *
      * @param jobId the job ID to close
      * @return the closed job
@@ -228,16 +247,25 @@ public class JobService {
      */
     @Transactional
     public Job closeJob(Long jobId) {
-        int updated = jobRepository.closeJobIfNoActiveContract(jobId);
-        if (updated > 0) {
-            jobRepository.rejectSubmittedProposalsByJobId(jobId);
-            return jobRepository.findById(jobId)
-                    .orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + jobId));
+        Job job = jobRepository.findById(jobId)
+                .orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + jobId));
+
+        if (job.getStatus() == JobStatus.CLOSED) {
+            return job;
         }
 
-        if (!jobRepository.existsById(jobId)) {
-            throw new EntityNotFoundException("Job not found with id: " + jobId);
+        int updated = jobRepository.closeJobIfEligible(jobId);
+        if (updated == 0) {
+            Job current = jobRepository.findById(jobId).orElseThrow();
+            if (current.getStatus() == JobStatus.CLOSED) {
+                return current;
+            }
+            throw new IllegalArgumentException("Cannot close job with an active contract");
         }
-        throw new IllegalArgumentException("Cannot close job with an active contract");
+
+        jobRepository.rejectSubmittedProposalsByJobId(jobId);
+
+        return jobRepository.findById(jobId)
+                .orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + jobId));
     }
 }
