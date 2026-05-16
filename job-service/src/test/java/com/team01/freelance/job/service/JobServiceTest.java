@@ -443,6 +443,57 @@ class JobServiceTest {
         verify(jobRepository).findJobsWithExpiredAttachments();
     }
 
+    @Test
+    void closeJob_usesAtomicUpdateAndRejectsProposals() {
+        Long jobId = 1L;
+        Job openJob = new Job();
+        openJob.setId(jobId);
+        openJob.setStatus(JobStatus.OPEN);
+
+        Job closedJob = new Job();
+        closedJob.setId(jobId);
+        closedJob.setStatus(JobStatus.CLOSED);
+
+        when(jobRepository.findById(jobId)).thenReturn(Optional.of(openJob), Optional.of(closedJob));
+        when(jobRepository.closeJobIfEligible(jobId)).thenReturn(1);
+
+        Job result = jobService.closeJob(jobId);
+
+        assertEquals(JobStatus.CLOSED, result.getStatus());
+        verify(jobRepository).closeJobIfEligible(jobId);
+        verify(jobRepository).rejectSubmittedProposalsByJobId(jobId);
+        verify(jobRepository, never()).save(any(Job.class));
+    }
+
+    @Test
+    void closeJob_throwsWhenAtomicUpdateBlocked() {
+        Long jobId = 1L;
+        Job openJob = new Job();
+        openJob.setId(jobId);
+        openJob.setStatus(JobStatus.OPEN);
+
+        when(jobRepository.findById(jobId)).thenReturn(Optional.of(openJob));
+        when(jobRepository.closeJobIfEligible(jobId)).thenReturn(0);
+
+        assertThrows(IllegalArgumentException.class, () -> jobService.closeJob(jobId));
+        verify(jobRepository, never()).rejectSubmittedProposalsByJobId(anyLong());
+    }
+
+    @Test
+    void closeJob_returnsEarlyWhenAlreadyClosed() {
+        Long jobId = 1L;
+        Job closedJob = new Job();
+        closedJob.setId(jobId);
+        closedJob.setStatus(JobStatus.CLOSED);
+
+        when(jobRepository.findById(jobId)).thenReturn(Optional.of(closedJob));
+
+        Job result = jobService.closeJob(jobId);
+
+        assertEquals(JobStatus.CLOSED, result.getStatus());
+        verify(jobRepository, never()).closeJobIfEligible(anyLong());
+    }
+
     private Job createJobWithAttachments(Long id, String title, JobStatus status, JobAttachment... attachments) {
         Job job = new Job();
         job.setId(id);

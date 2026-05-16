@@ -3,8 +3,10 @@ package com.team01.freelance.job.controller;
 import com.team01.freelance.job.exception.ForbiddenOperationException;
 import com.team01.freelance.job.model.JobAttachmentAlertDTO;
 import com.team01.freelance.job.model.JobAttachmentVerificationRequest;
+import com.team01.freelance.job.model.JobCloseRequest;
 import com.team01.freelance.job.model.JobRatingRequest;
 import com.team01.freelance.job.model.Job;
+import com.team01.freelance.job.model.JobStatus;
 import com.team01.freelance.job.service.JobService;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -139,6 +141,28 @@ public class JobController {
      * @param status the optional job status filter
      * @return 200 with list of matching jobs
      */
+    /**
+     * Closes a job and rejects all related SUBMITTED proposals.
+     *
+     * @param id the job ID
+     * @param closeRequest must contain {@code status: "CLOSED"}
+     * @return 200 with closed job, 400 if an ACTIVE contract exists or status is invalid, or 404 if not found
+     */
+    @PutMapping("/{id}/close")
+    public ResponseEntity<Job> closeJob(@PathVariable Long id, @RequestBody JobCloseRequest closeRequest) {
+        if (closeRequest == null || closeRequest.getStatus() == null
+                || !JobStatus.CLOSED.name().equalsIgnoreCase(closeRequest.getStatus())) {
+            return ResponseEntity.badRequest().build();
+        }
+        try {
+            return ResponseEntity.ok(jobService.closeJob(id));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
     @GetMapping("/requirements/search")
     public ResponseEntity<List<Job>> searchByRequirements(
             @RequestParam String key,

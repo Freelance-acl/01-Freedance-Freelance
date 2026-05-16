@@ -8,6 +8,7 @@ import com.team01.freelance.job.model.JobAttachment;
 import com.team01.freelance.job.model.JobAttachmentVerificationRequest;
 import com.team01.freelance.job.model.Job;
 import com.team01.freelance.job.model.JobRatingRequest;
+import com.team01.freelance.job.model.JobStatus;
 import com.team01.freelance.job.repository.JobAttachmentRepository;
 import com.team01.freelance.job.repository.JobRepository;
 import com.team01.freelance.user.model.User;
@@ -232,5 +233,39 @@ public class JobService {
         } else {
             return jobRepository.searchByRequirements(key, value);
         }
+    }
+
+    /**
+     * Closes a job and rejects all related SUBMITTED proposals.
+     * Eligibility and status transition are enforced in one conditional UPDATE so a
+     * concurrent contract activation cannot slip in between check and write.
+     *
+     * @param jobId the job ID to close
+     * @return the closed job
+     * @throws EntityNotFoundException if the job is not found
+     * @throws IllegalArgumentException if an ACTIVE contract exists for the job
+     */
+    @Transactional
+    public Job closeJob(Long jobId) {
+        Job job = jobRepository.findById(jobId)
+                .orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + jobId));
+
+        if (job.getStatus() == JobStatus.CLOSED) {
+            return job;
+        }
+
+        int updated = jobRepository.closeJobIfEligible(jobId);
+        if (updated == 0) {
+            Job current = jobRepository.findById(jobId).orElseThrow();
+            if (current.getStatus() == JobStatus.CLOSED) {
+                return current;
+            }
+            throw new IllegalArgumentException("Cannot close job with an active contract");
+        }
+
+        jobRepository.rejectSubmittedProposalsByJobId(jobId);
+
+        return jobRepository.findById(jobId)
+                .orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + jobId));
     }
 }

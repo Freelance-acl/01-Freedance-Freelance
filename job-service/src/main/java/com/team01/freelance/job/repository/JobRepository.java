@@ -2,6 +2,7 @@ package com.team01.freelance.job.repository;
 
 import com.team01.freelance.job.model.Job;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -41,5 +42,31 @@ public interface JobRepository extends JpaRepository<Job, Long> {
 			"WHERE j.requirements #>> ARRAY[:key] = :value",
 			nativeQuery = true)
 	List<Job> searchByRequirements(@Param("key") String key, @Param("value") String value);
+
+	/**
+	 * Atomically closes a job only when no ACTIVE contract exists for it.
+	 *
+	 * @return number of rows updated (1 = closed, 0 = blocked or already closed)
+	 */
+	@Modifying(clearAutomatically = true)
+	@Query(value = """
+			UPDATE jobs
+			SET status = 'CLOSED'
+			WHERE id = :jobId
+			  AND status <> 'CLOSED'
+			  AND NOT EXISTS (
+			    SELECT 1 FROM contracts c
+			    WHERE c.job_id = :jobId AND c.status = 'ACTIVE'
+			  )
+			""", nativeQuery = true)
+	int closeJobIfEligible(@Param("jobId") Long jobId);
+
+	@Modifying(clearAutomatically = true)
+	@Query(value = """
+			UPDATE proposals
+			SET status = 'REJECTED'
+			WHERE job_id = :jobId AND status = 'SUBMITTED'
+			""", nativeQuery = true)
+	int rejectSubmittedProposalsByJobId(@Param("jobId") Long jobId);
 }
 
