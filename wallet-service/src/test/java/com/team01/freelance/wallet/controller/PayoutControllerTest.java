@@ -108,7 +108,7 @@ class PayoutControllerTest {
     @Test
     void updateReturnsNotFound() throws Exception {
         when(payoutService.updatePayout(eq(999L), any(Payout.class)))
-                .thenThrow(new RuntimeException("Payout not found"));
+                .thenThrow(new EntityNotFoundException("Payout not found with id: 999"));
 
         mockMvc.perform(put("/api/payouts/{id}", 999L)
                         .contentType(MediaType.APPLICATION_JSON)
