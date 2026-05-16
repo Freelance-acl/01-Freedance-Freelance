@@ -83,6 +83,17 @@ public class UserController {
         return ResponseEntity.ok(userService.searchUsers(name, email, role));
     }
 
+    @GetMapping("/preferences/language")
+    public ResponseEntity<List<User>> getUsersByLanguageAndMinimumCompletedContracts(
+            @RequestParam String lang,
+            @RequestParam(defaultValue = "0") Long minContracts) {
+        try {
+            return ResponseEntity.ok(userService.findUsersByLanguageAndMinimumCompletedContracts(lang, minContracts));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
     @PutMapping("/{id}/preferences")
     public ResponseEntity<User> updatePreferences(
             @PathVariable Long id,
