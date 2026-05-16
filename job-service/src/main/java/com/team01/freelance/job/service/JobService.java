@@ -228,18 +228,16 @@ public class JobService {
      */
     @Transactional
     public Job closeJob(Long jobId) {
-        Job job = jobRepository.findById(jobId)
-                .orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + jobId));
-
-        if (jobRepository.countActiveContractsByJobId(jobId) > 0) {
-            throw new IllegalArgumentException("Cannot close job with an active contract");
+        int updated = jobRepository.closeJobIfNoActiveContract(jobId);
+        if (updated > 0) {
+            jobRepository.rejectSubmittedProposalsByJobId(jobId);
+            return jobRepository.findById(jobId)
+                    .orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + jobId));
         }
 
-        job.setStatus(com.team01.freelance.job.model.JobStatus.CLOSED);
-        Job closedJob = jobRepository.save(job);
-
-        jobRepository.rejectSubmittedProposalsByJobId(jobId);
-
-        return closedJob;
+        if (!jobRepository.existsById(jobId)) {
+            throw new EntityNotFoundException("Job not found with id: " + jobId);
+        }
+        throw new IllegalArgumentException("Cannot close job with an active contract");
     }
 }

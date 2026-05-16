@@ -16,7 +16,6 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
 
 import java.sql.Timestamp;
@@ -30,7 +29,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * [S2-F4] Integration tests for {@code PUT /api/jobs/{id}/close}.
  */
-@Transactional
 class CloseJobIntegrationTest extends AbstractIntegrationTest {
 
     private static final String CLOSE_URL = "/api/jobs/{id}/close";
@@ -78,6 +76,7 @@ class CloseJobIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isBadRequest());
 
         jdbcTemplate.update("UPDATE contracts SET status = ? WHERE id = ?", "COMPLETED", contractId);
+        assertEquals(0, countActiveContracts(job.getId()));
 
         mockMvc.perform(put(CLOSE_URL, job.getId())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -156,6 +155,13 @@ class CloseJobIntegrationTest extends AbstractIntegrationTest {
         Integer count = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM proposals WHERE job_id = ? AND status = ?",
                 Integer.class, jobId, status);
+        return count != null ? count : 0;
+    }
+
+    private int countActiveContracts(Long jobId) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM contracts WHERE job_id = ? AND status = 'ACTIVE'",
+                Integer.class, jobId);
         return count != null ? count : 0;
     }
 }
