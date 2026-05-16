@@ -216,4 +216,28 @@ public class JobService {
 
         return refreshedJob;
     }
+
+    /**
+     * Closes a job and rejects all related SUBMITTED proposals.
+     * Prevents closure if there is an ACTIVE contract for the job.
+     *
+     * @param jobId the job ID to close
+     * @return the closed job
+     * @throws EntityNotFoundException if the job is not found
+     * @throws IllegalArgumentException if an ACTIVE contract exists for the job
+     */
+    @Transactional
+    public Job closeJob(Long jobId) {
+        int updated = jobRepository.closeJobIfNoActiveContract(jobId);
+        if (updated > 0) {
+            jobRepository.rejectSubmittedProposalsByJobId(jobId);
+            return jobRepository.findById(jobId)
+                    .orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + jobId));
+        }
+
+        if (!jobRepository.existsById(jobId)) {
+            throw new EntityNotFoundException("Job not found with id: " + jobId);
+        }
+        throw new IllegalArgumentException("Cannot close job with an active contract");
+    }
 }
