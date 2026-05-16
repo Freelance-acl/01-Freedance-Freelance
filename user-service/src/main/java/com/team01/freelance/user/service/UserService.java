@@ -5,9 +5,13 @@ import com.team01.freelance.user.repository.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-
+import com.team01.freelance.user.model.UserRole;
 import java.util.List;
 import java.util.Optional;
+import java.util.Map;
+import java.util.HashMap;
+import org.springframework.transaction.annotation.Transactional;
+import com.team01.freelance.user.dto.UserContractSummaryDTO;
 
 @Service
 public class UserService {
@@ -62,5 +66,65 @@ public class UserService {
 
     public void deleteAllUsers() {
         userRepository.deleteAll();
+    }
+
+    public List<User> searchUsers(String name, String email, UserRole role) {
+        return userRepository.searchUsers(name, email, role);
+    }
+
+    @Transactional
+    public User updatePreferences(Long id, Map<String, Object> incomingPreferences) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("User not found with id: " + id));
+
+        Map<String, Object> merged = user.getPreferences() != null
+                ? new HashMap<>(user.getPreferences())
+                : new HashMap<>();
+
+        if (incomingPreferences != null) {
+            merged.putAll(incomingPreferences);
+        }
+
+        user.setPreferences(merged);
+        return userRepository.save(user);
+    }
+
+    public UserContractSummaryDTO getUserContractSummary(Long id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("User not found with id: " + id));
+
+        Object result = userRepository.getUserContractSummary(id);
+        if (result == null) {
+            return zeroContractSummary(user);
+        }
+        Object[] row = (Object[]) result;
+
+        Long totalContracts = row[0] != null ? ((Number) row[0]).longValue() : 0L;
+        Long completedContracts = row[1] != null ? ((Number) row[1]).longValue() : 0L;
+        Long terminatedContracts = row[2] != null ? ((Number) row[2]).longValue() : 0L;
+        Double totalEarnings = row[3] != null ? ((Number) row[3]).doubleValue() : 0.0;
+        Double averageContractValue = row[4] != null ? ((Number) row[4]).doubleValue() : 0.0;
+
+        return new UserContractSummaryDTO(
+                user.getId(),
+                user.getName(),
+                totalContracts,
+                completedContracts,
+                terminatedContracts,
+                totalEarnings,
+                averageContractValue
+        );
+    }
+
+    private static UserContractSummaryDTO zeroContractSummary(User user) {
+        return new UserContractSummaryDTO(
+                user.getId(),
+                user.getName(),
+                0L,
+                0L,
+                0L,
+                0.0,
+                0.0
+        );
     }
 }

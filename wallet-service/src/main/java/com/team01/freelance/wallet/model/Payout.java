@@ -7,6 +7,7 @@ import org.hibernate.type.SqlTypes;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 @Entity
 @Table(name = "payouts")
@@ -39,13 +40,16 @@ public class Payout {
     @JsonAlias({"transactionDetails", "transaction_details"})
     @JdbcTypeCode(SqlTypes.JSON)
     private Map<String, Object> transactionDetails;
+
+    @JsonIgnore
+    @OneToMany(mappedBy = "payout", fetch = FetchType.EAGER, cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<PayoutPromo> payoutPromos;
     
     @Column(name = "created_at", nullable = false)
     @JsonAlias({"createdAt", "created_at"})
     private LocalDateTime createdAt;
 
     @OneToMany(mappedBy = "payout", fetch = FetchType.LAZY)
-    private List<PayoutPromo> payoutPromos;
 
     @PrePersist
     public void onCreate() {
