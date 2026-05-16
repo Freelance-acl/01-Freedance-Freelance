@@ -1,2 +1,40 @@
-/mvnw text eol=lf
+# Normalize line endings: LF in the Git repository for source and config.
+# Reduces "modified with no diff" noise on Windows when mixing CRLF/LF.
+* text=auto
+
+*.java text eol=lf
+*.xml text eol=lf
+*.properties text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.md text eol=lf
+*.json text eol=lf
+*.sql text eol=lf
+*.gradle text eol=lf
+*.gradle.kts text eol=lf
+*.txt text eol=lf
+*.html text eol=lf
+*.css text eol=lf
+*.js text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.jsx text eol=lf
+
+# Windows-only scripts keep CRLF
 *.cmd text eol=crlf
+*.bat text eol=crlf
+
+# Maven wrapper (Unix)
+/mvnw text eol=lf
+**/mvnw text eol=lf
+
+# Common binaries
+*.jar binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary

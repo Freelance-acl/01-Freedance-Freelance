@@ -6,5 +6,6 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface PayoutPromoRepository extends JpaRepository<PayoutPromo, Long> {
+    boolean existsByPayoutIdAndPromoCodeId(Long payoutId, Long promoCodeId);
 }
 

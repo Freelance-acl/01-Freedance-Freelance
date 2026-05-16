@@ -54,6 +54,14 @@ class PromoCodeControllerTest {
     }
 
     @Test
+    void getByIdReturnsNotFound() throws Exception {
+        when(promoCodeService.getPromoCodeById(999L)).thenReturn(Optional.empty());
+
+        mockMvc.perform(get("/api/promo-codes/{id}", 999L))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     void createReturnsOk() throws Exception {
         PromoCode promoCode = new PromoCode();
         when(promoCodeService.createPromoCode(any(PromoCode.class))).thenReturn(promoCode);
@@ -76,11 +84,30 @@ class PromoCodeControllerTest {
     }
 
     @Test
+    void updateReturnsNotFound() throws Exception {
+        when(promoCodeService.updatePromoCode(eq(999L), any(PromoCode.class)))
+                .thenThrow(new RuntimeException("Promo code not found"));
+
+        mockMvc.perform(put("/api/promo-codes/{id}", 999L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     void deleteByIdReturnsNoContent() throws Exception {
         when(promoCodeService.deletePromoCodeById(1L)).thenReturn(true);
 
         mockMvc.perform(delete("/api/promo-codes/{id}", 1L))
                 .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void deleteByIdReturnsNotFound() throws Exception {
+        when(promoCodeService.deletePromoCodeById(999L)).thenReturn(false);
+
+        mockMvc.perform(delete("/api/promo-codes/{id}", 999L))
+                .andExpect(status().isNotFound());
     }
 
     @Test
