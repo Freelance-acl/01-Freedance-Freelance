@@ -2,6 +2,7 @@ package com.team01.freelance.user.controller;
 
 import com.team01.freelance.user.model.User;
 import com.team01.freelance.user.service.UserService;
+import com.team01.freelance.user.service.UserSkillService;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -25,6 +26,9 @@ public class UserController {
 
     @Autowired
     private UserService userService;
+
+    @Autowired
+    private UserSkillService userSkillService;
 
     @GetMapping
     public ResponseEntity<List<User>> getAllUsers() {
@@ -98,6 +102,26 @@ public class UserController {
     public ResponseEntity<UserContractSummaryDTO> getUserContractSummary(@PathVariable Long id) {
         try {
             return ResponseEntity.ok(userService.getUserContractSummary(id));
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    /**
+     * Sets a user skill as the sole primary skill for that user.
+     *
+     * @param userId the user ID
+     * @param skillId the user-skill ID
+     * @return 200 with user and skills, 400 if skill belongs to another user, or 404 if not found
+     */
+    @PutMapping("/{userId}/skills/{skillId}/primary")
+    public ResponseEntity<User> setPrimarySkill(
+            @PathVariable Long userId,
+            @PathVariable Long skillId) {
+        try {
+            return ResponseEntity.ok(userSkillService.setPrimarySkill(userId, skillId));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
         } catch (EntityNotFoundException e) {
             return ResponseEntity.notFound().build();
         }
