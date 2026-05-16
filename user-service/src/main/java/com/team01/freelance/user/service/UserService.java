@@ -123,6 +123,19 @@ public class UserService {
         );
     }
 
+    public List<User> findUsersByLanguageAndMinimumCompletedContracts(String lang, Long minContracts) {
+        if (lang == null || lang.trim().isEmpty()) {
+            throw new IllegalArgumentException("Language cannot be blank");
+        }
+
+        Long minimumContracts = minContracts != null ? minContracts : 0L;
+
+        return userRepository.findUsersByLanguageAndMinimumCompletedContracts(
+                lang.trim(),
+                minimumContracts
+        );
+    }
+
     public UserContractSummaryDTO getUserContractSummary(Long id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("User not found with id: " + id));
