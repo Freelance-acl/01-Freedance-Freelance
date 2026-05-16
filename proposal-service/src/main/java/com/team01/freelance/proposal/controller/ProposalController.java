@@ -12,8 +12,11 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.format.annotation.DateTimeFormat;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -26,6 +29,17 @@ public class ProposalController {
     @GetMapping
     public ResponseEntity<List<Proposal>> getAllProposals() {
         return ResponseEntity.ok(proposalService.getAllProposals());
+    }
+
+    /**
+     * Search proposals by optional status and inclusive date range on {@code submittedAt}, newest first.
+     */
+    @GetMapping("/search")
+    public ResponseEntity<List<Proposal>> searchProposals(
+            @RequestParam(required = false) String status,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        return ResponseEntity.ok(proposalService.searchProposals(status, startDate, endDate));
     }
 
     @GetMapping("/{id}")

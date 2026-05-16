@@ -1,0 +1,31 @@
+# Multi-module build from repo root: installs all services, then copies one executable jar.
+# Build args: MODULE = Maven module directory name (e.g. user-service, job-service).
+# syntax=docker/dockerfile:1
+
+ARG MODULE=user-service
+
+FROM eclipse-temurin:25.0.2_10-jdk-noble AS build
+ARG MODULE
+WORKDIR /workspace
+
+COPY pom.xml mvnw ./
+COPY .mvn .mvn
+COPY user-service user-service
+COPY job-service job-service
+COPY proposal-service proposal-service
+COPY contract-service contract-service
+COPY wallet-service wallet-service
+
+RUN sed -i 's/\r$//' mvnw && chmod +x mvnw \
+    && ./mvnw -B -ntp install -DskipTests
+
+FROM eclipse-temurin:25.0.2_10-jre-noble
+ARG MODULE
+WORKDIR /app
+RUN groupadd --system --gid 10001 appgroup && useradd --system --uid 10001 --gid appgroup --create-home appuser
+COPY --from=build /workspace/${MODULE}/target/*-exec.jar app.jar
+RUN chown -R appuser:appgroup /app
+EXPOSE 8080
+ENV JAVA_TOOL_OPTIONS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
+USER appuser
+CMD ["java", "-jar", "app.jar"]
