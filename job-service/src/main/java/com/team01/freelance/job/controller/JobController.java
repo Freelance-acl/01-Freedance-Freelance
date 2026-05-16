@@ -9,6 +9,7 @@ import com.team01.freelance.job.model.JobCloseRequest;
 import com.team01.freelance.job.model.Job;
 import com.team01.freelance.job.model.JobStatus;
 import com.team01.freelance.job.model.JobStatus;
+import com.team01.freelance.job.dto.TopBudgetJobDTO;
 import com.team01.freelance.job.service.JobService;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -190,5 +191,25 @@ public class JobController {
         response.put("createdAt", job.getCreatedAt());
         response.put("jobAttachments", job.getJobAttachments() == null ? List.of() : job.getJobAttachments());
         return response;
+    }
+
+    /**
+     * Retrieves the top jobs ordered by budgetMax in descending order.
+     * Includes the count of proposals for each job.
+     *
+     * @param limit the maximum number of jobs to return (default: 10)
+     * @return 200 with list of top budget jobs
+     */
+    /**
+     * Retrieves the top jobs ordered by budgetMax in descending order.
+     * Includes the count of proposals for each job.
+     *
+     * @param limit the maximum number of jobs to return (default: 10)
+     * @return 200 with list of top budget jobs
+     */
+    @GetMapping("/reports/top-budget")
+    public ResponseEntity<List<TopBudgetJobDTO>> getTopBudgetJobs(
+            @RequestParam(name = "limit", defaultValue = "10") int limit) {
+        return ResponseEntity.ok(jobService.getTopBudgetJobs(limit));
     }
 }

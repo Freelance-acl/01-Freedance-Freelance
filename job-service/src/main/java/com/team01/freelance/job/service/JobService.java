@@ -9,6 +9,7 @@ import com.team01.freelance.job.model.JobAttachmentVerificationRequest;
 import com.team01.freelance.job.model.Job;
 import com.team01.freelance.job.model.JobRatingRequest;
 import com.team01.freelance.job.model.JobStatus;
+import com.team01.freelance.job.dto.TopBudgetJobDTO;
 import com.team01.freelance.job.repository.JobAttachmentRepository;
 import com.team01.freelance.job.repository.JobRepository;
 import com.team01.freelance.user.model.User;
@@ -267,5 +268,16 @@ public class JobService {
 
         return jobRepository.findById(jobId)
                 .orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + jobId));
+    }
+
+    /**
+     * Retrieves the top jobs ordered by budgetMax in descending order.
+     * Includes the count of proposals for each job.
+     *
+     * @param limit the maximum number of jobs to return
+     * @return a list of TopBudgetJobDTO with job details and proposal counts
+     */
+    public List<TopBudgetJobDTO> getTopBudgetJobs(int limit) {
+        return jobRepository.findTopBudgetJobs(limit);
     }
 }
