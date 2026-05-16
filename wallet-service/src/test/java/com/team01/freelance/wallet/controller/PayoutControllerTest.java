@@ -1,7 +1,9 @@
 package com.team01.freelance.wallet.controller;
 
 import com.team01.freelance.wallet.dto.FreelancerPayoutSummaryDTO;
+import com.team01.freelance.wallet.dto.PayoutDetailsDTO;
 import com.team01.freelance.wallet.dto.ProcessPayoutRequest;
+import com.team01.freelance.wallet.dto.PromoCodeUsageDTO;
 import com.team01.freelance.wallet.dto.RevenueReportDTO;
 import com.team01.freelance.wallet.exception.GlobalExceptionHandler;
 import com.team01.freelance.wallet.model.Payout;
@@ -21,10 +23,12 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalDate;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.hasSize;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
@@ -72,6 +76,14 @@ class PayoutControllerTest {
     }
 
     @Test
+    void getByIdReturnsNotFound() throws Exception {
+        when(payoutService.getPayoutById(999L)).thenReturn(Optional.empty());
+
+        mockMvc.perform(get("/api/payouts/{id}", 999L))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     void createReturnsOk() throws Exception {
         Payout payout = new Payout();
         when(payoutService.createPayout(any(Payout.class))).thenReturn(payout);
@@ -94,11 +106,30 @@ class PayoutControllerTest {
     }
 
     @Test
+    void updateReturnsNotFound() throws Exception {
+        when(payoutService.updatePayout(eq(999L), any(Payout.class)))
+                .thenThrow(new RuntimeException("Payout not found"));
+
+        mockMvc.perform(put("/api/payouts/{id}", 999L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     void deleteByIdReturnsNoContent() throws Exception {
         when(payoutService.deletePayoutById(1L)).thenReturn(true);
 
         mockMvc.perform(delete("/api/payouts/{id}", 1L))
                 .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void deleteByIdReturnsNotFound() throws Exception {
+        when(payoutService.deletePayoutById(999L)).thenReturn(false);
+
+        mockMvc.perform(delete("/api/payouts/{id}", 999L))
+                .andExpect(status().isNotFound());
     }
 
     @Test
@@ -121,6 +152,132 @@ class PayoutControllerTest {
                 .andExpect(status().isOk());
     }
 
+
+    // -----------------------------------------------------------------------
+    // [S5-F2] Refund Payout
+    // -----------------------------------------------------------------------
+
+    @Test
+    void refundPayout_returnsOkWithRefundedStatus() throws Exception {
+        Payout payout = new Payout();
+        payout.setId(1L);
+        payout.setStatus(PayoutStatus.REFUNDED);
+        when(payoutService.refundPayout(1L, "duplicate charge")).thenReturn(payout);
+
+        mockMvc.perform(put("/api/payouts/{id}/refund", 1L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"duplicate charge\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("REFUNDED"));
+    }
+
+    @Test
+    void refundPayout_notFound_returns404() throws Exception {
+        when(payoutService.refundPayout(999L, "reason"))
+                .thenThrow(new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Payout not found with id: 999"));
+
+        mockMvc.perform(put("/api/payouts/{id}/refund", 999L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"reason\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message", containsString("Payout not found")));
+    }
+
+    @Test
+    void refundPayout_notCompleted_returns400() throws Exception {
+        when(payoutService.refundPayout(1L, "reason"))
+                .thenThrow(new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST, "Only COMPLETED payouts can be refunded"));
+
+        mockMvc.perform(put("/api/payouts/{id}/refund", 1L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"reason\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("COMPLETED")));
+    }
+
+    // -----------------------------------------------------------------------
+    // Payout details & top promos
+    // -----------------------------------------------------------------------
+
+    @Test
+    void getDetails_returnsOkWithPayoutFields() throws Exception {
+        PayoutDetailsDTO dto = new PayoutDetailsDTO();
+        dto.payoutId = 1L;
+        dto.contractId = 42L;
+        dto.originalAmount = 1500.0;
+        dto.status = PayoutStatus.COMPLETED;
+        when(payoutService.getPayoutDetails(1L)).thenReturn(dto);
+
+        mockMvc.perform(get("/api/payouts/{payoutId}/details", 1L))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.payoutId").value(1))
+                .andExpect(jsonPath("$.contractId").value(42))
+                .andExpect(jsonPath("$.originalAmount").value(1500.0))
+                .andExpect(jsonPath("$.status").value("COMPLETED"));
+    }
+
+    @Test
+    void getDetails_notFound_returns404() throws Exception {
+        when(payoutService.getPayoutDetails(999L))
+                .thenThrow(new EntityNotFoundException("Payout not found with id: 999"));
+
+        mockMvc.perform(get("/api/payouts/{payoutId}/details", 999L))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message", containsString("Payout not found")));
+    }
+
+    @Test
+    void getTopUsedPromos_returnsOkWithUsageList() throws Exception {
+        PromoCodeUsageDTO usage = new PromoCodeUsageDTO();
+        usage.code = "SAVE10";
+        usage.timesUsed = 5;
+        when(payoutService.getTopUsedPromoCodes(3)).thenReturn(List.of(usage));
+
+        mockMvc.perform(get("/api/payouts/promos/top-used").param("limit", "3"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].code").value("SAVE10"))
+                .andExpect(jsonPath("$[0].timesUsed").value(5));
+    }
+
+    // -----------------------------------------------------------------------
+    // Retry failed payout
+    // -----------------------------------------------------------------------
+
+    @Test
+    void retryPayout_returnsOkWithCompletedStatus() throws Exception {
+        Payout payout = new Payout();
+        payout.setId(1L);
+        payout.setStatus(PayoutStatus.COMPLETED);
+        when(payoutService.retryPayout(1L)).thenReturn(payout);
+
+        mockMvc.perform(put("/api/payouts/{id}/retry", 1L))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("COMPLETED"));
+    }
+
+    @Test
+    void retryPayout_notFound_returns404() throws Exception {
+        when(payoutService.retryPayout(999L))
+                .thenThrow(new EntityNotFoundException("Payout not found with id: 999"));
+
+        mockMvc.perform(put("/api/payouts/{id}/retry", 999L))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message", containsString("Payout not found")));
+    }
+
+    @Test
+    void retryPayout_notFailed_returns400() throws Exception {
+        when(payoutService.retryPayout(1L))
+                .thenThrow(new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST, "Only FAILED payouts can be retried"));
+
+        mockMvc.perform(put("/api/payouts/{id}/retry", 1L))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("FAILED")));
+    }
 
     // -----------------------------------------------------------------------
     // [S5-F3] Freelancer Payout Summary
@@ -245,6 +402,18 @@ class PayoutControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value(1))
                 .andExpect(jsonPath("$.status").value("PENDING"));
+    }
+
+    @Test
+    void applyPromoCode_notFound_returns404() throws Exception {
+        Long payoutId = 1L;
+        Long promoCodeId = 2L;
+        when(payoutService.applyPromoCode(payoutId, promoCodeId))
+                .thenThrow(new EntityNotFoundException("Payout not found with id: " + payoutId));
+
+        mockMvc.perform(post("/api/payouts/{payoutId}/promos/{promoCodeId}", payoutId, promoCodeId))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message", containsString("Payout not found")));
     }
 
     @Test
