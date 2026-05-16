@@ -1,5 +1,5 @@
 package com.team01.freelance.user.controller;
-
+import static org.hamcrest.Matchers.contains;
 import com.team01.freelance.user.model.ProficiencyLevel;
 import com.team01.freelance.user.model.User;
 import com.team01.freelance.user.model.UserRole;
@@ -85,9 +85,9 @@ class SetPrimarySkillIntegrationTest extends AbstractIntegrationTest {
     void setPrimarySkill_switchesPrimaryBetweenUserSkills() throws Exception {
         mockMvc.perform(put(PRIMARY_URL, user.getId(), skill2.getId()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.userSkills[?(@.skillName=='Spring')].isPrimary").value(true))
-                .andExpect(jsonPath("$.userSkills[?(@.skillName=='Java')].isPrimary").value(false))
-                .andExpect(jsonPath("$.userSkills[?(@.skillName=='PostgreSQL')].isPrimary").value(false));
+                .andExpect(jsonPath("$.userSkills[?(@.skillName=='Spring')].isPrimary").value(contains(true)))
+                .andExpect(jsonPath("$.userSkills[?(@.skillName=='Java')].isPrimary").value(contains(false)))
+                .andExpect(jsonPath("$.userSkills[?(@.skillName=='PostgreSQL')].isPrimary").value(contains(false)));
 
         assertTrue(findSkill(skill2.getId()).getIsPrimary());
         assertFalse(findSkill(skill1.getId()).getIsPrimary());
@@ -95,8 +95,8 @@ class SetPrimarySkillIntegrationTest extends AbstractIntegrationTest {
 
         mockMvc.perform(put(PRIMARY_URL, user.getId(), skill3.getId()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.userSkills[?(@.skillName=='PostgreSQL')].isPrimary").value(true))
-                .andExpect(jsonPath("$.userSkills[?(@.skillName=='Spring')].isPrimary").value(false));
+                .andExpect(jsonPath("$.userSkills[?(@.skillName=='PostgreSQL')].isPrimary").value(contains(true)))
+                .andExpect(jsonPath("$.userSkills[?(@.skillName=='Spring')].isPrimary").value(contains(false)));
 
         assertTrue(findSkill(skill3.getId()).getIsPrimary());
         assertFalse(findSkill(skill2.getId()).getIsPrimary());
