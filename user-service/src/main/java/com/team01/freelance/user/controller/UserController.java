@@ -18,6 +18,7 @@ import com.team01.freelance.user.model.UserRole;
 import java.util.Map;
 import java.util.List;
 import com.team01.freelance.user.dto.UserContractSummaryDTO;
+import com.team01.freelance.user.dto.UserProfileDTO;
 
 @RestController
 @RequestMapping("/api/users")
@@ -89,6 +90,15 @@ public class UserController {
             @RequestBody Map<String, Object> preferences) {
         try {
             return ResponseEntity.ok(userService.updatePreferences(id, preferences));
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    @GetMapping("/{id}/profile")
+    public ResponseEntity<UserProfileDTO> getUserProfile(@PathVariable Long id) {
+        try {
+            return ResponseEntity.ok(userService.getUserProfile(id));
         } catch (EntityNotFoundException e) {
             return ResponseEntity.notFound().build();
         }
