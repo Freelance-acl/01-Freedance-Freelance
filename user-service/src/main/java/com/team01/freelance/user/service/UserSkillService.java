@@ -99,7 +99,7 @@ public class UserSkillService {
 
         List<UserSkill> skills = user.getUserSkills();
         if (skills == null || skills.isEmpty()) {
-            user.setUserSkills(new ArrayList<>(userSkillRepository.findByUser_Id(userId)));
+            user.setUserSkills(new ArrayList<>(userSkillRepository.findByUserId(userId)));
             skills = user.getUserSkills();
         }
 

@@ -163,7 +163,7 @@ class UserSkillServiceTest {
         assertFalse(skill1.getIsPrimary());
         assertTrue(skill2.getIsPrimary());
         verify(userRepository).save(user);
-        verify(userSkillRepository, never()).findByUser_Id(anyLong());
+        verify(userSkillRepository, never()).findByUserId(anyLong());
     }
 
     @Test
