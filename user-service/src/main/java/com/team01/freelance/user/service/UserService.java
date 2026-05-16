@@ -12,12 +12,19 @@ import java.util.Map;
 import java.util.HashMap;
 import org.springframework.transaction.annotation.Transactional;
 import com.team01.freelance.user.dto.UserContractSummaryDTO;
+import com.team01.freelance.user.dto.UserProfileDTO;
+import com.team01.freelance.user.dto.UserProfileSkillDTO;
+import com.team01.freelance.user.model.UserSkill;
+import com.team01.freelance.user.repository.UserSkillRepository;
 
 @Service
 public class UserService {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private UserSkillRepository userSkillRepository;
 
     public List<User> getAllUsers() {
         return userRepository.findAll();
@@ -87,6 +94,46 @@ public class UserService {
 
         user.setPreferences(merged);
         return userRepository.save(user);
+    }
+    public UserProfileDTO getUserProfile(Long id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("User not found with id: " + id));
+
+        List<UserSkill> userSkills = userSkillRepository.findByUserId(id);
+
+        List<UserProfileSkillDTO> skills = userSkills.stream()
+                .map(skill -> new UserProfileSkillDTO(
+                        skill.getSkillName(),
+                        skill.getCategory(),
+                        skill.getYearsOfExperience(),
+                        skill.getProficiencyLevel(),
+                        skill.getIsPrimary() != null ? skill.getIsPrimary() : false,
+                        skill.getMetadata()
+                ))
+                .toList();
+
+        return new UserProfileDTO(
+                user.getId(),
+                user.getName(),
+                user.getEmail(),
+                user.getPhone(),
+                user.getPreferences(),
+                skills,
+                skills.size()
+        );
+    }
+
+    public List<User> findUsersByLanguageAndMinimumCompletedContracts(String lang, Long minContracts) {
+        if (lang == null || lang.trim().isEmpty()) {
+            throw new IllegalArgumentException("Language cannot be blank");
+        }
+
+        Long minimumContracts = minContracts != null ? minContracts : 0L;
+
+        return userRepository.findUsersByLanguageAndMinimumCompletedContracts(
+                lang.trim(),
+                minimumContracts
+        );
     }
 
     public UserContractSummaryDTO getUserContractSummary(Long id) {

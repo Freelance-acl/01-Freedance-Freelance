@@ -19,6 +19,7 @@ import com.team01.freelance.user.model.UserRole;
 import java.util.Map;
 import java.util.List;
 import com.team01.freelance.user.dto.UserContractSummaryDTO;
+import com.team01.freelance.user.dto.UserProfileDTO;
 
 @RestController
 @RequestMapping("/api/users")
@@ -87,12 +88,32 @@ public class UserController {
         return ResponseEntity.ok(userService.searchUsers(name, email, role));
     }
 
+    @GetMapping("/preferences/language")
+    public ResponseEntity<List<User>> getUsersByLanguageAndMinimumCompletedContracts(
+            @RequestParam String lang,
+            @RequestParam(defaultValue = "0") Long minContracts) {
+        try {
+            return ResponseEntity.ok(userService.findUsersByLanguageAndMinimumCompletedContracts(lang, minContracts));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
     @PutMapping("/{id}/preferences")
     public ResponseEntity<User> updatePreferences(
             @PathVariable Long id,
             @RequestBody Map<String, Object> preferences) {
         try {
             return ResponseEntity.ok(userService.updatePreferences(id, preferences));
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    @GetMapping("/{id}/profile")
+    public ResponseEntity<UserProfileDTO> getUserProfile(@PathVariable Long id) {
+        try {
+            return ResponseEntity.ok(userService.getUserProfile(id));
         } catch (EntityNotFoundException e) {
             return ResponseEntity.notFound().build();
         }
