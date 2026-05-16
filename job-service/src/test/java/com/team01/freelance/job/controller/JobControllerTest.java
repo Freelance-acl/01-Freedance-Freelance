@@ -225,6 +225,49 @@ class JobControllerTest {
                 .andExpect(jsonPath("$.length()").value(0));
     }
 
+    @Test
+    void closeJob_returnsOkWithClosedStatus() throws Exception {
+        Job job = new Job();
+        job.setId(1L);
+        job.setStatus(JobStatus.CLOSED);
+        when(jobService.closeJob(1L)).thenReturn(job);
+
+        mockMvc.perform(put("/api/jobs/{id}/close", 1L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"CLOSED\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CLOSED"));
+    }
+
+    @Test
+    void closeJob_returnsBadRequestWhenActiveContract() throws Exception {
+        when(jobService.closeJob(1L))
+                .thenThrow(new IllegalArgumentException("Cannot close job with an active contract"));
+
+        mockMvc.perform(put("/api/jobs/{id}/close", 1L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"CLOSED\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void closeJob_returnsBadRequestForInvalidStatus() throws Exception {
+        mockMvc.perform(put("/api/jobs/{id}/close", 1L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"OPEN\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void closeJob_returnsNotFound() throws Exception {
+        when(jobService.closeJob(1L)).thenThrow(new EntityNotFoundException("Job not found with id: 1"));
+
+        mockMvc.perform(put("/api/jobs/{id}/close", 1L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"CLOSED\"}"))
+                .andExpect(status().isNotFound());
+    }
+
     private JobAttachmentAlertDTO buildAlertDto(Long jobId, String jobTitle, JobStatus jobStatus, int expiredCount) {
         JobAttachmentAlertDTO dto = new JobAttachmentAlertDTO();
         dto.setJobId(jobId);
