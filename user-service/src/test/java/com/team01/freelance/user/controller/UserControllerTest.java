@@ -4,7 +4,9 @@ import com.team01.freelance.user.dto.UserContractSummaryDTO;
 import com.team01.freelance.user.exception.GlobalExceptionHandler;
 import com.team01.freelance.user.model.User;
 import com.team01.freelance.user.model.UserRole;
+import com.team01.freelance.user.model.UserSkill;
 import com.team01.freelance.user.service.UserService;
+import com.team01.freelance.user.service.UserSkillService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -39,12 +41,15 @@ class UserControllerTest {
 
     private MockMvc mockMvc;
     private UserService userService;
+    private UserSkillService userSkillService;
 
     @BeforeEach
     void setUp() {
         UserController controller = new UserController();
         userService = mock(UserService.class);
+        userSkillService = mock(UserSkillService.class);
         ReflectionTestUtils.setField(controller, "userService", userService);
+        ReflectionTestUtils.setField(controller, "userSkillService", userSkillService);
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
@@ -226,6 +231,47 @@ class UserControllerTest {
                 .thenThrow(new EntityNotFoundException("User not found with id: 999"));
 
         mockMvc.perform(get("/api/users/{id}/contract-summary", 999L))
+                .andExpect(status().isNotFound());
+    }
+
+    // -----------------------------------------------------------------------
+    // [S1-F7] Set Primary Skill
+    // -----------------------------------------------------------------------
+
+    @Test
+    void setPrimarySkill_returnsOkWithUserAndSkills() throws Exception {
+        User user = new User();
+        user.setId(1L);
+        UserSkill skill = new UserSkill();
+        skill.setId(2L);
+        skill.setSkillName("Spring");
+        skill.setIsPrimary(true);
+        user.setUserSkills(List.of(skill));
+
+        when(userSkillService.setPrimarySkill(1L, 2L)).thenReturn(user);
+
+        mockMvc.perform(put("/api/users/{userId}/skills/{skillId}/primary", 1L, 2L))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.userSkills[0].skillName").value("Spring"))
+                .andExpect(jsonPath("$.userSkills[0].isPrimary").value(true));
+    }
+
+    @Test
+    void setPrimarySkill_returnsBadRequestWhenSkillBelongsToOtherUser() throws Exception {
+        when(userSkillService.setPrimarySkill(1L, 2L))
+                .thenThrow(new IllegalArgumentException("Skill does not belong to this user"));
+
+        mockMvc.perform(put("/api/users/{userId}/skills/{skillId}/primary", 1L, 2L))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void setPrimarySkill_returnsNotFound() throws Exception {
+        when(userSkillService.setPrimarySkill(1L, 2L))
+                .thenThrow(new EntityNotFoundException("User not found with id: 1"));
+
+        mockMvc.perform(put("/api/users/{userId}/skills/{skillId}/primary", 1L, 2L))
                 .andExpect(status().isNotFound());
     }
 }
