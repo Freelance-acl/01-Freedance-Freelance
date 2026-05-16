@@ -134,29 +134,7 @@ public class JobController {
         }
     }
 
-    /**
-     * Closes a job and rejects all related SUBMITTED proposals.
-     * Prevents closure if there is an ACTIVE contract for the job.
-     *
-     * @param id the job ID
-     * @param closeRequest the close request payload
-     * @return 200 with closed job, 400 if an ACTIVE contract exists, or 404 if job is not found
-     */
-    @PutMapping("/{id}/close")
-    public ResponseEntity<Job> closeJob(@PathVariable Long id, @RequestBody JobCloseRequest closeRequest) {
-        if (closeRequest == null || closeRequest.getStatus() == null
-                || !JobStatus.CLOSED.name().equalsIgnoreCase(closeRequest.getStatus())) {
-            return ResponseEntity.badRequest().build();
-        }
-        try {
-            return ResponseEntity.ok(jobService.closeJob(id));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().build();
-        } catch (EntityNotFoundException e) {
-            return ResponseEntity.notFound().build();
-        }
-    }
-
+   
     /**
      * Searches jobs by a key-value pair in the requirements JSONB column.
      * Optionally filters by job status.
