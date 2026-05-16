@@ -2,7 +2,6 @@ package com.team01.freelance.job.service;
 
 import com.team01.freelance.job.client.ContractLookupClient;
 import com.team01.freelance.job.client.ContractSummary;
-import com.team01.freelance.job.client.ProposalLookupClient;
 import com.team01.freelance.job.exception.ForbiddenOperationException;
 import com.team01.freelance.job.model.JobAttachmentAlertDTO;
 import com.team01.freelance.job.model.JobAttachment;
@@ -38,9 +37,6 @@ public class JobService {
 
     @Autowired
     private ContractLookupClient contractLookupClient;
-
-    @Autowired
-    private ProposalLookupClient proposalLookupClient;
 
     @Autowired
     private JobAttachmentRepository jobAttachmentRepository;
@@ -235,17 +231,14 @@ public class JobService {
         Job job = jobRepository.findById(jobId)
                 .orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + jobId));
 
-        // Check if there is an ACTIVE contract for this job
-        if (contractLookupClient.hasActiveContract(jobId)) {
+        if (jobRepository.countActiveContractsByJobId(jobId) > 0) {
             throw new IllegalArgumentException("Cannot close job with an active contract");
         }
 
-        // Update job status to CLOSED
         job.setStatus(com.team01.freelance.job.model.JobStatus.CLOSED);
         Job closedJob = jobRepository.save(job);
 
-        // Reject all SUBMITTED proposals for this job
-        proposalLookupClient.rejectProposalsByJobId(jobId);
+        jobRepository.rejectSubmittedProposalsByJobId(jobId);
 
         return closedJob;
     }

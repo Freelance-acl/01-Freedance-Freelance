@@ -6,6 +6,7 @@ import com.team01.freelance.job.model.JobAttachmentVerificationRequest;
 import com.team01.freelance.job.model.JobRatingRequest;
 import com.team01.freelance.job.model.JobCloseRequest;
 import com.team01.freelance.job.model.Job;
+import com.team01.freelance.job.model.JobStatus;
 import com.team01.freelance.job.service.JobService;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -140,6 +141,10 @@ public class JobController {
      */
     @PutMapping("/{id}/close")
     public ResponseEntity<Job> closeJob(@PathVariable Long id, @RequestBody JobCloseRequest closeRequest) {
+        if (closeRequest == null || closeRequest.getStatus() == null
+                || !JobStatus.CLOSED.name().equalsIgnoreCase(closeRequest.getStatus())) {
+            return ResponseEntity.badRequest().build();
+        }
         try {
             return ResponseEntity.ok(jobService.closeJob(id));
         } catch (IllegalArgumentException e) {

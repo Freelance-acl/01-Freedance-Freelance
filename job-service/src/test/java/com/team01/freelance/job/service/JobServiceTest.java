@@ -443,6 +443,47 @@ class JobServiceTest {
         verify(jobRepository).findJobsWithExpiredAttachments();
     }
 
+    @Test
+    void closeJob_throwsWhenActiveContractExists() {
+        Long jobId = 1L;
+        Job job = new Job();
+        job.setId(jobId);
+        job.setStatus(JobStatus.OPEN);
+
+        when(jobRepository.findById(jobId)).thenReturn(Optional.of(job));
+        when(jobRepository.countActiveContractsByJobId(jobId)).thenReturn(1L);
+
+        assertThrows(IllegalArgumentException.class, () -> jobService.closeJob(jobId));
+        verify(jobRepository, never()).save(any(Job.class));
+        verify(jobRepository, never()).rejectSubmittedProposalsByJobId(anyLong());
+    }
+
+    @Test
+    void closeJob_closesJobAndRejectsProposalsWhenNoActiveContract() {
+        Long jobId = 1L;
+        Job job = new Job();
+        job.setId(jobId);
+        job.setStatus(JobStatus.OPEN);
+
+        when(jobRepository.findById(jobId)).thenReturn(Optional.of(job));
+        when(jobRepository.countActiveContractsByJobId(jobId)).thenReturn(0L);
+        when(jobRepository.save(job)).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Job result = jobService.closeJob(jobId);
+
+        assertEquals(JobStatus.CLOSED, result.getStatus());
+        verify(jobRepository).rejectSubmittedProposalsByJobId(jobId);
+        verify(jobRepository).save(job);
+    }
+
+    @Test
+    void closeJob_throwsWhenJobNotFound() {
+        when(jobRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThrows(EntityNotFoundException.class, () -> jobService.closeJob(99L));
+        verify(jobRepository, never()).countActiveContractsByJobId(anyLong());
+    }
+
     private Job createJobWithAttachments(Long id, String title, JobStatus status, JobAttachment... attachments) {
         Job job = new Job();
         job.setId(id);
