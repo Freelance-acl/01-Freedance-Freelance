@@ -1,6 +1,7 @@
 package com.team01.freelance.user.controller;
 
 import com.team01.freelance.user.dto.UserContractSummaryDTO;
+import com.team01.freelance.user.dto.UserProfileDTO;
 import com.team01.freelance.user.exception.GlobalExceptionHandler;
 import com.team01.freelance.user.model.User;
 import com.team01.freelance.user.model.UserRole;
@@ -57,11 +58,11 @@ class UserControllerTest {
 
     @Test
     void getAllReturnsOk() throws Exception {
-        when(userService.searchUsers(isNull(), isNull(), isNull()))
-                .thenReturn(Collections.emptyList());
+        when(userService.getAllUsers()).thenReturn(Collections.emptyList());
 
         mockMvc.perform(get("/api/users"))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(0)));
     }
 
     @Test
@@ -71,6 +72,14 @@ class UserControllerTest {
 
         mockMvc.perform(get("/api/users/{id}", 1L))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void getByIdReturnsNotFound() throws Exception {
+        when(userService.getUserById(999L)).thenReturn(Optional.empty());
+
+        mockMvc.perform(get("/api/users/{id}", 999L))
+                .andExpect(status().isNotFound());
     }
 
     @Test
@@ -96,11 +105,41 @@ class UserControllerTest {
     }
 
     @Test
+    void updateReturnsBadRequest() throws Exception {
+        when(userService.updateUser(eq(1L), any(User.class)))
+                .thenThrow(new IllegalArgumentException("Invalid email"));
+
+        mockMvc.perform(put("/api/users/{id}", 1L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void updateReturnsNotFound() throws Exception {
+        when(userService.updateUser(eq(999L), any(User.class)))
+                .thenThrow(new EntityNotFoundException("User not found with id: 999"));
+
+        mockMvc.perform(put("/api/users/{id}", 999L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     void deleteByIdReturnsNoContent() throws Exception {
         when(userService.deleteUserById(1L)).thenReturn(true);
 
         mockMvc.perform(delete("/api/users/{id}", 1L))
                 .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void deleteByIdReturnsNotFound() throws Exception {
+        when(userService.deleteUserById(999L)).thenReturn(false);
+
+        mockMvc.perform(delete("/api/users/{id}", 999L))
+                .andExpect(status().isNotFound());
     }
 
     @Test
@@ -273,5 +312,64 @@ class UserControllerTest {
 
         mockMvc.perform(put("/api/users/{userId}/skills/{skillId}/primary", 1L, 2L))
                 .andExpect(status().isNotFound());
+    }
+
+    // -----------------------------------------------------------------------
+    // User Profile
+    // -----------------------------------------------------------------------
+
+    @Test
+    void getUserProfile_returnsOkWithProfile() throws Exception {
+        Long userId = 1L;
+        UserProfileDTO dto = new UserProfileDTO(
+                userId, "Omar Taha", "omar@example.com", "01000000000",
+                Map.of("language", "en"), Collections.emptyList(), 0);
+
+        when(userService.getUserProfile(userId)).thenReturn(dto);
+
+        mockMvc.perform(get("/api/users/{id}/profile", userId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.userId").value(1))
+                .andExpect(jsonPath("$.name").value("Omar Taha"))
+                .andExpect(jsonPath("$.email").value("omar@example.com"))
+                .andExpect(jsonPath("$.totalSkills").value(0));
+    }
+
+    @Test
+    void getUserProfile_userNotFound_returns404() throws Exception {
+        when(userService.getUserProfile(999L))
+                .thenThrow(new EntityNotFoundException("User not found with id: 999"));
+
+        mockMvc.perform(get("/api/users/{id}/profile", 999L))
+                .andExpect(status().isNotFound());
+    }
+
+    // -----------------------------------------------------------------------
+    // Users by language preference
+    // -----------------------------------------------------------------------
+
+    @Test
+    void getUsersByLanguage_returnsOkWithUsers() throws Exception {
+        User user = new User();
+        user.setName("Ahmed");
+        when(userService.findUsersByLanguageAndMinimumCompletedContracts("en", 2L))
+                .thenReturn(List.of(user));
+
+        mockMvc.perform(get("/api/users/preferences/language")
+                        .param("lang", "en")
+                        .param("minContracts", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].name").value("Ahmed"));
+    }
+
+    @Test
+    void getUsersByLanguage_invalidLanguage_returns400() throws Exception {
+        when(userService.findUsersByLanguageAndMinimumCompletedContracts("   ", 0L))
+                .thenThrow(new IllegalArgumentException("Language must not be blank"));
+
+        mockMvc.perform(get("/api/users/preferences/language")
+                        .param("lang", "   "))
+                .andExpect(status().isBadRequest());
     }
 }
