@@ -11,7 +11,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -76,6 +78,21 @@ public class ContractService {
                 if (contractDetails.getCreatedAt() != null) existingContract.setCreatedAt(contractDetails.getCreatedAt());
             return contractRepository.save(existingContract);
         }).orElseThrow(() -> new EntityNotFoundException("Contract not found with id: " + id));
+    }
+
+    public Contract updateContractProgress(Long contractId, Map<String, Object> metadataUpdates) {
+        Contract contract = contractRepository.findById(contractId)
+                .orElseThrow(() -> new EntityNotFoundException("Contract not found with id: " + contractId));
+
+        Map<String, Object> mergedMetadata = contract.getMetadata() == null
+                ? new LinkedHashMap<>()
+                : new LinkedHashMap<>(contract.getMetadata());
+        if (metadataUpdates != null) {
+            mergedMetadata.putAll(metadataUpdates);
+        }
+
+        contract.setMetadata(mergedMetadata);
+        return contractRepository.save(contract);
     }
 
     public boolean deleteContractById(Long id) {
