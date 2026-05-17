@@ -1,6 +1,8 @@
 package com.team01.freelance.contract.service;
 
 import com.team01.freelance.contract.dto.ContractSummaryDTO;
+import com.team01.freelance.contract.dto.BatchContractStatusUpdateRequest;
+import com.team01.freelance.contract.dto.BatchContractStatusUpdateResponse;
 import com.team01.freelance.contract.dto.FreelancerPerformanceDTO;
 import com.team01.freelance.contract.dto.StalledContractDTO;
 import com.team01.freelance.contract.model.Contract;
@@ -20,6 +22,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 @Service
 public class ContractService {
@@ -205,6 +208,52 @@ public class ContractService {
                 toDouble(row[4]),
                 toLong(row[5])
         )).toList();
+    }
+
+    @Transactional
+    public BatchContractStatusUpdateResponse batchUpdateContractStatus(List<BatchContractStatusUpdateRequest> updates) {
+        if (updates == null || updates.isEmpty()) {
+            throw new IllegalArgumentException("At least one contract status update is required");
+        }
+
+        List<Long> contractIds = updates.stream()
+                .map(BatchContractStatusUpdateRequest::getContractId)
+                .toList();
+        if (contractIds.stream().anyMatch(id -> id == null)) {
+            throw new IllegalArgumentException("contractId is required for every update");
+        }
+        if (updates.stream().anyMatch(update -> update.getStatus() == null)) {
+            throw new IllegalArgumentException("status is required for every update");
+        }
+
+        List<Contract> contracts = contractRepository.findAllById(contractIds);
+        if (contracts.size() != Set.copyOf(contractIds).size()) {
+            throw new EntityNotFoundException("One or more contracts were not found");
+        }
+
+        Map<Long, Contract> contractsById = contracts.stream()
+                .collect(java.util.stream.Collectors.toMap(Contract::getId, contract -> contract));
+        for (BatchContractStatusUpdateRequest update : updates) {
+            Contract contract = contractsById.get(update.getContractId());
+            ContractStatus newStatus = update.getStatus();
+            validateStatusTransition(contract.getStatus(), newStatus);
+            contract.setStatus(newStatus);
+            if (newStatus == ContractStatus.COMPLETED && contract.getEndDate() == null) {
+                contract.setEndDate(LocalDateTime.now());
+            }
+        }
+
+        contractRepository.saveAllAndFlush(contracts);
+        return new BatchContractStatusUpdateResponse(contracts.size());
+    }
+
+    private void validateStatusTransition(ContractStatus currentStatus, ContractStatus newStatus) {
+        if (currentStatus == newStatus) {
+            return;
+        }
+        if (currentStatus == ContractStatus.COMPLETED || currentStatus == ContractStatus.TERMINATED) {
+            throw new IllegalArgumentException("Completed or terminated contracts cannot be moved to another status");
+        }
     }
 
     private long toLong(Object value) {
