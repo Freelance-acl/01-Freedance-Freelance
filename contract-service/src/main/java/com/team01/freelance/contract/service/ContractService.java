@@ -1,17 +1,22 @@
 package com.team01.freelance.contract.service;
 
+import com.team01.freelance.contract.dto.ContractSummaryDTO;
 import com.team01.freelance.contract.dto.FreelancerPerformanceDTO;
 import com.team01.freelance.contract.dto.StalledContractDTO;
 import com.team01.freelance.contract.model.Contract;
+import com.team01.freelance.contract.model.ContractStatus;
 import com.team01.freelance.contract.repository.ContractRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
+import java.time.OffsetDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -93,6 +98,30 @@ public class ContractService {
 
         contract.setMetadata(mergedMetadata);
         return contractRepository.save(contract);
+    }
+
+    public List<ContractSummaryDTO> searchContracts(Double minAmount, Double maxAmount, String status) {
+        if (minAmount == null || maxAmount == null) {
+            throw new IllegalArgumentException("minAmount and maxAmount are required");
+        }
+        if (minAmount > maxAmount) {
+            throw new IllegalArgumentException("minAmount must be less than or equal to maxAmount");
+        }
+
+        String normalizedStatus = null;
+        if (status != null && !status.isBlank()) {
+            normalizedStatus = ContractStatus.fromString(status).name();
+        }
+
+        List<Object[]> rows = contractRepository.searchContracts(minAmount, maxAmount, normalizedStatus);
+        return rows.stream().map(row -> new ContractSummaryDTO(
+                toLong(row[0]),
+                row[1] == null ? null : row[1].toString(),
+                row[2] == null ? null : row[2].toString(),
+                toDouble(row[3]),
+                row[4] == null ? null : row[4].toString(),
+                calculateDurationDays(row[5], row[6])
+        )).toList();
     }
 
     public boolean deleteContractById(Long id) {
@@ -190,5 +219,30 @@ public class ContractService {
             return 0.0;
         }
         return ((Number) value).doubleValue();
+    }
+
+    private long calculateDurationDays(Object startValue, Object endValue) {
+        LocalDateTime start = toLocalDateTime(startValue);
+        LocalDateTime end = toLocalDateTime(endValue);
+        if (start == null || end == null) {
+            return 0L;
+        }
+        return Math.max(0L, ChronoUnit.DAYS.between(start, end));
+    }
+
+    private LocalDateTime toLocalDateTime(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof LocalDateTime localDateTime) {
+            return localDateTime;
+        }
+        if (value instanceof OffsetDateTime offsetDateTime) {
+            return offsetDateTime.toLocalDateTime();
+        }
+        if (value instanceof Timestamp timestamp) {
+            return timestamp.toLocalDateTime();
+        }
+        throw new IllegalArgumentException("Unsupported date value: " + value.getClass().getName());
     }
 }
