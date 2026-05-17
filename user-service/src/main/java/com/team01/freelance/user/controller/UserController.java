@@ -1,10 +1,12 @@
 package com.team01.freelance.user.controller;
 
+import com.team01.freelance.user.dto.TopFreelancerDTO;
 import com.team01.freelance.user.model.User;
 import com.team01.freelance.user.service.UserService;
 import com.team01.freelance.user.service.UserSkillService;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -15,9 +17,12 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import com.team01.freelance.user.model.UserRole;
 import java.util.Map;
+
+import java.time.LocalDate;
 import java.util.List;
 import com.team01.freelance.user.dto.UserContractSummaryDTO;
 import com.team01.freelance.user.dto.UserProfileDTO;
@@ -66,6 +71,18 @@ public class UserController {
             @RequestParam String value) {
         try {
             return ResponseEntity.ok(userService.findUsersByPreference(key, value));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @GetMapping("/reports/top-freelancers")
+    public ResponseEntity<List<TopFreelancerDTO>> getTopFreelancers(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(defaultValue = "10") Integer limit) {
+        try {
+            return ResponseEntity.ok(userService.getTopFreelancersByEarnings(startDate, endDate, limit));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().build();
         }
