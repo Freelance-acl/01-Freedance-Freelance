@@ -12,10 +12,13 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
 
 class UserSkillServiceTest {
@@ -127,5 +130,72 @@ class UserSkillServiceTest {
 
         // Act & Assert
         assertThrows(IllegalArgumentException.class, () -> userSkillService.createUserSkill(skill));
+    }
+
+    @Test
+    void setPrimarySkill_clearsOtherPrimariesAndSetsTarget() {
+        Long userId = 10L;
+        User user = new User();
+        user.setId(userId);
+
+        UserSkill skill1 = new UserSkill();
+        skill1.setId(1L);
+        skill1.setSkillName("Java");
+        skill1.setIsPrimary(true);
+        skill1.setUser(user);
+
+        UserSkill skill2 = new UserSkill();
+        skill2.setId(2L);
+        skill2.setSkillName("Spring");
+        skill2.setIsPrimary(false);
+        skill2.setUser(user);
+
+        List<UserSkill> skills = new ArrayList<>(List.of(skill1, skill2));
+        user.setUserSkills(skills);
+
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(userSkillRepository.findById(2L)).thenReturn(Optional.of(skill2));
+        when(userRepository.save(user)).thenAnswer(invocation -> invocation.getArgument(0));
+
+        User result = userSkillService.setPrimarySkill(userId, 2L);
+
+        assertNotNull(result);
+        assertFalse(skill1.getIsPrimary());
+        assertTrue(skill2.getIsPrimary());
+        verify(userRepository).save(user);
+        verify(userSkillRepository, never()).findByUserId(anyLong());
+    }
+
+    @Test
+    void setPrimarySkill_throwsWhenUserNotFound() {
+        when(userRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThrows(EntityNotFoundException.class, () -> userSkillService.setPrimarySkill(99L, 1L));
+        verify(userSkillRepository, never()).findById(anyLong());
+    }
+
+    @Test
+    void setPrimarySkill_throwsWhenSkillNotFound() {
+        when(userRepository.findById(10L)).thenReturn(Optional.of(new User()));
+        when(userSkillRepository.findById(1L)).thenReturn(Optional.empty());
+
+        assertThrows(EntityNotFoundException.class, () -> userSkillService.setPrimarySkill(10L, 1L));
+    }
+
+    @Test
+    void setPrimarySkill_throwsWhenSkillBelongsToOtherUser() {
+        Long userId = 10L;
+        User owner = new User();
+        owner.setId(20L);
+
+        UserSkill skill = new UserSkill();
+        skill.setId(1L);
+        skill.setUser(owner);
+
+        when(userRepository.findById(userId)).thenReturn(Optional.of(new User()));
+        when(userSkillRepository.findById(1L)).thenReturn(Optional.of(skill));
+
+        assertThrows(IllegalArgumentException.class, () -> userSkillService.setPrimarySkill(userId, 1L));
+        verify(userRepository, never()).save(any());
     }
 }
