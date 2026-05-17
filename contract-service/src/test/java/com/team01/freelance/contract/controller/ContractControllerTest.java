@@ -1,7 +1,10 @@
 package com.team01.freelance.contract.controller;
 
+import com.team01.freelance.contract.dto.FreelancerPerformanceDTO;
+import com.team01.freelance.contract.dto.StalledContractDTO;
 import com.team01.freelance.contract.model.Contract;
 import com.team01.freelance.contract.service.ContractService;
+import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -10,6 +13,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -99,5 +103,46 @@ class ContractControllerTest {
 
         mockMvc.perform(delete("/api/contracts/all"))
                 .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void purgeReturnsOk() throws Exception {
+        when(contractService.purgeOldContractData(30)).thenReturn(7L);
+
+        mockMvc.perform(delete("/api/contracts/purge").param("olderThanDays", "30"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void summaryReturnsOk() throws Exception {
+        FreelancerPerformanceDTO dto = new FreelancerPerformanceDTO(10L, 5L, 1400.0, 80.0, 17.5, 7000.0);
+        when(contractService.getFreelancerPerformanceSummary(eq(10L), any(), any())).thenReturn(dto);
+
+        mockMvc.perform(get("/api/contracts/freelancer/{freelancerId}/summary", 10L)
+                        .param("startDate", "2026-03-01")
+                        .param("endDate", "2026-03-31"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void summaryReturnsNotFound() throws Exception {
+        when(contractService.getFreelancerPerformanceSummary(eq(999L), any(), any()))
+                .thenThrow(new EntityNotFoundException("not found"));
+
+        mockMvc.perform(get("/api/contracts/freelancer/{freelancerId}/summary", 999L)
+                        .param("startDate", "2026-03-01")
+                        .param("endDate", "2026-03-31"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void stalledReturnsOk() throws Exception {
+        when(contractService.findStalledContracts(50.0, 7))
+                .thenReturn(List.of(new StalledContractDTO(1L, "A", "B", 1000.0, 10.0, 30L)));
+
+        mockMvc.perform(get("/api/contracts/stalled")
+                        .param("maxProgress", "50")
+                        .param("stalledDays", "7"))
+                .andExpect(status().isOk());
     }
 }

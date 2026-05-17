@@ -1,15 +1,24 @@
 package com.team01.freelance.contract.service;
 
+import com.team01.freelance.contract.dto.ContractSummaryDTO;
+import com.team01.freelance.contract.dto.FreelancerPerformanceDTO;
+import com.team01.freelance.contract.dto.StalledContractDTO;
 import com.team01.freelance.contract.model.Contract;
+import com.team01.freelance.contract.model.ContractStatus;
 import com.team01.freelance.contract.repository.ContractRepository;
-import com.team01.freelance.job.repository.JobRepository;
-import com.team01.freelance.proposal.repository.ProposalRepository;
-import com.team01.freelance.user.repository.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.sql.Timestamp;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
+import java.time.OffsetDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -17,15 +26,6 @@ public class ContractService {
 
     @Autowired
     private ContractRepository contractRepository;
-
-    @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
-    private JobRepository jobRepository;
-
-    @Autowired
-    private ProposalRepository proposalRepository;
 
     public List<Contract> getAllContracts() {
         return contractRepository.findAll();
@@ -35,23 +35,31 @@ public class ContractService {
         return contractRepository.findById(id);
     }
 
+    public Contract getActiveContractForUser(Long userId) {
+        if (userId == null) {
+            throw new IllegalArgumentException("userId is required");
+        }
+        if (!contractRepository.userExists(userId)) {
+            throw new EntityNotFoundException("User not found with id: " + userId);
+        }
+
+        return contractRepository.findMostRecentActiveContractForUser(userId)
+                .orElseThrow(() -> new EntityNotFoundException("No active contract found for user id: " + userId));
+    }
+
     public Contract createContract(Contract contract) {
         if (contract.getFreelancerId() == null || contract.getJobId() == null ||
             contract.getClientId() == null || contract.getProposalId() == null) {
             throw new IllegalArgumentException("Freelancer, Job, Client, and Proposal IDs are required to create a Contract");
         }
 
-        userRepository.findById(contract.getFreelancerId())
-                .orElseThrow(() -> new EntityNotFoundException("Freelancer not found with id: " + contract.getFreelancerId()));
+        if (contract.getAgreedAmount() == null || contract.getAgreedAmount() <= 0) {
+            throw new IllegalArgumentException("Agreed amount must be greater than 0");
+        }
 
-        jobRepository.findById(contract.getJobId())
-                .orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + contract.getJobId()));
-
-        userRepository.findById(contract.getClientId())
-                .orElseThrow(() -> new EntityNotFoundException("Client not found with id: " + contract.getClientId()));
-
-        proposalRepository.findById(contract.getProposalId())
-                .orElseThrow(() -> new EntityNotFoundException("Proposal not found with id: " + contract.getProposalId()));
+        if (contract.getStartDate() == null) {
+            throw new IllegalArgumentException("Start date is required");
+        }
 
         return contractRepository.save(contract);
     }
@@ -77,6 +85,45 @@ public class ContractService {
         }).orElseThrow(() -> new EntityNotFoundException("Contract not found with id: " + id));
     }
 
+    public Contract updateContractProgress(Long contractId, Map<String, Object> metadataUpdates) {
+        Contract contract = contractRepository.findById(contractId)
+                .orElseThrow(() -> new EntityNotFoundException("Contract not found with id: " + contractId));
+
+        Map<String, Object> mergedMetadata = contract.getMetadata() == null
+                ? new LinkedHashMap<>()
+                : new LinkedHashMap<>(contract.getMetadata());
+        if (metadataUpdates != null) {
+            mergedMetadata.putAll(metadataUpdates);
+        }
+
+        contract.setMetadata(mergedMetadata);
+        return contractRepository.save(contract);
+    }
+
+    public List<ContractSummaryDTO> searchContracts(Double minAmount, Double maxAmount, String status) {
+        if (minAmount == null || maxAmount == null) {
+            throw new IllegalArgumentException("minAmount and maxAmount are required");
+        }
+        if (minAmount > maxAmount) {
+            throw new IllegalArgumentException("minAmount must be less than or equal to maxAmount");
+        }
+
+        String normalizedStatus = null;
+        if (status != null && !status.isBlank()) {
+            normalizedStatus = ContractStatus.fromString(status).name();
+        }
+
+        List<Object[]> rows = contractRepository.searchContracts(minAmount, maxAmount, normalizedStatus);
+        return rows.stream().map(row -> new ContractSummaryDTO(
+                toLong(row[0]),
+                row[1] == null ? null : row[1].toString(),
+                row[2] == null ? null : row[2].toString(),
+                toDouble(row[3]),
+                row[4] == null ? null : row[4].toString(),
+                calculateDurationDays(row[5], row[6])
+        )).toList();
+    }
+
     public boolean deleteContractById(Long id) {
         try {
             contractRepository.deleteById(id);
@@ -88,5 +135,114 @@ public class ContractService {
 
     public void deleteAllContracts() {
         contractRepository.deleteAll();
+    }
+
+    @Transactional
+    public long purgeOldContractData(int olderThanDays) {
+        if (olderThanDays <= 0) {
+            throw new IllegalArgumentException("olderThanDays must be greater than 0");
+        }
+
+        LocalDateTime cutoff = LocalDateTime.now().minusDays(olderThanDays);
+        long deletedCount = contractRepository.countPurgeCandidates(cutoff);
+        contractRepository.purgeOldContracts(cutoff);
+        return deletedCount;
+    }
+
+    public FreelancerPerformanceDTO getFreelancerPerformanceSummary(
+            Long freelancerId,
+            LocalDate startDate,
+            LocalDate endDate
+    ) {
+        if (startDate == null || endDate == null) {
+            throw new IllegalArgumentException("startDate and endDate are required");
+        }
+        if (endDate.isBefore(startDate)) {
+            throw new IllegalArgumentException("endDate must be on or after startDate");
+        }
+        if (!contractRepository.freelancerExists(freelancerId)) {
+            throw new EntityNotFoundException("Freelancer not found with id: " + freelancerId);
+        }
+
+        LocalDateTime start = startDate.atStartOfDay();
+        LocalDateTime endExclusive = endDate.plusDays(1).atStartOfDay();
+        Object[] raw = contractRepository.getFreelancerPerformance(freelancerId, start, endExclusive);
+
+        long totalContracts = toLong(raw[0]);
+        long completedContracts = toLong(raw[1]);
+        double totalEarnings = toDouble(raw[2]);
+        double averageContractValue = toDouble(raw[3]);
+        double averageDurationDays = toDouble(raw[4]);
+        double completionRate = totalContracts == 0 ? 0.0 : (completedContracts * 100.0) / totalContracts;
+
+        return new FreelancerPerformanceDTO(
+                freelancerId,
+                totalContracts,
+                averageContractValue,
+                completionRate,
+                averageDurationDays,
+                totalEarnings
+        );
+    }
+
+    public List<StalledContractDTO> findStalledContracts(Double maxProgress, Integer stalledDays) {
+        if (maxProgress == null || stalledDays == null) {
+            throw new IllegalArgumentException("maxProgress and stalledDays are required");
+        }
+        if (maxProgress < 0 || maxProgress > 100) {
+            throw new IllegalArgumentException("maxProgress must be between 0 and 100");
+        }
+        if (stalledDays < 0) {
+            throw new IllegalArgumentException("stalledDays must be 0 or greater");
+        }
+
+        List<Object[]> rows = contractRepository.findStalledContracts(maxProgress, stalledDays);
+        return rows.stream().map(row -> new StalledContractDTO(
+                toLong(row[0]),
+                row[1] == null ? null : row[1].toString(),
+                row[2] == null ? null : row[2].toString(),
+                toDouble(row[3]),
+                toDouble(row[4]),
+                toLong(row[5])
+        )).toList();
+    }
+
+    private long toLong(Object value) {
+        if (value == null) {
+            return 0L;
+        }
+        return ((Number) value).longValue();
+    }
+
+    private double toDouble(Object value) {
+        if (value == null) {
+            return 0.0;
+        }
+        return ((Number) value).doubleValue();
+    }
+
+    private long calculateDurationDays(Object startValue, Object endValue) {
+        LocalDateTime start = toLocalDateTime(startValue);
+        LocalDateTime end = toLocalDateTime(endValue);
+        if (start == null || end == null) {
+            return 0L;
+        }
+        return Math.max(0L, ChronoUnit.DAYS.between(start, end));
+    }
+
+    private LocalDateTime toLocalDateTime(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof LocalDateTime localDateTime) {
+            return localDateTime;
+        }
+        if (value instanceof OffsetDateTime offsetDateTime) {
+            return offsetDateTime.toLocalDateTime();
+        }
+        if (value instanceof Timestamp timestamp) {
+            return timestamp.toLocalDateTime();
+        }
+        throw new IllegalArgumentException("Unsupported date value: " + value.getClass().getName());
     }
 }

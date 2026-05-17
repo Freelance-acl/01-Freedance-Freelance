@@ -113,20 +113,21 @@ prefer_java25_for_maven() {
 
 prefer_java25_for_maven
 
-MVN_CMD=""
-if [ -x "$ROOT/mvnw" ]; then
-  MVN_CMD="$ROOT/mvnw"
-elif [ -f "$ROOT/mvnw" ]; then
-  MVN_CMD="sh $ROOT/mvnw"
-elif command -v mvn >/dev/null 2>&1; then
-  MVN_CMD="mvn"
-else
-  echo "pre-push: neither ./mvnw nor mvn found; cannot run tests." >&2
-  exit 1
-fi
+run_mvn_test() {
+  if [ -x "$ROOT/mvnw" ]; then
+    "$ROOT/mvnw" -q test
+  elif [ -f "$ROOT/mvnw" ]; then
+    sh "$ROOT/mvnw" -q test
+  elif command -v mvn >/dev/null 2>&1; then
+    mvn -q test
+  else
+    echo "pre-push: neither ./mvnw nor mvn found; cannot run tests." >&2
+    return 1
+  fi
+}
 
 echo "pre-push: running tests for all modules..." >&2
-$MVN_CMD -q test || {
+run_mvn_test || {
   echo "pre-push: mvn test failed." >&2
   exit 1
 }
