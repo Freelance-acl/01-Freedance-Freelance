@@ -30,6 +30,18 @@ public class ContractService {
         return contractRepository.findById(id);
     }
 
+    public Contract getActiveContractForUser(Long userId) {
+        if (userId == null) {
+            throw new IllegalArgumentException("userId is required");
+        }
+        if (!contractRepository.userExists(userId)) {
+            throw new EntityNotFoundException("User not found with id: " + userId);
+        }
+
+        return contractRepository.findMostRecentActiveContractForUser(userId)
+                .orElseThrow(() -> new EntityNotFoundException("No active contract found for user id: " + userId));
+    }
+
     public Contract createContract(Contract contract) {
         if (contract.getFreelancerId() == null || contract.getJobId() == null ||
             contract.getClientId() == null || contract.getProposalId() == null) {
