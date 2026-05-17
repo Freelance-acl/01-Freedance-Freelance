@@ -28,6 +28,29 @@ public interface ContractRepository extends JpaRepository<Contract, Long> {
             """, nativeQuery = true)
     int purgeOldContracts(@Param("cutoff") LocalDateTime cutoff);
 
+    @Query(value = """
+            SELECT
+                c.id AS contract_id,
+                COALESCE(u.name, 'Unknown Freelancer') AS freelancer_name,
+                COALESCE(j.title, 'Unknown Job') AS job_title,
+                c.agreed_amount,
+                c.status,
+                c.start_date,
+                COALESCE(c.end_date, CURRENT_TIMESTAMP) AS effective_end_date
+            FROM contracts c
+            LEFT JOIN users u ON u.id = c.freelancer_id
+            LEFT JOIN jobs j ON j.id = c.job_id
+            WHERE c.agreed_amount >= :minAmount
+              AND c.agreed_amount <= :maxAmount
+              AND (:status IS NULL OR c.status = :status)
+            ORDER BY c.agreed_amount DESC, c.id DESC
+            """, nativeQuery = true)
+    List<Object[]> searchContracts(
+            @Param("minAmount") Double minAmount,
+            @Param("maxAmount") Double maxAmount,
+            @Param("status") String status
+    );
+
     @Query(value = "SELECT COUNT(*) > 0 FROM users WHERE id = :freelancerId", nativeQuery = true)
     boolean freelancerExists(@Param("freelancerId") Long freelancerId);
 

@@ -1,5 +1,6 @@
 package com.team01.freelance.contract.controller;
 
+import com.team01.freelance.contract.dto.ContractSummaryDTO;
 import com.team01.freelance.contract.model.Contract;
 import com.team01.freelance.contract.dto.FreelancerPerformanceDTO;
 import com.team01.freelance.contract.dto.StalledContractDTO;
@@ -66,6 +67,19 @@ public class ContractController {
         } catch (RuntimeException e) {
             // Maps to the "Contract not found" exception from service
             return ResponseEntity.notFound().build();
+        }
+    }
+
+    @GetMapping("/search")
+    public ResponseEntity<List<ContractSummaryDTO>> searchContracts(
+            @RequestParam Double minAmount,
+            @RequestParam Double maxAmount,
+            @RequestParam(required = false) String status
+    ) {
+        try {
+            return ResponseEntity.ok(contractService.searchContracts(minAmount, maxAmount, status));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
         }
     }
 
