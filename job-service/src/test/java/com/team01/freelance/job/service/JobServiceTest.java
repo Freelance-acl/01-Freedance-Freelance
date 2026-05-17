@@ -3,6 +3,7 @@ package com.team01.freelance.job.service;
 import com.team01.freelance.job.client.ContractLookupClient;
 import com.team01.freelance.job.client.ContractSummary;
 import com.team01.freelance.job.exception.ForbiddenOperationException;
+import com.team01.freelance.job.dto.TopBudgetJobDTO;
 import com.team01.freelance.job.model.JobAttachmentAlertDTO;
 import com.team01.freelance.job.model.JobAttachment;
 import com.team01.freelance.job.model.JobAttachmentVerificationRequest;
@@ -477,6 +478,41 @@ class JobServiceTest {
 
         assertThrows(IllegalArgumentException.class, () -> jobService.closeJob(jobId));
         verify(jobRepository, never()).rejectSubmittedProposalsByJobId(anyLong());
+    }
+
+    @Test
+    void searchByRequirements_withStatus_delegatesToRepositoryWithStatus() {
+        Job job = new Job();
+        when(jobRepository.searchByRequirements("experienceLevel", "SENIOR", "OPEN"))
+                .thenReturn(List.of(job));
+
+        List<Job> result = jobService.searchByRequirements("experienceLevel", "SENIOR", "OPEN");
+
+        assertEquals(1, result.size());
+        verify(jobRepository).searchByRequirements("experienceLevel", "SENIOR", "OPEN");
+        verify(jobRepository, never()).searchByRequirements("experienceLevel", "SENIOR");
+    }
+
+    @Test
+    void searchByRequirements_withoutStatus_delegatesToRepositoryWithoutStatus() {
+        when(jobRepository.searchByRequirements("experienceLevel", "SENIOR"))
+                .thenReturn(List.of());
+
+        jobService.searchByRequirements("experienceLevel", "SENIOR", null);
+
+        verify(jobRepository).searchByRequirements("experienceLevel", "SENIOR");
+    }
+
+    @Test
+    void getTopBudgetJobs_returnsRepositoryResults() {
+        TopBudgetJobDTO dto = new TopBudgetJobDTO(1L, "Job A", 5000.0, 2L);
+        when(jobRepository.findTopBudgetJobs(2)).thenReturn(List.of(dto));
+
+        List<TopBudgetJobDTO> result = jobService.getTopBudgetJobs(2);
+
+        assertEquals(1, result.size());
+        assertEquals(5000.0, result.getFirst().getBudgetMax());
+        verify(jobRepository).findTopBudgetJobs(2);
     }
 
     @Test
