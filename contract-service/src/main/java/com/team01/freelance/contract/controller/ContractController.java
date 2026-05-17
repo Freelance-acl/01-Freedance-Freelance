@@ -41,6 +41,17 @@ public class ContractController {
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
+    @GetMapping("/user/{userId}/active")
+    public ResponseEntity<Contract> getActiveContractForUser(@PathVariable Long userId) {
+        try {
+            return ResponseEntity.ok(contractService.getActiveContractForUser(userId));
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
     @PostMapping
     public ResponseEntity<Contract> createContract(@RequestBody Contract contract) {
         try {
