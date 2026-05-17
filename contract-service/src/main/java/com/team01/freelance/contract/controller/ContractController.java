@@ -69,6 +69,18 @@ public class ContractController {
         }
     }
 
+    @PutMapping("/{contractId}/progress")
+    public ResponseEntity<Contract> updateContractProgress(
+            @PathVariable Long contractId,
+            @RequestBody Map<String, Object> metadataUpdates
+    ) {
+        try {
+            return ResponseEntity.ok(contractService.updateContractProgress(contractId, metadataUpdates));
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteContractById(@PathVariable Long id) {
         if (contractService.deleteContractById(id)) {
