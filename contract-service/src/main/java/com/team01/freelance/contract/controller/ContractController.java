@@ -1,6 +1,8 @@
 package com.team01.freelance.contract.controller;
 
 import com.team01.freelance.contract.dto.ContractSummaryDTO;
+import com.team01.freelance.contract.dto.BatchContractStatusUpdateRequest;
+import com.team01.freelance.contract.dto.BatchContractStatusUpdateResponse;
 import com.team01.freelance.contract.model.Contract;
 import com.team01.freelance.contract.dto.FreelancerPerformanceDTO;
 import com.team01.freelance.contract.dto.StalledContractDTO;
@@ -152,6 +154,19 @@ public class ContractController {
     ) {
         try {
             return ResponseEntity.ok(contractService.findStalledContracts(maxProgress, stalledDays));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @PutMapping("/batch-status")
+    public ResponseEntity<BatchContractStatusUpdateResponse> batchUpdateContractStatus(
+            @RequestBody List<BatchContractStatusUpdateRequest> updates
+    ) {
+        try {
+            return ResponseEntity.ok(contractService.batchUpdateContractStatus(updates));
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().build();
         }
