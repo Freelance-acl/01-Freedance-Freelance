@@ -48,6 +48,17 @@ public class UserController {
         return ResponseEntity.ok(userService.createUser(user));
     }
 
+    @PutMapping("/{id}/deactivate")
+    public ResponseEntity<User> deactivateUser(@PathVariable Long id) {
+        try {
+            return ResponseEntity.ok(userService.deactivateUser(id));
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (IllegalStateException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
     /**
      * Updates a user by ID.
      *

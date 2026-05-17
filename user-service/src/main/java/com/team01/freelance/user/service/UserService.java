@@ -1,6 +1,7 @@
 package com.team01.freelance.user.service;
 
 import com.team01.freelance.user.model.User;
+import com.team01.freelance.user.model.UserStatus;
 import com.team01.freelance.user.repository.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,6 +36,20 @@ public class UserService {
     }
 
     public User createUser(User user) {
+        return userRepository.save(user);
+    }
+
+    @Transactional
+    public User deactivateUser(Long id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("User not found with id: " + id));
+
+        if (userRepository.countActiveContractsForUser(id) > 0) {
+            throw new IllegalStateException("Cannot deactivate user with active contracts");
+        }
+
+        user.setStatus(UserStatus.DEACTIVATED);
+        userRepository.withdrawSubmittedProposalsForUser(id);
         return userRepository.save(user);
     }
 
