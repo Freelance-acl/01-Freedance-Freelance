@@ -159,6 +159,14 @@ public class ContractController {
         }
     }
 
+    @GetMapping("/history")
+    public ResponseEntity<List<Contract>> findContractHistory(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(required = false) String status
+    ) {
+        try {
+            return ResponseEntity.ok(contractService.findContractHistory(startDate, endDate, status));
     @GetMapping("/metadata/search")
     public ResponseEntity<List<Contract>> findContractsByMetadata(
             @RequestParam String key,
