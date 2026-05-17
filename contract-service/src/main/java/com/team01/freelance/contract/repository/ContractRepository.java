@@ -9,9 +9,23 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface ContractRepository extends JpaRepository<Contract, Long> {
+    @Query(value = "SELECT COUNT(*) > 0 FROM users WHERE id = :userId", nativeQuery = true)
+    boolean userExists(@Param("userId") Long userId);
+
+    @Query(value = """
+            SELECT *
+            FROM contracts
+            WHERE status = 'ACTIVE'
+              AND (freelancer_id = :userId OR client_id = :userId)
+            ORDER BY created_at DESC
+            LIMIT 1
+            """, nativeQuery = true)
+    Optional<Contract> findMostRecentActiveContractForUser(@Param("userId") Long userId);
+
     @Query(value = """
             SELECT COUNT(*)
             FROM contracts c

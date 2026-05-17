@@ -1,5 +1,6 @@
 package com.team01.freelance.job.controller;
 
+import com.team01.freelance.job.dto.TopBudgetJobDTO;
 import com.team01.freelance.job.exception.ForbiddenOperationException;
 import com.team01.freelance.job.model.JobAttachmentAlertDTO;
 import com.team01.freelance.job.model.JobAttachment;
@@ -25,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import static org.hamcrest.Matchers.hasSize;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
@@ -266,6 +268,44 @@ class JobControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"status\":\"CLOSED\"}"))
                 .andExpect(status().isNotFound());
+    }
+
+    // -----------------------------------------------------------------------
+    // [S2-F5] Filter Jobs by Requirement (JSONB)
+    // -----------------------------------------------------------------------
+
+    @Test
+    void searchByRequirements_returnsOkWithMatches() throws Exception {
+        Job job = new Job();
+        job.setId(1L);
+        job.setTitle("Senior Backend");
+        when(jobService.searchByRequirements("experienceLevel", "SENIOR", "OPEN"))
+                .thenReturn(List.of(job));
+
+        mockMvc.perform(get("/api/jobs/requirements/search")
+                        .param("key", "experienceLevel")
+                        .param("value", "SENIOR")
+                        .param("status", "OPEN"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].title").value("Senior Backend"));
+    }
+
+    // -----------------------------------------------------------------------
+    // [S2-F6] Top Budget Jobs Report (DTO)
+    // -----------------------------------------------------------------------
+
+    @Test
+    void getTopBudgetJobs_returnsOkWithOrderedResults() throws Exception {
+        TopBudgetJobDTO top = new TopBudgetJobDTO(3L, "Enterprise App", 8000.0, 4L);
+        when(jobService.getTopBudgetJobs(2)).thenReturn(List.of(top));
+
+        mockMvc.perform(get("/api/jobs/reports/top-budget").param("limit", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].jobId").value(3))
+                .andExpect(jsonPath("$[0].budgetMax").value(8000.0))
+                .andExpect(jsonPath("$[0].totalProposals").value(4));
     }
 
     private JobAttachmentAlertDTO buildAlertDto(Long jobId, String jobTitle, JobStatus jobStatus, int expiredCount) {

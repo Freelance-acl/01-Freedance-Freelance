@@ -42,6 +42,17 @@ public class ContractController {
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
+    @GetMapping("/user/{userId}/active")
+    public ResponseEntity<Contract> getActiveContractForUser(@PathVariable Long userId) {
+        try {
+            return ResponseEntity.ok(contractService.getActiveContractForUser(userId));
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
     @PostMapping
     public ResponseEntity<Contract> createContract(@RequestBody Contract contract) {
         try {
@@ -66,6 +77,18 @@ public class ContractController {
             return ResponseEntity.badRequest().build();
         } catch (RuntimeException e) {
             // Maps to the "Contract not found" exception from service
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    @PutMapping("/{contractId}/progress")
+    public ResponseEntity<Contract> updateContractProgress(
+            @PathVariable Long contractId,
+            @RequestBody Map<String, Object> metadataUpdates
+    ) {
+        try {
+            return ResponseEntity.ok(contractService.updateContractProgress(contractId, metadataUpdates));
+        } catch (EntityNotFoundException e) {
             return ResponseEntity.notFound().build();
         }
     }
