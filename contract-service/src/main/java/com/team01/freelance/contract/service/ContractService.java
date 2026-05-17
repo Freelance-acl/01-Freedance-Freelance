@@ -1,5 +1,7 @@
 package com.team01.freelance.contract.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team01.freelance.contract.dto.ContractSummaryDTO;
 import com.team01.freelance.contract.dto.FreelancerPerformanceDTO;
 import com.team01.freelance.contract.dto.StalledContractDTO;
@@ -8,6 +10,8 @@ import com.team01.freelance.contract.model.ContractStatus;
 import com.team01.freelance.contract.repository.ContractRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataAccessException;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +30,11 @@ public class ContractService {
 
     @Autowired
     private ContractRepository contractRepository;
+
+    @Autowired(required = false)
+    private JdbcTemplate jdbcTemplate;
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public List<Contract> getAllContracts() {
         return contractRepository.findAll();
@@ -205,6 +214,110 @@ public class ContractService {
                 toDouble(row[4]),
                 toLong(row[5])
         )).toList();
+    }
+
+    public List<Contract> findContractsByMetadata(String key, String operator, String value) {
+        if (key == null || key.isBlank() || value == null || value.isBlank()) {
+            throw new IllegalArgumentException("key and value are required");
+        }
+        if (operator == null || operator.isBlank()) {
+            throw new IllegalArgumentException("operator is required");
+        }
+
+        String normalizedKey = key.trim();
+        String normalizedValue = value.trim();
+        String normalizedOperator = operator.trim().toLowerCase();
+
+        try {
+            return switch (normalizedOperator) {
+                case "eq" -> contractRepository.findByMetadataEquals(normalizedKey, normalizedValue);
+                case "gt" -> contractRepository.findByMetadataGreaterThan(normalizedKey, parseMetadataNumber(normalizedValue));
+                case "lt" -> contractRepository.findByMetadataLessThan(normalizedKey, parseMetadataNumber(normalizedValue));
+                default -> throw new IllegalArgumentException("operator must be one of: eq, gt, lt");
+            };
+        } catch (DataAccessException e) {
+            return filterMetadataFromJdbc(normalizedKey, normalizedOperator, normalizedValue);
+        }
+    }
+
+    private List<Contract> filterMetadataFromJdbc(String key, String operator, String value) {
+        List<Contract> contracts = jdbcTemplate == null
+                ? contractRepository.findAll()
+                : jdbcTemplate.query("""
+                        SELECT id, job_id, freelancer_id, client_id, proposal_id, agreed_amount,
+                               status, start_date, end_date, metadata, created_at
+                        FROM contracts
+                        ORDER BY id ASC
+                        """, (rs, rowNum) -> {
+                    Contract contract = new Contract();
+                    contract.setId(rs.getLong("id"));
+                    contract.setJobId(rs.getLong("job_id"));
+                    contract.setFreelancerId(rs.getLong("freelancer_id"));
+                    contract.setClientId(rs.getLong("client_id"));
+                    contract.setProposalId(rs.getLong("proposal_id"));
+                    contract.setAgreedAmount(rs.getDouble("agreed_amount"));
+                    contract.setStatus(ContractStatus.fromString(rs.getString("status")));
+                    contract.setStartDate(rs.getTimestamp("start_date").toLocalDateTime());
+                    if (rs.getTimestamp("end_date") != null) {
+                        contract.setEndDate(rs.getTimestamp("end_date").toLocalDateTime());
+                    }
+                    contract.setMetadata(parseMetadata(rs.getObject("metadata")));
+                    contract.setCreatedAt(rs.getTimestamp("created_at").toLocalDateTime());
+                    return contract;
+                });
+
+        return contracts.stream()
+                .filter(contract -> contract.getMetadata() != null && contract.getMetadata().containsKey(key))
+                .filter(contract -> metadataMatches(contract.getMetadata().get(key), operator, value))
+                .toList();
+    }
+
+    private Map<String, Object> parseMetadata(Object metadata) {
+        if (metadata == null) {
+            return null;
+        }
+        String json = metadata instanceof byte[] bytes
+                ? new String(bytes, java.nio.charset.StandardCharsets.UTF_8)
+                : metadata.toString();
+        if (json.isBlank()) {
+            return null;
+        }
+        try {
+            if (json.startsWith("\"") && json.endsWith("\"")) {
+                json = objectMapper.readValue(json, String.class);
+            }
+            return objectMapper.readValue(json, new TypeReference<>() {});
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Invalid contract metadata JSON", e);
+        }
+    }
+
+    private boolean metadataMatches(Object actualValue, String operator, String expectedValue) {
+        if (actualValue == null) {
+            return false;
+        }
+
+        return switch (operator) {
+            case "eq" -> expectedValue.equals(String.valueOf(actualValue));
+            case "gt" -> toMetadataDouble(actualValue) > parseMetadataNumber(expectedValue);
+            case "lt" -> toMetadataDouble(actualValue) < parseMetadataNumber(expectedValue);
+            default -> throw new IllegalArgumentException("operator must be one of: eq, gt, lt");
+        };
+    }
+
+    private double toMetadataDouble(Object value) {
+        if (value instanceof Number number) {
+            return number.doubleValue();
+        }
+        return parseMetadataNumber(String.valueOf(value));
+    }
+
+    private Double parseMetadataNumber(String value) {
+        try {
+            return Double.valueOf(value.trim());
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("value must be numeric for gt and lt operators");
+        }
     }
 
     private long toLong(Object value) {

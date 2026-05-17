@@ -156,4 +156,17 @@ public class ContractController {
             return ResponseEntity.badRequest().build();
         }
     }
+
+    @GetMapping("/metadata/search")
+    public ResponseEntity<List<Contract>> findContractsByMetadata(
+            @RequestParam String key,
+            @RequestParam String operator,
+            @RequestParam String value
+    ) {
+        try {
+            return ResponseEntity.ok(contractService.findContractsByMetadata(key, operator, value));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
 }
