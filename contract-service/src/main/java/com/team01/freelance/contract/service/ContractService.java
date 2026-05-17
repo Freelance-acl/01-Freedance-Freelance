@@ -207,6 +207,29 @@ public class ContractService {
         )).toList();
     }
 
+    public List<Contract> findContractHistory(LocalDate startDate, LocalDate endDate, String status) {
+        if (startDate == null || endDate == null) {
+            throw new IllegalArgumentException("startDate and endDate are required");
+        }
+        if (endDate.isBefore(startDate)) {
+            throw new IllegalArgumentException("endDate must be on or after startDate");
+        }
+
+        LocalDateTime start = startDate.atStartOfDay();
+        LocalDateTime endExclusive = endDate.plusDays(1).atStartOfDay();
+        if (status == null || status.isBlank()) {
+            return contractRepository.findByCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByCreatedAtAsc(
+                    start,
+                    endExclusive
+            );
+        }
+        return contractRepository.findByCreatedAtGreaterThanEqualAndCreatedAtLessThanAndStatusOrderByCreatedAtAsc(
+                start,
+                endExclusive,
+                ContractStatus.fromString(status)
+        );
+    }
+
     private long toLong(Object value) {
         if (value == null) {
             return 0L;

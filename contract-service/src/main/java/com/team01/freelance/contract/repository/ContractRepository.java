@@ -130,4 +130,15 @@ public interface ContractRepository extends JpaRepository<Contract, Long> {
             @Param("maxProgress") Double maxProgress,
             @Param("stalledDays") Integer stalledDays
     );
+
+    List<Contract> findByCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByCreatedAtAsc(
+            LocalDateTime startDate,
+            LocalDateTime endDateExclusive
+    );
+
+    List<Contract> findByCreatedAtGreaterThanEqualAndCreatedAtLessThanAndStatusOrderByCreatedAtAsc(
+            LocalDateTime startDate,
+            LocalDateTime endDateExclusive,
+            com.team01.freelance.contract.model.ContractStatus status
+    );
 }

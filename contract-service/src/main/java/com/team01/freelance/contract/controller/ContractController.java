@@ -156,4 +156,17 @@ public class ContractController {
             return ResponseEntity.badRequest().build();
         }
     }
+
+    @GetMapping("/history")
+    public ResponseEntity<List<Contract>> findContractHistory(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(required = false) String status
+    ) {
+        try {
+            return ResponseEntity.ok(contractService.findContractHistory(startDate, endDate, status));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
 }
