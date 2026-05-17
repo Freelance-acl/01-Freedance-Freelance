@@ -159,6 +159,14 @@ public class ContractController {
         }
     }
 
+    @GetMapping("/metadata/search")
+    public ResponseEntity<List<Contract>> findContractsByMetadata(
+            @RequestParam String key,
+            @RequestParam String operator,
+            @RequestParam String value
+    ) {
+        try {
+            return ResponseEntity.ok(contractService.findContractsByMetadata(key, operator, value));
     @PutMapping("/batch-status")
     public ResponseEntity<BatchContractStatusUpdateResponse> batchUpdateContractStatus(
             @RequestBody List<BatchContractStatusUpdateRequest> updates

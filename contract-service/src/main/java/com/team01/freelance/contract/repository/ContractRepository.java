@@ -130,4 +130,28 @@ public interface ContractRepository extends JpaRepository<Contract, Long> {
             @Param("maxProgress") Double maxProgress,
             @Param("stalledDays") Integer stalledDays
     );
+
+    @Query(value = """
+            SELECT *
+            FROM contracts
+            WHERE metadata ->> :key = :value
+            ORDER BY id ASC
+            """, nativeQuery = true)
+    List<Contract> findByMetadataEquals(@Param("key") String key, @Param("value") String value);
+
+    @Query(value = """
+            SELECT *
+            FROM contracts
+            WHERE CAST(metadata ->> :key AS DOUBLE PRECISION) > :value
+            ORDER BY id ASC
+            """, nativeQuery = true)
+    List<Contract> findByMetadataGreaterThan(@Param("key") String key, @Param("value") Double value);
+
+    @Query(value = """
+            SELECT *
+            FROM contracts
+            WHERE CAST(metadata ->> :key AS DOUBLE PRECISION) < :value
+            ORDER BY id ASC
+            """, nativeQuery = true)
+    List<Contract> findByMetadataLessThan(@Param("key") String key, @Param("value") Double value);
 }
