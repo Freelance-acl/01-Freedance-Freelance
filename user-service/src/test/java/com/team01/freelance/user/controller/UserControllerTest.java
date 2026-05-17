@@ -22,6 +22,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.List;
 import java.util.Optional;
 
 import static org.hamcrest.Matchers.containsString;
@@ -144,6 +145,43 @@ class UserControllerTest {
                 .thenThrow(new IllegalStateException("Cannot deactivate user with active contracts"));
 
         mockMvc.perform(put("/api/users/{id}/deactivate", 1L))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void searchByPreferenceReturnsMatchingUsers() throws Exception {
+        User first = new User();
+        first.setName("Arabic User 1");
+        User second = new User();
+        second.setName("Arabic User 2");
+        when(userService.findUsersByPreference("language", "ar")).thenReturn(List.of(first, second));
+
+        mockMvc.perform(get("/api/users/preferences/search")
+                        .param("key", "language")
+                        .param("value", "ar"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2));
+    }
+
+    @Test
+    void searchByPreferenceReturnsEmptyListWhenNoUsersMatch() throws Exception {
+        when(userService.findUsersByPreference("language", "fr")).thenReturn(Collections.emptyList());
+
+        mockMvc.perform(get("/api/users/preferences/search")
+                        .param("key", "language")
+                        .param("value", "fr"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    void searchByPreferenceReturnsBadRequestWhenKeyIsBlank() throws Exception {
+        when(userService.findUsersByPreference("", "ar"))
+                .thenThrow(new IllegalArgumentException("Preference key and value must not be blank"));
+
+        mockMvc.perform(get("/api/users/preferences/search")
+                        .param("key", "")
+                        .param("value", "ar"))
                 .andExpect(status().isBadRequest());
     }
 

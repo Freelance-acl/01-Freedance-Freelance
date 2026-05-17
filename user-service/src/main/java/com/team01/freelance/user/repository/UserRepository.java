@@ -6,8 +6,6 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
 import java.util.List;
 import com.team01.freelance.user.model.UserRole;
 
@@ -72,4 +70,12 @@ public interface UserRepository extends JpaRepository<User, Long> {
               AND status = 'SUBMITTED'
             """, nativeQuery = true)
     int withdrawSubmittedProposalsForUser(@Param("userId") Long userId);
+
+    @Query(value = """
+            SELECT *
+            FROM users
+            WHERE jsonb_extract_path_text(preferences, :key) = :value
+            """, nativeQuery = true)
+    List<User> findByPreference(@Param("key") String key, @Param("value") String value);
 }
+

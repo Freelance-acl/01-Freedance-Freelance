@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import com.team01.freelance.user.model.UserRole;
 import java.util.Map;
@@ -55,6 +56,17 @@ public class UserController {
         } catch (EntityNotFoundException e) {
             return ResponseEntity.notFound().build();
         } catch (IllegalStateException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @GetMapping("/preferences/search")
+    public ResponseEntity<List<User>> searchByPreference(
+            @RequestParam String key,
+            @RequestParam String value) {
+        try {
+            return ResponseEntity.ok(userService.findUsersByPreference(key, value));
+        } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().build();
         }
     }
