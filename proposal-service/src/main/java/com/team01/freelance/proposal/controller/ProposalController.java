@@ -88,6 +88,17 @@ public class ProposalController {
         }
     }
 
+    @PutMapping("/{id}/complete")
+    public ResponseEntity<Proposal> completeProposal(@PathVariable("id") Long proposalId) {
+        try {
+            return ResponseEntity.ok(proposalService.completeProposal(proposalId));
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteProposalById(@PathVariable Long id) {
         if (proposalService.deleteProposalById(id)) {

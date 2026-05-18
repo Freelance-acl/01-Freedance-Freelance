@@ -75,6 +75,10 @@ public interface JobRepository extends JpaRepository<Job, Long> {
 	@Query(value = "UPDATE jobs SET status = 'IN_PROGRESS' WHERE id = :jobId", nativeQuery = true)
 	int markJobInProgress(@Param("jobId") Long jobId);
 
+	@Modifying(clearAutomatically = true)
+	@Query(value = "UPDATE jobs SET status = 'CLOSED' WHERE id = :jobId", nativeQuery = true)
+	int markJobClosed(@Param("jobId") Long jobId);
+
 	 /**
      * Retrieves the top jobs ordered by budgetMax descending.
      * Includes the count of proposals for each job.

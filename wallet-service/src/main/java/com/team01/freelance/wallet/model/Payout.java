@@ -49,8 +49,6 @@ public class Payout {
     @JsonAlias({"createdAt", "created_at"})
     private LocalDateTime createdAt;
 
-    @OneToMany(mappedBy = "payout", fetch = FetchType.LAZY)
-
     @PrePersist
     public void onCreate() {
         if (createdAt == null) {
