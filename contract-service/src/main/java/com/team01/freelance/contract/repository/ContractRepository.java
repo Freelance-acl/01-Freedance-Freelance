@@ -1,15 +1,16 @@
 package com.team01.freelance.contract.repository;
 
-import com.team01.freelance.contract.model.Contract;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Optional;
+import com.team01.freelance.contract.model.Contract;
 
 @Repository
 public interface ContractRepository extends JpaRepository<Contract, Long> {
@@ -164,4 +165,26 @@ public interface ContractRepository extends JpaRepository<Contract, Long> {
             ORDER BY id ASC
             """, nativeQuery = true)
     List<Contract> findByMetadataLessThan(@Param("key") String key, @Param("value") Double value);
+
+    Optional<Contract> findByProposalId(Long proposalId);
+
+    @Modifying(clearAutomatically = true)
+    @Query(value = """
+            INSERT INTO contracts (
+                job_id, freelancer_id, client_id, proposal_id,
+                agreed_amount, status, start_date, created_at
+            )
+            VALUES (
+                :jobId, :freelancerId, :clientId, :proposalId,
+                :agreedAmount, 'ACTIVE', :timestamp, :timestamp
+            )
+            """, nativeQuery = true)
+    void insertActiveContract(
+            @Param("jobId") Long jobId,
+            @Param("freelancerId") Long freelancerId,
+            @Param("clientId") Long clientId,
+            @Param("proposalId") Long proposalId,
+            @Param("agreedAmount") Double agreedAmount,
+            @Param("timestamp") LocalDateTime timestamp
+    );
 }

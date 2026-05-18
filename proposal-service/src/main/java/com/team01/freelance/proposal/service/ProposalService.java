@@ -1,21 +1,33 @@
 package com.team01.freelance.proposal.service;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.EnumSet;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.team01.freelance.contract.repository.ContractRepository;
+import com.team01.freelance.job.model.Job;
+import com.team01.freelance.job.repository.JobRepository;
 import com.team01.freelance.proposal.model.Proposal;
 import com.team01.freelance.proposal.model.ProposalStatus;
 import com.team01.freelance.proposal.repository.ProposalRepository;
-import com.team01.freelance.job.repository.JobRepository;
 import com.team01.freelance.user.repository.UserRepository;
-import jakarta.persistence.EntityNotFoundException;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
 
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Optional;
+import jakarta.persistence.EntityNotFoundException;
 
 @Service
 public class ProposalService {
+
+    private static final Set<ProposalStatus> ACCEPTABLE_STATUSES = EnumSet.of(
+            ProposalStatus.SUBMITTED,
+            ProposalStatus.SHORTLISTED
+    );
 
     @Autowired
     private ProposalRepository proposalRepository;
@@ -25,6 +37,9 @@ public class ProposalService {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private ContractRepository contractRepository;
 
     public List<Proposal> getAllProposals() {
         return proposalRepository.findAll();
@@ -88,6 +103,53 @@ public class ProposalService {
             if (proposalDetails.getAcceptedAt() != null) existingProposal.setAcceptedAt(proposalDetails.getAcceptedAt());
             return proposalRepository.save(existingProposal);
         }).orElseThrow(() -> new EntityNotFoundException("Proposal not found with id: " + id));
+    }
+
+    /**
+     * Accepts a proposal, marks the job in progress, and creates an active contract transactionally.
+     *
+     * @param id the proposal ID
+     * @return the accepted proposal
+     * @throws EntityNotFoundException if the proposal, job, or freelancer user is not found
+     * @throws IllegalArgumentException if the proposal status is not acceptable or the user is not a freelancer
+     */
+    @Transactional
+    public Proposal acceptProposal(Long id) {
+        Proposal proposal = proposalRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Proposal not found with id: " + id));
+
+        if (!ACCEPTABLE_STATUSES.contains(proposal.getStatus())) {
+            throw new IllegalArgumentException("Only SUBMITTED or SHORTLISTED proposals can be accepted");
+        }
+
+        String freelancerRole = userRepository.findRoleByUserId(proposal.getFreelancerId());
+        if (freelancerRole == null) {
+            throw new EntityNotFoundException("Freelancer not found with id: " + proposal.getFreelancerId());
+        }
+        if (!"FREELANCER".equalsIgnoreCase(freelancerRole)) {
+            throw new IllegalArgumentException("User is not a freelancer");
+        }
+
+        Job job = jobRepository.findById(proposal.getJobId())
+                .orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + proposal.getJobId()));
+
+        LocalDateTime now = LocalDateTime.now();
+        proposal.setStatus(ProposalStatus.ACCEPTED);
+        proposal.setAcceptedAt(now);
+        Proposal acceptedProposal = proposalRepository.save(proposal);
+
+        jobRepository.markJobInProgress(proposal.getJobId());
+
+        contractRepository.insertActiveContract(
+                proposal.getJobId(),
+                proposal.getFreelancerId(),
+                job.getClientId(),
+                proposal.getId(),
+                proposal.getBidAmount(),
+                now
+        );
+
+        return acceptedProposal;
     }
 
     public boolean deleteProposalById(Long id) {

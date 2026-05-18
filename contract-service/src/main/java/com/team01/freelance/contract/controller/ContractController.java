@@ -167,6 +167,11 @@ public class ContractController {
     ) {
         try {
             return ResponseEntity.ok(contractService.findContractHistory(startDate, endDate, status));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
     @GetMapping("/metadata/search")
     public ResponseEntity<List<Contract>> findContractsByMetadata(
             @RequestParam String key,
@@ -175,6 +180,11 @@ public class ContractController {
     ) {
         try {
             return ResponseEntity.ok(contractService.findContractsByMetadata(key, operator, value));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
     @PutMapping("/batch-status")
     public ResponseEntity<BatchContractStatusUpdateResponse> batchUpdateContractStatus(
             @RequestBody List<BatchContractStatusUpdateRequest> updates

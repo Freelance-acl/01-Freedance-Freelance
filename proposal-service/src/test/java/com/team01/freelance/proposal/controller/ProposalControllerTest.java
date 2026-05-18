@@ -102,6 +102,33 @@ class ProposalControllerTest {
     }
 
     @Test
+    void acceptReturnsOk() throws Exception {
+        Proposal proposal = new Proposal();
+        when(proposalService.acceptProposal(1L)).thenReturn(proposal);
+
+        mockMvc.perform(put("/api/proposals/{id}/accept", 1L))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void acceptReturnsNotFound() throws Exception {
+        when(proposalService.acceptProposal(1L))
+                .thenThrow(new jakarta.persistence.EntityNotFoundException("Proposal not found"));
+
+        mockMvc.perform(put("/api/proposals/{id}/accept", 1L))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void acceptReturnsBadRequest() throws Exception {
+        when(proposalService.acceptProposal(1L))
+                .thenThrow(new IllegalArgumentException("Only SUBMITTED or SHORTLISTED proposals can be accepted"));
+
+        mockMvc.perform(put("/api/proposals/{id}/accept", 1L))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void deleteByIdReturnsNoContent() throws Exception {
         when(proposalService.deleteProposalById(1L)).thenReturn(true);
 

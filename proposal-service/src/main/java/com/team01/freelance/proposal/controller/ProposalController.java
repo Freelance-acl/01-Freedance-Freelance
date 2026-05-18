@@ -77,6 +77,17 @@ public class ProposalController {
         }
     }
 
+    @PutMapping("/{id}/accept")
+    public ResponseEntity<Proposal> acceptProposal(@PathVariable("id") Long proposalId) {
+        try {
+            return ResponseEntity.ok(proposalService.acceptProposal(proposalId));
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteProposalById(@PathVariable Long id) {
         if (proposalService.deleteProposalById(id)) {
