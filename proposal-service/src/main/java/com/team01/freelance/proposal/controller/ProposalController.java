@@ -42,6 +42,17 @@ public class ProposalController {
         return ResponseEntity.ok(proposalService.searchProposals(status, startDate, endDate));
     }
 
+    @GetMapping("/metadata/search")
+    public ResponseEntity<List<Proposal>> searchProposalsByMetadata(
+            @RequestParam String key,
+            @RequestParam String value) {
+        try {
+            return ResponseEntity.ok(proposalService.searchProposalsByMetadata(key, value));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<Proposal> getProposalById(@PathVariable Long id) {
         return proposalService.getProposalById(id)

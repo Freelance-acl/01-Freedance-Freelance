@@ -154,4 +154,39 @@ class ProposalServiceTest {
                 LocalDateTime.of(2026, 6, 16, 0, 0),
                 ProposalStatus.SUBMITTED);
     }
+
+    @Test
+    void searchProposalsByMetadata_delegatesToRepository() {
+        Proposal proposal = new Proposal();
+        proposal.setId(1L);
+        when(proposalRepository.findIdsByMetadata("approach", "agile")).thenReturn(List.of(1L));
+        when(proposalRepository.findAllById(List.of(1L))).thenReturn(List.of(proposal));
+
+        assertThat(proposalService.searchProposalsByMetadata("approach", "agile")).containsExactly(proposal);
+
+        verify(proposalRepository).findIdsByMetadata("approach", "agile");
+    }
+
+    @Test
+    void searchProposalsByMetadata_trimsKeyAndValue() {
+        when(proposalRepository.findIdsByMetadata("approach", "agile")).thenReturn(List.of());
+
+        proposalService.searchProposalsByMetadata("  approach  ", "  agile  ");
+
+        verify(proposalRepository).findIdsByMetadata("approach", "agile");
+    }
+
+    @Test
+    void searchProposalsByMetadata_rejectsBlankKey() {
+        assertThatThrownBy(() -> proposalService.searchProposalsByMetadata("", "agile"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("key and value");
+    }
+
+    @Test
+    void searchProposalsByMetadata_rejectsBlankValue() {
+        assertThatThrownBy(() -> proposalService.searchProposalsByMetadata("approach", " "))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("key and value");
+    }
 }

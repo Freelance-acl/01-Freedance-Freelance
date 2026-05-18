@@ -116,4 +116,25 @@ class ProposalControllerTest {
         mockMvc.perform(delete("/api/proposals/all"))
                 .andExpect(status().isNoContent());
     }
+
+    @Test
+    void searchByMetadataReturnsOk() throws Exception {
+        when(proposalService.searchProposalsByMetadata("approach", "agile")).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/proposals/metadata/search")
+                        .param("key", "approach")
+                        .param("value", "agile"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void searchByMetadataReturns400WhenInvalid() throws Exception {
+        when(proposalService.searchProposalsByMetadata("", "x"))
+                .thenThrow(new IllegalArgumentException("key and value are required"));
+
+        mockMvc.perform(get("/api/proposals/metadata/search")
+                        .param("key", "")
+                        .param("value", "x"))
+                .andExpect(status().isBadRequest());
+    }
 }
