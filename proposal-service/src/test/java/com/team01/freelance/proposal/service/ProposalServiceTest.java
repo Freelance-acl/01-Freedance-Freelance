@@ -1,5 +1,6 @@
 package com.team01.freelance.proposal.service;
 
+import com.team01.freelance.proposal.dto.FeeEstimateDTO;
 import com.team01.freelance.proposal.model.Proposal;
 import com.team01.freelance.proposal.model.ProposalStatus;
 import com.team01.freelance.proposal.repository.ProposalRepository;
@@ -18,6 +19,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.verify;
@@ -153,5 +155,37 @@ class ProposalServiceTest {
                 LocalDateTime.of(2026, 6, 1, 0, 0),
                 LocalDateTime.of(2026, 6, 16, 0, 0),
                 ProposalStatus.SUBMITTED);
+    }
+
+    @Test
+    void estimatePlatformFeeWithNoCompetitionUsesTwentyPercentTier() {
+        when(proposalRepository.countActiveProposalsInSimilarBidRange(anyDouble(), anyDouble())).thenReturn(0L);
+
+        FeeEstimateDTO estimate = proposalService.estimatePlatformFee(1000.0, 10);
+
+        assertThat(estimate.getBidAmount()).isEqualTo(1000.0);
+        assertThat(estimate.getFeePercentage()).isEqualTo(20);
+        assertThat(estimate.getPlatformFee()).isEqualTo(200.0);
+        assertThat(estimate.getFreelancerPayout()).isEqualTo(800.0);
+        assertThat(estimate.getEstimatedDailyRate()).isEqualTo(80.0);
+    }
+
+    @Test
+    void estimatePlatformFeeWithModerateCompetitionUsesFifteenPercentTier() {
+        when(proposalRepository.countActiveProposalsInSimilarBidRange(anyDouble(), anyDouble())).thenReturn(10L);
+
+        FeeEstimateDTO estimate = proposalService.estimatePlatformFee(1000.0, 10);
+
+        assertThat(estimate.getFeePercentage()).isEqualTo(15);
+        assertThat(estimate.getPlatformFee()).isEqualTo(150.0);
+        assertThat(estimate.getFreelancerPayout()).isEqualTo(850.0);
+        assertThat(estimate.getEstimatedDailyRate()).isEqualTo(85.0);
+    }
+
+    @Test
+    void estimatePlatformFeeRejectsNonPositiveBidAmount() {
+        assertThatThrownBy(() -> proposalService.estimatePlatformFee(0.0, 10))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("bidAmount");
     }
 }
