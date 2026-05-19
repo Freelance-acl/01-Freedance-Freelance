@@ -1,10 +1,8 @@
 package com.team01.freelance.proposal.model;
 
-import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 import java.util.Map;
 
 @Entity
@@ -31,12 +29,13 @@ public class ProposalMilestone {
     @Enumerated(EnumType.STRING)
     private MilestoneStatus status;
 
-    @Column(name = "metadata", columnDefinition = "jsonb")
-    @JdbcTypeCode(SqlTypes.JSON)
+    @Convert(converter = JsonMapConverter.class)
+    @Column(name = "metadata")
     private Map<String, Object> metadata;
 
     @ManyToOne
     @JoinColumn(name = "proposal_id", nullable = false)
+    @JsonBackReference
     private Proposal proposal;
 
     @PrePersist
@@ -111,4 +110,3 @@ public class ProposalMilestone {
         this.proposal = proposal;
     }
 }
-

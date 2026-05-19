@@ -2,6 +2,7 @@ package com.team01.freelance.wallet.controller;
 
 import com.team01.freelance.wallet.model.PayoutPromo;
 import com.team01.freelance.wallet.service.PayoutPromoService;
+import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -54,6 +55,14 @@ class PayoutPromoControllerTest {
     }
 
     @Test
+    void getByIdReturnsNotFound() throws Exception {
+        when(payoutPromoService.getPayoutPromoById(999L)).thenReturn(Optional.empty());
+
+        mockMvc.perform(get("/api/payout-promos/{id}", 999L))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     void createReturnsCreated() throws Exception {
         PayoutPromo payoutPromo = new PayoutPromo();
         when(payoutPromoService.createPayoutPromo(any(PayoutPromo.class))).thenReturn(payoutPromo);
@@ -76,11 +85,30 @@ class PayoutPromoControllerTest {
     }
 
     @Test
+    void updateReturnsNotFound() throws Exception {
+        when(payoutPromoService.updatePayoutPromo(eq(999L), any(PayoutPromo.class)))
+                .thenThrow(new EntityNotFoundException("Payout promo not found"));
+
+        mockMvc.perform(put("/api/payout-promos/{id}", 999L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     void deleteByIdReturnsNoContent() throws Exception {
         when(payoutPromoService.deletePayoutPromoById(1L)).thenReturn(true);
 
         mockMvc.perform(delete("/api/payout-promos/{id}", 1L))
                 .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void deleteByIdReturnsNotFound() throws Exception {
+        when(payoutPromoService.deletePayoutPromoById(999L)).thenReturn(false);
+
+        mockMvc.perform(delete("/api/payout-promos/{id}", 999L))
+                .andExpect(status().isNotFound());
     }
 
     @Test
