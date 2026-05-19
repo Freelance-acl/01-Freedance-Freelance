@@ -53,6 +53,7 @@ public interface ProposalRepository extends JpaRepository<Proposal, Long> {
             @Param("minBid") double minBid,
             @Param("maxBid") double maxBid);
 
+
     long countByJobIdAndStatusIn(Long jobId, List<ProposalStatus> statuses);
 
     @Query("""

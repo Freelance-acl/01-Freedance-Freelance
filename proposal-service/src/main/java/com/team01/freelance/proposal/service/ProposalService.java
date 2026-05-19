@@ -210,6 +210,7 @@ public class ProposalService {
                 now
         );
 
+        acceptedProposal.setProposalMilestones(new ArrayList<>(acceptedProposal.getProposalMilestones()));
         acceptedProposal.setProposalMilestones(new ArrayList<>());
         return acceptedProposal;
     }
@@ -292,6 +293,7 @@ public class ProposalService {
             jobRepository.reopenIfInProgress(proposal.getJobId());
         }
 
+        withdrawnProposal.setProposalMilestones(new ArrayList<>(withdrawnProposal.getProposalMilestones()));
         withdrawnProposal.setProposalMilestones(new ArrayList<>());
         return withdrawnProposal;
     }
