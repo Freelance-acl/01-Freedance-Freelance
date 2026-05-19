@@ -1,19 +1,29 @@
 package com.team01.freelance.contract.controller;
 
+import com.team01.freelance.contract.dto.ContractSummaryDTO;
+import com.team01.freelance.contract.dto.BatchContractStatusUpdateRequest;
+import com.team01.freelance.contract.dto.BatchContractStatusUpdateResponse;
 import com.team01.freelance.contract.model.Contract;
+import com.team01.freelance.contract.dto.FreelancerPerformanceDTO;
+import com.team01.freelance.contract.dto.StalledContractDTO;
 import com.team01.freelance.contract.service.ContractService;
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/contracts")
@@ -32,6 +42,17 @@ public class ContractController {
         return contractService.getContractById(id)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/user/{userId}/active")
+    public ResponseEntity<Contract> getActiveContractForUser(@PathVariable Long userId) {
+        try {
+            return ResponseEntity.ok(contractService.getActiveContractForUser(userId));
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
     }
 
     @PostMapping
@@ -62,6 +83,31 @@ public class ContractController {
         }
     }
 
+    @PutMapping("/{contractId}/progress")
+    public ResponseEntity<Contract> updateContractProgress(
+            @PathVariable Long contractId,
+            @RequestBody Map<String, Object> metadataUpdates
+    ) {
+        try {
+            return ResponseEntity.ok(contractService.updateContractProgress(contractId, metadataUpdates));
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    @GetMapping("/search")
+    public ResponseEntity<List<ContractSummaryDTO>> searchContracts(
+            @RequestParam Double minAmount,
+            @RequestParam Double maxAmount,
+            @RequestParam(required = false) String status
+    ) {
+        try {
+            return ResponseEntity.ok(contractService.searchContracts(minAmount, maxAmount, status));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteContractById(@PathVariable Long id) {
         if (contractService.deleteContractById(id)) {
@@ -74,5 +120,81 @@ public class ContractController {
     public ResponseEntity<Void> deleteAllContracts() {
         contractService.deleteAllContracts();
         return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/purge")
+    public ResponseEntity<Map<String, Long>> purgeOldContractData(@RequestParam Integer olderThanDays) {
+        try {
+            long deletedCount = contractService.purgeOldContractData(olderThanDays);
+            return ResponseEntity.ok(Map.of("deletedCount", deletedCount));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @GetMapping("/freelancer/{freelancerId}/summary")
+    public ResponseEntity<FreelancerPerformanceDTO> getFreelancerPerformanceSummary(
+            @PathVariable Long freelancerId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate
+    ) {
+        try {
+            return ResponseEntity.ok(contractService.getFreelancerPerformanceSummary(freelancerId, startDate, endDate));
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @GetMapping("/stalled")
+    public ResponseEntity<List<StalledContractDTO>> getStalledContracts(
+            @RequestParam Double maxProgress,
+            @RequestParam Integer stalledDays
+    ) {
+        try {
+            return ResponseEntity.ok(contractService.findStalledContracts(maxProgress, stalledDays));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @GetMapping("/history")
+    public ResponseEntity<List<Contract>> findContractHistory(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(required = false) String status
+    ) {
+        try {
+            return ResponseEntity.ok(contractService.findContractHistory(startDate, endDate, status));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @GetMapping("/metadata/search")
+    public ResponseEntity<List<Contract>> findContractsByMetadata(
+            @RequestParam String key,
+            @RequestParam String operator,
+            @RequestParam String value
+    ) {
+        try {
+            return ResponseEntity.ok(contractService.findContractsByMetadata(key, operator, value));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @PutMapping("/batch-status")
+    public ResponseEntity<BatchContractStatusUpdateResponse> batchUpdateContractStatus(
+            @RequestBody List<BatchContractStatusUpdateRequest> updates
+    ) {
+        try {
+            return ResponseEntity.ok(contractService.batchUpdateContractStatus(updates));
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
     }
 }

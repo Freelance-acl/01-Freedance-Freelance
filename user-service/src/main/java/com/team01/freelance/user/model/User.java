@@ -47,7 +47,6 @@ public class User {
     @JsonAlias({"createdAt", "created_at"})
     private LocalDateTime createdAt;
 
-    @JsonIgnore
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<UserSkill> userSkills;
 
