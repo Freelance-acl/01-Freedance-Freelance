@@ -91,7 +91,7 @@ public interface JobRepository extends JpaRepository<Job, Long> {
 	 "LIMIT :limit", 
 	 nativeQuery = true)
 List<TopBudgetJobDTO> findTopBudgetJobs(@Param("limit") int limit);
-}
+
 
 	@Modifying
 	@Query(value = "UPDATE jobs SET status = 'OPEN' WHERE id = :jobId AND status = 'IN_PROGRESS'", nativeQuery = true)

@@ -154,9 +154,17 @@ public class Proposal {
     }
 
     public List<ProposalMilestone> getProposalMilestones() {
-        if (proposalMilestones != null) {
-            proposalMilestones.sort(Comparator.comparing(ProposalMilestone::getMilestoneOrder));
+        if (proposalMilestones == null) {
+            return List.of();
         }
+        return proposalMilestones.stream()
+                .sorted(Comparator.comparing(ProposalMilestone::getMilestoneOrder))
+                .toList();
+    }
+
+    /** Returns the live milestone collection for persistence updates. */
+    public List<ProposalMilestone> getProposalMilestonesForUpdate() {
+        ensureMutableMilestones();
         return proposalMilestones;
     }
 
@@ -168,10 +176,14 @@ public class Proposal {
     }
 
     public void addProposalMilestone(ProposalMilestone proposalMilestone) {
+        ensureMutableMilestones();
+        proposalMilestone.setProposal(this);
+        proposalMilestones.add(proposalMilestone);
+    }
+
+    private void ensureMutableMilestones() {
         if (proposalMilestones == null) {
             proposalMilestones = new ArrayList<>();
         }
-        proposalMilestone.setProposal(this);
-        proposalMilestones.add(proposalMilestone);
     }
 }

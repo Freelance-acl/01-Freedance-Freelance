@@ -329,20 +329,20 @@ class ProposalServiceTest {
                 .hasMessageContaining("Proposal not found");
     }
 
-    private Proposal proposalWithStatus(Long id, Long jobId, ProposalStatus status) {
-        Proposal proposal = new Proposal();
-        proposal.setId(id);
-        proposal.setJobId(jobId);
-        proposal.setStatus(status);
-        return proposal;
-    }
-
     private ProposalMilestone milestone(String title, String description, Double amount) {
         ProposalMilestone milestone = new ProposalMilestone();
         milestone.setTitle(title);
         milestone.setDescription(description);
         milestone.setAmount(amount);
         return milestone;
+    }
+
+    private Proposal proposalWithStatus(Long id, ProposalStatus status) {
+        Proposal proposal = new Proposal();
+        proposal.setId(id);
+        proposal.setStatus(status);
+        return proposal;
+    }
 
     @Test
     void withdrawProposalSetsSubmittedProposalWithdrawnAndReopensOnlyActiveInProgressJob() {
@@ -414,6 +414,9 @@ class ProposalServiceTest {
         proposal.setJobId(jobId);
         proposal.setStatus(status);
         return proposal;
+    }
+
+    @Test
     void getProposalAnalyticsCalculatesMarchScenario() {
         LocalDate start = LocalDate.of(2026, 3, 1);
         LocalDate end = LocalDate.of(2026, 3, 31);

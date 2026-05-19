@@ -33,7 +33,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 
 class ProposalControllerTest {
 
@@ -173,6 +172,10 @@ class ProposalControllerTest {
         mockMvc.perform(post("/api/proposals/{proposalId}/milestones", 404L)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("[{\"title\":\"Planning\",\"description\":\"Plan\",\"amount\":800.0}]"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     void withdrawReturnsOk() throws Exception {
         Proposal proposal = new Proposal();
         proposal.setStatus(ProposalStatus.WITHDRAWN);
@@ -199,6 +202,10 @@ class ProposalControllerTest {
         mockMvc.perform(post("/api/proposals/{proposalId}/milestones", 2L)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("[{\"description\":\"Plan\",\"amount\":800.0}]"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void withdrawReturnsBadRequestWhenStatusCannotBeWithdrawn() throws Exception {
         when(proposalService.withdrawProposal(2L))
                 .thenThrow(new IllegalArgumentException("Only SUBMITTED or SHORTLISTED proposals can be withdrawn"));
