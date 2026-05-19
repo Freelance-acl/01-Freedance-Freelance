@@ -155,6 +155,16 @@ class JobControllerTest {
         mockMvc.perform(get("/api/jobs/{id}/proposal-summary", 1L)
                         .param("startDate", "2026-03-01")
                         .param("endDate", "2026-03-31"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.jobId").value(1))
+                .andExpect(jsonPath("$.title").value("Web Development"))
+                .andExpect(jsonPath("$.totalProposals").value(5))
+                .andExpect(jsonPath("$.averageBidAmount").value(800.0))
+                .andExpect(jsonPath("$.lowestBid").value(500.0))
+                .andExpect(jsonPath("$.highestBid").value(1200.0));
+    }
+
+    @Test
     void rateReturnsOk() throws Exception {
         Job job = new Job();
         when(jobService.rateJob(eq(1L), any(JobRatingRequest.class))).thenReturn(job);
@@ -176,6 +186,10 @@ class JobControllerTest {
         mockMvc.perform(get("/api/jobs/{id}/proposal-summary", 1L)
                         .param("startDate", "2026-03-31")
                         .param("endDate", "2026-03-01"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void rateReturnsBadRequest() throws Exception {
         when(jobService.rateJob(eq(1L), any(JobRatingRequest.class))).thenThrow(new IllegalArgumentException("Invalid rating"));
 
@@ -322,6 +336,8 @@ class JobControllerTest {
                         .param("endDate", "2026-03-31"))
                 .andExpect(status().isNotFound());
     }
+
+    @Test
     void closeJob_returnsBadRequestForInvalidStatus() throws Exception {
         mockMvc.perform(put("/api/jobs/{id}/close", 1L)
                         .contentType(MediaType.APPLICATION_JSON)

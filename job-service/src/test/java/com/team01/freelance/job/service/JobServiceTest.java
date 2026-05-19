@@ -285,6 +285,9 @@ class JobServiceTest {
         assertNotNull(result);
         assertEquals(2L, result.getTotalProposals());
         verify(jobRepository).getProposalSummary(jobId, queryStart, queryEndExclusive);
+    }
+
+    @Test
     void updateJobRequirementsMergesIncomingFields() {
         Long jobId = 1L;
         Job existingJob = new Job();
@@ -319,6 +322,8 @@ class JobServiceTest {
         assertThrows(EntityNotFoundException.class, () -> jobService.updateJobRequirements(1L, Map.of("foo", "bar")));
         verify(jobRepository, never()).save(any(Job.class));
     }
+
+    @Test
     void rateJobRecalculatesRunningAverage() {
         Long jobId = 1L;
         Job existingJob = new Job();
