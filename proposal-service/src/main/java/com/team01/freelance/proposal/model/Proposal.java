@@ -1,8 +1,10 @@
 package com.team01.freelance.proposal.model;
 
 import com.fasterxml.jackson.annotation.JsonAlias;
-import com.fasterxml.jackson.annotation.JsonManagedReference;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
+import org.hibernate.Hibernate;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 import java.time.LocalDateTime;
@@ -54,7 +56,7 @@ public class Proposal {
     @JsonAlias({"acceptedAt", "accepted_at"})
     private LocalDateTime acceptedAt;
 
-    @JsonManagedReference
+    @JsonIgnore
     @OrderBy("milestoneOrder ASC")
     @OneToMany(mappedBy = "proposal", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ProposalMilestone> proposalMilestones;
@@ -153,8 +155,9 @@ public class Proposal {
         this.acceptedAt = acceptedAt;
     }
 
+    @JsonProperty("proposalMilestones")
     public List<ProposalMilestone> getProposalMilestones() {
-        if (proposalMilestones == null) {
+        if (proposalMilestones == null || !Hibernate.isInitialized(proposalMilestones)) {
             return List.of();
         }
         return proposalMilestones.stream()

@@ -2,6 +2,8 @@ package com.team01.freelance.proposal.service;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
@@ -15,27 +17,16 @@ import com.team01.freelance.contract.repository.ContractRepository;
 import com.team01.freelance.job.model.Job;
 import com.team01.freelance.job.repository.JobRepository;
 import com.team01.freelance.proposal.dto.ProposalAnalyticsDTO;
-import com.team01.freelance.proposal.model.Proposal;
 import com.team01.freelance.proposal.dto.ProposalDetailsDTO;
 import com.team01.freelance.proposal.model.MilestoneStatus;
+import com.team01.freelance.proposal.model.Proposal;
 import com.team01.freelance.proposal.model.ProposalMilestone;
 import com.team01.freelance.proposal.model.ProposalStatus;
-import com.team01.freelance.proposal.model.MilestoneStatus;
 import com.team01.freelance.proposal.repository.ProposalAnalyticsProjection;
 import com.team01.freelance.proposal.repository.ProposalRepository;
 import com.team01.freelance.user.repository.UserRepository;
 
 import jakarta.persistence.EntityNotFoundException;
-import jakarta.persistence.EntityNotFoundException;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Optional;
 
 @Service
 public class ProposalService {
@@ -213,7 +204,10 @@ public class ProposalService {
                 now
         );
 
+        acceptedProposal.setProposalMilestones(new ArrayList<>(acceptedProposal.getProposalMilestones()));
         return acceptedProposal;
+    }
+
     @Transactional
     public Proposal addMilestones(Long proposalId, List<ProposalMilestone> milestones) {
         Proposal proposal = proposalRepository.findById(proposalId)
@@ -292,6 +286,7 @@ public class ProposalService {
             jobRepository.reopenIfInProgress(proposal.getJobId());
         }
 
+        withdrawnProposal.setProposalMilestones(new ArrayList<>(withdrawnProposal.getProposalMilestones()));
         return withdrawnProposal;
     }
 
