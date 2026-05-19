@@ -26,6 +26,7 @@ import java.util.Optional;
 public class ProposalService {
 
     private static final List<ProposalStatus> MILESTONE_ALLOWED_STATUSES = List.of(
+    private static final List<ProposalStatus> WITHDRAWABLE_STATUSES = List.of(
             ProposalStatus.SUBMITTED,
             ProposalStatus.SHORTLISTED);
 
@@ -208,6 +209,26 @@ public class ProposalService {
         if (milestone.getAmount() == null || milestone.getAmount() <= 0) {
             throw new IllegalArgumentException("Milestone amount must be positive");
         }
+    public Proposal withdrawProposal(Long id) {
+        Proposal proposal = proposalRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Proposal not found with id: " + id));
+
+        if (!WITHDRAWABLE_STATUSES.contains(proposal.getStatus())) {
+            throw new IllegalArgumentException("Only SUBMITTED or SHORTLISTED proposals can be withdrawn");
+        }
+
+        long activeProposalCount = proposalRepository.countByJobIdAndStatusIn(
+                proposal.getJobId(),
+                WITHDRAWABLE_STATUSES);
+
+        proposal.setStatus(ProposalStatus.WITHDRAWN);
+        Proposal withdrawnProposal = proposalRepository.save(proposal);
+
+        if (activeProposalCount == 1) {
+            jobRepository.reopenIfInProgress(proposal.getJobId());
+        }
+
+        return withdrawnProposal;
     }
 
     public boolean deleteProposalById(Long id) {

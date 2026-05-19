@@ -4,6 +4,7 @@ import com.team01.freelance.proposal.dto.ProposalDetailsDTO;
 import com.team01.freelance.proposal.dto.ProposalAnalyticsDTO;
 import com.team01.freelance.proposal.model.Proposal;
 import com.team01.freelance.proposal.model.ProposalMilestone;
+import com.team01.freelance.proposal.model.ProposalStatus;
 import com.team01.freelance.proposal.service.ProposalService;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
@@ -172,6 +173,21 @@ class ProposalControllerTest {
         mockMvc.perform(post("/api/proposals/{proposalId}/milestones", 404L)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("[{\"title\":\"Planning\",\"description\":\"Plan\",\"amount\":800.0}]"))
+    void withdrawReturnsOk() throws Exception {
+        Proposal proposal = new Proposal();
+        proposal.setStatus(ProposalStatus.WITHDRAWN);
+        when(proposalService.withdrawProposal(1L)).thenReturn(proposal);
+
+        mockMvc.perform(put("/api/proposals/{id}/withdraw", 1L))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void withdrawReturnsNotFoundWhenProposalMissing() throws Exception {
+        when(proposalService.withdrawProposal(404L))
+                .thenThrow(new EntityNotFoundException("Proposal not found"));
+
+        mockMvc.perform(put("/api/proposals/{id}/withdraw", 404L))
                 .andExpect(status().isNotFound());
     }
 
@@ -183,6 +199,11 @@ class ProposalControllerTest {
         mockMvc.perform(post("/api/proposals/{proposalId}/milestones", 2L)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("[{\"description\":\"Plan\",\"amount\":800.0}]"))
+    void withdrawReturnsBadRequestWhenStatusCannotBeWithdrawn() throws Exception {
+        when(proposalService.withdrawProposal(2L))
+                .thenThrow(new IllegalArgumentException("Only SUBMITTED or SHORTLISTED proposals can be withdrawn"));
+
+        mockMvc.perform(put("/api/proposals/{id}/withdraw", 2L))
                 .andExpect(status().isBadRequest());
     }
 

@@ -102,6 +102,10 @@ public class ProposalController {
             @RequestBody List<ProposalMilestone> milestones) {
         try {
             return ResponseEntity.ok(proposalService.addMilestones(proposalId, milestones));
+    @PutMapping("/{id}/withdraw")
+    public ResponseEntity<Proposal> withdrawProposal(@PathVariable Long id) {
+        try {
+            return ResponseEntity.ok(proposalService.withdrawProposal(id));
         } catch (EntityNotFoundException e) {
             return ResponseEntity.notFound().build();
         } catch (IllegalArgumentException e) {
