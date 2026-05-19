@@ -166,6 +166,8 @@ public class ProposalController {
             return ResponseEntity.notFound().build();
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().build();
+        } catch (IllegalStateException e) {
+            return ResponseEntity.badRequest().build();
         }
     }
 

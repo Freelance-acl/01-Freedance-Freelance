@@ -1,6 +1,7 @@
 package com.team01.freelance.proposal.service;
 
 import com.team01.freelance.contract.model.Contract;
+import com.team01.freelance.contract.model.ContractStatus;
 import com.team01.freelance.contract.repository.ContractRepository;
 import com.team01.freelance.proposal.dto.FeeEstimateDTO;
 import com.team01.freelance.job.model.Job;
@@ -690,9 +691,10 @@ class ProposalServiceTest {
         contract.setJobId(7L);
         contract.setFreelancerId(30L);
         contract.setAgreedAmount(2000.0);
+        contract.setStatus(ContractStatus.ACTIVE);
 
         when(proposalRepository.findById(5L)).thenReturn(Optional.of(proposal));
-        when(contractRepository.findActiveContractByProposalId(5L)).thenReturn(Optional.of(contract));
+        when(contractRepository.findByProposalId(5L)).thenReturn(Optional.of(contract));
         when(contractRepository.completeActiveContract(eq(20L), any(LocalDateTime.class))).thenReturn(1);
         when(jobRepository.markJobClosed(7L)).thenReturn(1);
 
@@ -715,7 +717,7 @@ class ProposalServiceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("ACCEPTED");
 
-        verify(contractRepository, never()).findActiveContractByProposalId(anyLong());
+        verify(contractRepository, never()).findByProposalId(anyLong());
     }
 
     @Test
@@ -724,7 +726,7 @@ class ProposalServiceTest {
         proposal.setId(5L);
         proposal.setStatus(ProposalStatus.ACCEPTED);
         when(proposalRepository.findById(5L)).thenReturn(Optional.of(proposal));
-        when(contractRepository.findActiveContractByProposalId(5L)).thenReturn(Optional.empty());
+        when(contractRepository.findByProposalId(5L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> proposalService.completeProposal(5L))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -744,9 +746,10 @@ class ProposalServiceTest {
         contract.setJobId(7L);
         contract.setFreelancerId(30L);
         contract.setAgreedAmount(2000.0);
+        contract.setStatus(ContractStatus.ACTIVE);
 
         when(proposalRepository.findById(5L)).thenReturn(Optional.of(proposal));
-        when(contractRepository.findActiveContractByProposalId(5L)).thenReturn(Optional.of(contract));
+        when(contractRepository.findByProposalId(5L)).thenReturn(Optional.of(contract));
         when(contractRepository.completeActiveContract(eq(20L), any(LocalDateTime.class))).thenReturn(0);
 
         assertThatThrownBy(() -> proposalService.completeProposal(5L))

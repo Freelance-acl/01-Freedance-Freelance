@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.team01.freelance.contract.model.Contract;
+import com.team01.freelance.contract.model.ContractStatus;
 import com.team01.freelance.contract.repository.ContractRepository;
 import com.team01.freelance.job.model.Job;
 import com.team01.freelance.job.repository.JobRepository;
@@ -270,6 +271,7 @@ public class ProposalService {
                 now
         );
 
+        acceptedProposal.setProposalMilestones(new ArrayList<>());
         return acceptedProposal;
     }
 
@@ -373,12 +375,19 @@ public class ProposalService {
             throw new IllegalArgumentException("Only ACCEPTED proposals can be completed");
         }
 
-        Contract contract = contractRepository.findActiveContractByProposalId(id)
+        Contract contract = contractRepository.findByProposalId(id)
+                .filter(existing -> existing.getStatus() == ContractStatus.ACTIVE)
                 .orElseThrow(() -> new IllegalArgumentException("No ACTIVE contract found for proposal"));
 
         LocalDateTime now = LocalDateTime.now();
-        contractRepository.completeActiveContract(contract.getId(), now);
-        jobRepository.markJobClosed(contract.getJobId());
+        int contractsUpdated = contractRepository.completeActiveContract(contract.getId(), now);
+        if (contractsUpdated != 1) {
+            throw new IllegalStateException("Contract is no longer active or was already completed");
+        }
+        int jobsUpdated = jobRepository.markJobClosed(contract.getJobId());
+        if (jobsUpdated != 1) {
+            throw new IllegalStateException("Job could not be closed");
+        }
         payoutRepository.insertPendingPayout(
                 contract.getId(),
                 contract.getFreelancerId(),
@@ -386,6 +395,7 @@ public class ProposalService {
                 now
         );
 
+        proposal.setProposalMilestones(new ArrayList<>());
         return proposal;
     }
 
