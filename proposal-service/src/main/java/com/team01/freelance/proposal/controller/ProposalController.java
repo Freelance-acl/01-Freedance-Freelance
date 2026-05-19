@@ -1,5 +1,7 @@
 package com.team01.freelance.proposal.controller;
 
+import com.team01.freelance.proposal.dto.FeeEstimateDTO;
+import com.team01.freelance.proposal.dto.FeeEstimateRequest;
 import com.team01.freelance.proposal.dto.ProposalDetailsDTO;
 import com.team01.freelance.proposal.dto.ProposalAnalyticsDTO;
 import com.team01.freelance.proposal.model.Proposal;
@@ -57,6 +59,17 @@ public class ProposalController {
         return proposalService.getProposalById(id)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @PostMapping("/estimate")
+    public ResponseEntity<FeeEstimateDTO> estimatePlatformFee(@RequestBody FeeEstimateRequest request) {
+        try {
+            return ResponseEntity.ok(proposalService.estimatePlatformFee(
+                    request.getBidAmount(),
+                    request.getEstimatedDays()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
     }
 
     @GetMapping("/{proposalId}/details")
@@ -124,6 +137,17 @@ public class ProposalController {
     public ResponseEntity<Proposal> withdrawProposal(@PathVariable Long id) {
         try {
             return ResponseEntity.ok(proposalService.withdrawProposal(id));
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @PutMapping("/{id}/complete")
+    public ResponseEntity<Proposal> completeProposal(@PathVariable("id") Long proposalId) {
+        try {
+            return ResponseEntity.ok(proposalService.completeProposal(proposalId));
         } catch (EntityNotFoundException e) {
             return ResponseEntity.notFound().build();
         } catch (IllegalArgumentException e) {

@@ -187,4 +187,24 @@ public interface ContractRepository extends JpaRepository<Contract, Long> {
             @Param("agreedAmount") Double agreedAmount,
             @Param("timestamp") LocalDateTime timestamp
     );
+
+    @Query(value = """
+            SELECT *
+            FROM contracts
+            WHERE proposal_id = :proposalId
+              AND status = 'ACTIVE'
+            LIMIT 1
+            """, nativeQuery = true)
+    Optional<Contract> findActiveContractByProposalId(@Param("proposalId") Long proposalId);
+
+    @Modifying(clearAutomatically = true)
+    @Query(value = """
+            UPDATE contracts
+            SET status = 'COMPLETED', end_date = :endDate
+            WHERE id = :contractId
+              AND status = 'ACTIVE'
+            """, nativeQuery = true)
+    int completeActiveContract(
+            @Param("contractId") Long contractId,
+            @Param("endDate") LocalDateTime endDate);
 }
