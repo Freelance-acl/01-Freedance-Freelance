@@ -1,9 +1,11 @@
 package com.team01.freelance.proposal.service;
 
+import com.team01.freelance.proposal.dto.ProposalAnalyticsDTO;
 import com.team01.freelance.proposal.model.Proposal;
 import com.team01.freelance.proposal.model.ProposalMilestone;
 import com.team01.freelance.proposal.model.ProposalStatus;
 import com.team01.freelance.proposal.model.MilestoneStatus;
+import com.team01.freelance.proposal.repository.ProposalAnalyticsProjection;
 import com.team01.freelance.proposal.repository.ProposalRepository;
 import com.team01.freelance.job.repository.JobRepository;
 import com.team01.freelance.user.repository.UserRepository;
@@ -62,6 +64,22 @@ public class ProposalService {
         LocalDateTime start = startDate.atStartOfDay();
         LocalDateTime endExclusive = endDate.plusDays(1).atStartOfDay();
         return proposalRepository.searchBySubmittedAtRangeAndOptionalStatus(start, endExclusive, parsedStatus);
+    }
+
+    public ProposalAnalyticsDTO getProposalAnalytics(LocalDate startDate, LocalDate endDate) {
+        validateDateRange(startDate, endDate);
+
+        LocalDateTime start = startDate.atStartOfDay();
+        LocalDateTime endExclusive = endDate.plusDays(1).atStartOfDay();
+        ProposalAnalyticsProjection analytics = proposalRepository.calculateAnalyticsBySubmittedAtRange(start, endExclusive);
+
+        return new ProposalAnalyticsDTO(
+                analytics.getTotalProposals().longValue(),
+                analytics.getAcceptedProposals().longValue(),
+                analytics.getRejectedProposals().longValue(),
+                analytics.getTotalBidValue().doubleValue(),
+                analytics.getAverageBid().doubleValue(),
+                analytics.getAcceptanceRate().doubleValue());
     }
 
     public Proposal createProposal(Proposal proposal) {
@@ -174,5 +192,14 @@ public class ProposalService {
 
     public void deleteAllProposals() {
         proposalRepository.deleteAll();
+    }
+
+    private void validateDateRange(LocalDate startDate, LocalDate endDate) {
+        if (startDate == null || endDate == null) {
+            throw new IllegalArgumentException("startDate and endDate are required");
+        }
+        if (startDate.isAfter(endDate)) {
+            throw new IllegalArgumentException("startDate must be on or before endDate");
+        }
     }
 }
