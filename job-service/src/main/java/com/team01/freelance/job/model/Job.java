@@ -76,8 +76,9 @@ public class Job {
         if (createdAt == null) {
             createdAt = LocalDateTime.now();
         }
-        jobAttachments = new ArrayList<>();
-        
+        if (jobAttachments == null) {
+            jobAttachments = new ArrayList<>();
+        }
     }
 
     // Getters and Setters

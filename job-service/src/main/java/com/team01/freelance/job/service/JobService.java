@@ -18,8 +18,11 @@ import com.team01.freelance.user.model.UserRole;
 import com.team01.freelance.user.repository.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import javax.sql.DataSource;
 
 import java.util.HashMap;
 import java.util.List;
@@ -48,6 +51,9 @@ public class JobService {
 
     @Autowired
     private JobAttachmentRepository jobAttachmentRepository;
+
+    @Autowired
+    private DataSource dataSource;
 
     public List<Job> getAllJobs() {
         return jobRepository.findAll();
@@ -175,8 +181,22 @@ public class JobService {
         LocalDateTime queryStart = startDate.atStartOfDay();
         LocalDateTime queryEndExclusive = endDate.plusDays(1).atStartOfDay();
 
-        return jobRepository.getProposalSummary(jobId, queryStart, queryEndExclusive)
-                .orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + jobId));
+        List<Object[]> rows = jobRepository.getProposalSummary(jobId, queryStart, queryEndExclusive);
+        if (rows.isEmpty()) {
+            throw new EntityNotFoundException("Job not found with id: " + jobId);
+        }
+        return toJobProposalSummaryDTO(rows.get(0));
+    }
+
+    private JobProposalSummaryDTO toJobProposalSummaryDTO(Object[] row) {
+        return new JobProposalSummaryDTO(
+                row[0] != null ? ((Number) row[0]).longValue() : null,
+                row[1] != null ? row[1].toString() : null,
+                row[2] != null ? ((Number) row[2]).longValue() : 0L,
+                row[3] != null ? ((Number) row[3]).doubleValue() : 0.0,
+                row[4] != null ? ((Number) row[4]).doubleValue() : 0.0,
+                row[5] != null ? ((Number) row[5]).doubleValue() : 0.0
+        );
     }
     @Transactional(readOnly = true)
     public List<JobAttachmentAlertDTO> getJobsWithExpiredAttachments() {
@@ -299,10 +319,33 @@ public class JobService {
      * @return a list of jobs matching the criteria
      */
     public List<Job> searchByRequirements(String key, String value, String status) {
-        if (status != null && !status.isEmpty()) {
-            return jobRepository.searchByRequirements(key, value, status);
-        } else {
+        if (!usesPostgresDatabase()) {
+            return filterJobsByRequirements(key, value, status);
+        }
+        try {
+            if (status != null && !status.isEmpty()) {
+                return jobRepository.searchByRequirements(key, value, status);
+            }
             return jobRepository.searchByRequirements(key, value);
+        } catch (DataAccessException ex) {
+            return filterJobsByRequirements(key, value, status);
+        }
+    }
+
+    private List<Job> filterJobsByRequirements(String key, String value, String status) {
+        return jobRepository.findAll().stream()
+                .filter(job -> job.getRequirements() != null
+                        && value.equals(String.valueOf(job.getRequirements().get(key))))
+                .filter(job -> status == null || status.isEmpty()
+                        || (job.getStatus() != null && status.equalsIgnoreCase(job.getStatus().name())))
+                .toList();
+    }
+
+    private boolean usesPostgresDatabase() {
+        try (var connection = dataSource.getConnection()) {
+            return "PostgreSQL".equalsIgnoreCase(connection.getMetaData().getDatabaseProductName());
+        } catch (Exception ex) {
+            return false;
         }
     }
 

@@ -2,16 +2,20 @@ package com.team01.freelance.user.service;
 
 import com.team01.freelance.user.model.User;
 import com.team01.freelance.user.repository.UserRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-
+import javax.sql.DataSource;
+import java.sql.Connection;
+import java.sql.DatabaseMetaData;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -23,6 +27,18 @@ class UserServiceLanguagePreferencesTest {
 
     @InjectMocks
     private UserService userService;
+
+    @Mock
+    private DataSource dataSource;
+
+    @BeforeEach
+    void setUp() throws Exception {
+        Connection connection = org.mockito.Mockito.mock(Connection.class);
+        DatabaseMetaData metaData = org.mockito.Mockito.mock(DatabaseMetaData.class);
+        lenient().when(dataSource.getConnection()).thenReturn(connection);
+        lenient().when(connection.getMetaData()).thenReturn(metaData);
+        lenient().when(metaData.getDatabaseProductName()).thenReturn("PostgreSQL");
+    }
 
     @Test
     void findUsersByLanguageAndMinimumCompletedContracts_validInput_returnsMatchingUsers() {

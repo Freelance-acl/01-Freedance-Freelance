@@ -7,6 +7,8 @@ import com.team01.freelance.user.repository.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
+import javax.sql.DataSource;
 import com.team01.freelance.user.model.UserRole;
 
 import java.math.BigDecimal;
@@ -32,6 +34,9 @@ public class UserService {
 
     @Autowired
     private UserSkillRepository userSkillRepository;
+
+    @Autowired
+    private DataSource dataSource;
 
     public List<User> getAllUsers() {
         return userRepository.findAll();
@@ -63,7 +68,15 @@ public class UserService {
         if (isBlank(key) || isBlank(value)) {
             throw new IllegalArgumentException("Preference key and value must not be blank");
         }
-        return userRepository.findByPreference(key.trim(), value.trim());
+        String trimmedKey = key.trim();
+        String trimmedValue = value.trim();
+        if (!usesPostgresDatabase()) {
+            return userRepository.findAll().stream()
+                    .filter(user -> user.getPreferences() != null
+                            && trimmedValue.equals(String.valueOf(user.getPreferences().get(trimmedKey))))
+                    .toList();
+        }
+        return userRepository.findByPreference(trimmedKey, trimmedValue);
     }
 
     public List<TopFreelancerDTO> getTopFreelancersByEarnings(LocalDate startDate, LocalDate endDate, Integer limit) {
@@ -176,11 +189,34 @@ public class UserService {
         }
 
         Long minimumContracts = minContracts != null ? minContracts : 0L;
+        String language = lang.trim();
 
-        return userRepository.findUsersByLanguageAndMinimumCompletedContracts(
-                lang.trim(),
-                minimumContracts
-        );
+        if (!usesPostgresDatabase()) {
+            return userRepository.findAll().stream()
+                    .filter(user -> user.getPreferences() != null
+                            && language.equalsIgnoreCase(String.valueOf(user.getPreferences().get("language"))))
+                    .filter(user -> completedContractCount(user.getId()) >= minimumContracts)
+                    .toList();
+        }
+
+        return userRepository.findUsersByLanguageAndMinimumCompletedContracts(language, minimumContracts);
+    }
+
+    private long completedContractCount(Long userId) {
+        Object result = userRepository.getUserContractSummary(userId);
+        if (result == null) {
+            return 0L;
+        }
+        Object[] row = (Object[]) result;
+        return row[1] != null ? ((Number) row[1]).longValue() : 0L;
+    }
+
+    private boolean usesPostgresDatabase() {
+        try (var connection = dataSource.getConnection()) {
+            return "PostgreSQL".equalsIgnoreCase(connection.getMetaData().getDatabaseProductName());
+        } catch (Exception ex) {
+            return false;
+        }
     }
 
     public UserContractSummaryDTO getUserContractSummary(Long id) {

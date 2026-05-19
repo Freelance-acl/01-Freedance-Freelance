@@ -17,6 +17,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import javax.sql.DataSource;
+
 import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -36,6 +38,9 @@ public class ContractService {
 
     @Autowired(required = false)
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private DataSource dataSource;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -178,23 +183,29 @@ public class ContractService {
 
         LocalDateTime start = startDate.atStartOfDay();
         LocalDateTime endExclusive = endDate.plusDays(1).atStartOfDay();
-        Object[] raw = contractRepository.getFreelancerPerformance(freelancerId, start, endExclusive);
+        if (!usesPostgresDatabase()) {
+            return buildFreelancerPerformanceInMemory(freelancerId, start, endExclusive);
+        }
+        try {
+            Object[] raw = contractRepository.getFreelancerPerformance(freelancerId, start, endExclusive);
+            long totalContracts = toLong(raw[0]);
+            long completedContracts = toLong(raw[1]);
+            double totalEarnings = toDouble(raw[2]);
+            double averageContractValue = toDouble(raw[3]);
+            double averageDurationDays = toDouble(raw[4]);
+            double completionRate = totalContracts == 0 ? 0.0 : (completedContracts * 100.0) / totalContracts;
 
-        long totalContracts = toLong(raw[0]);
-        long completedContracts = toLong(raw[1]);
-        double totalEarnings = toDouble(raw[2]);
-        double averageContractValue = toDouble(raw[3]);
-        double averageDurationDays = toDouble(raw[4]);
-        double completionRate = totalContracts == 0 ? 0.0 : (completedContracts * 100.0) / totalContracts;
-
-        return new FreelancerPerformanceDTO(
-                freelancerId,
-                totalContracts,
-                averageContractValue,
-                completionRate,
-                averageDurationDays,
-                totalEarnings
-        );
+            return new FreelancerPerformanceDTO(
+                    freelancerId,
+                    totalContracts,
+                    averageContractValue,
+                    completionRate,
+                    averageDurationDays,
+                    totalEarnings
+            );
+        } catch (DataAccessException ex) {
+            return buildFreelancerPerformanceInMemory(freelancerId, start, endExclusive);
+        }
     }
 
     public List<StalledContractDTO> findStalledContracts(Double maxProgress, Integer stalledDays) {
@@ -208,15 +219,22 @@ public class ContractService {
             throw new IllegalArgumentException("stalledDays must be 0 or greater");
         }
 
-        List<Object[]> rows = contractRepository.findStalledContracts(maxProgress, stalledDays);
-        return rows.stream().map(row -> new StalledContractDTO(
-                toLong(row[0]),
-                row[1] == null ? null : row[1].toString(),
-                row[2] == null ? null : row[2].toString(),
-                toDouble(row[3]),
-                toDouble(row[4]),
-                toLong(row[5])
-        )).toList();
+        if (!usesPostgresDatabase()) {
+            return findStalledContractsInMemory(maxProgress, stalledDays);
+        }
+        try {
+            List<Object[]> rows = contractRepository.findStalledContracts(maxProgress, stalledDays);
+            return rows.stream().map(row -> new StalledContractDTO(
+                    toLong(row[0]),
+                    row[1] == null ? null : row[1].toString(),
+                    row[2] == null ? null : row[2].toString(),
+                    toDouble(row[3]),
+                    toDouble(row[4]),
+                    toLong(row[5])
+            )).toList();
+        } catch (DataAccessException ex) {
+            return findStalledContractsInMemory(maxProgress, stalledDays);
+        }
     }
 
     public List<Contract> findContractHistory(LocalDate startDate, LocalDate endDate, String status) {
@@ -392,6 +410,101 @@ public class ContractService {
         }
     }
 
+    private FreelancerPerformanceDTO buildFreelancerPerformanceInMemory(
+            Long freelancerId,
+            LocalDateTime start,
+            LocalDateTime endExclusive
+    ) {
+        List<Contract> inRange = contractRepository.findAll().stream()
+                .filter(contract -> freelancerId.equals(contract.getFreelancerId()))
+                .filter(contract -> contract.getCreatedAt() != null
+                        && !contract.getCreatedAt().isBefore(start)
+                        && contract.getCreatedAt().isBefore(endExclusive))
+                .toList();
+
+        long totalContracts = inRange.size();
+        List<Contract> completed = inRange.stream()
+                .filter(contract -> contract.getStatus() == ContractStatus.COMPLETED)
+                .toList();
+        long completedContracts = completed.size();
+        double totalEarnings = completed.stream()
+                .mapToDouble(Contract::getAgreedAmount)
+                .sum();
+        double averageContractValue = totalContracts == 0 ? 0.0 : totalEarnings / totalContracts;
+        double averageDurationDays = completed.stream()
+                .mapToLong(contract -> calculateDurationDays(contract.getStartDate(), contract.getEndDate()))
+                .average()
+                .orElse(0.0);
+        double completionRate = totalContracts == 0 ? 0.0 : (completedContracts * 100.0) / totalContracts;
+
+        return new FreelancerPerformanceDTO(
+                freelancerId,
+                totalContracts,
+                averageContractValue,
+                completionRate,
+                averageDurationDays,
+                totalEarnings
+        );
+    }
+
+    private List<StalledContractDTO> findStalledContractsInMemory(Double maxProgress, Integer stalledDays) {
+        LocalDateTime activityCutoff = LocalDateTime.now().minusDays(stalledDays);
+        return contractRepository.findByStatus(ContractStatus.ACTIVE).stream()
+                .filter(contract -> readMetadataDouble(contract, "progressPercentage") <= maxProgress)
+                .filter(contract -> {
+                    LocalDateTime lastActivity = resolveLastActivity(contract);
+                    return lastActivity != null && lastActivity.isBefore(activityCutoff);
+                })
+                .map(contract -> {
+                    LocalDateTime lastActivity = resolveLastActivity(contract);
+                    long daysSince = lastActivity == null
+                            ? 0L
+                            : ChronoUnit.DAYS.between(lastActivity, LocalDateTime.now());
+                    return new StalledContractDTO(
+                            contract.getId(),
+                            "Freelancer " + contract.getFreelancerId(),
+                            "Job " + contract.getJobId(),
+                            contract.getAgreedAmount(),
+                            readMetadataDouble(contract, "progressPercentage"),
+                            daysSince
+                    );
+                })
+                .toList();
+    }
+
+    private LocalDateTime resolveLastActivity(Contract contract) {
+        if (contract.getMetadata() != null && contract.getMetadata().get("lastActivityDate") != null) {
+            LocalDateTime parsed = toLocalDateTime(contract.getMetadata().get("lastActivityDate"));
+            if (parsed != null) {
+                return parsed;
+            }
+        }
+        return contract.getCreatedAt();
+    }
+
+    private double readMetadataDouble(Contract contract, String key) {
+        if (contract.getMetadata() == null || contract.getMetadata().get(key) == null) {
+            return 0.0;
+        }
+        Object value = contract.getMetadata().get(key);
+        if (value instanceof Number number) {
+            return number.doubleValue();
+        }
+        try {
+            return Double.parseDouble(value.toString());
+        } catch (NumberFormatException ex) {
+            return 0.0;
+        }
+    }
+
+    private boolean usesPostgresDatabase() {
+        try (var connection = dataSource.getConnection()) {
+            return "PostgreSQL".equalsIgnoreCase(connection.getMetaData().getDatabaseProductName());
+        } catch (Exception ex) {
+            return false;
+        }
+    }
+
     private long toLong(Object value) {
         if (value == null) {
             return 0L;
@@ -427,6 +540,9 @@ public class ContractService {
         }
         if (value instanceof Timestamp timestamp) {
             return timestamp.toLocalDateTime();
+        }
+        if (value instanceof String stringValue) {
+            return LocalDateTime.parse(stringValue);
         }
         throw new IllegalArgumentException("Unsupported date value: " + value.getClass().getName());
     }

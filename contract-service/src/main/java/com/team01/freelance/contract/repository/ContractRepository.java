@@ -11,9 +11,12 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import com.team01.freelance.contract.model.Contract;
+import com.team01.freelance.contract.model.ContractStatus;
 
 @Repository
 public interface ContractRepository extends JpaRepository<Contract, Long> {
+
+    List<Contract> findByStatus(ContractStatus status);
     @Query(value = "SELECT COUNT(*) > 0 FROM users WHERE id = :userId", nativeQuery = true)
     boolean userExists(@Param("userId") Long userId);
 

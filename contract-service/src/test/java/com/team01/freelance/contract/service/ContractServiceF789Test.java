@@ -8,6 +8,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import javax.sql.DataSource;
+import java.sql.Connection;
+import java.sql.DatabaseMetaData;
 import java.util.Collections;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -27,10 +30,17 @@ class ContractServiceF789Test {
     private ContractRepository contractRepository;
 
     @BeforeEach
-    void setUp() {
+    void setUp() throws Exception {
         contractService = new ContractService();
         contractRepository = mock(ContractRepository.class);
         ReflectionTestUtils.setField(contractService, "contractRepository", contractRepository);
+        DataSource dataSource = mock(DataSource.class);
+        Connection connection = mock(Connection.class);
+        DatabaseMetaData metaData = mock(DatabaseMetaData.class);
+        when(dataSource.getConnection()).thenReturn(connection);
+        when(connection.getMetaData()).thenReturn(metaData);
+        when(metaData.getDatabaseProductName()).thenReturn("PostgreSQL");
+        ReflectionTestUtils.setField(contractService, "dataSource", dataSource);
     }
 
     @Test
