@@ -13,6 +13,7 @@ import com.team01.freelance.user.repository.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -22,6 +23,10 @@ import java.util.Optional;
 
 @Service
 public class ProposalService {
+
+    private static final List<ProposalStatus> WITHDRAWABLE_STATUSES = List.of(
+            ProposalStatus.SUBMITTED,
+            ProposalStatus.SHORTLISTED);
 
     @Autowired
     private ProposalRepository proposalRepository;
@@ -136,6 +141,29 @@ public class ProposalService {
             if (proposalDetails.getAcceptedAt() != null) existingProposal.setAcceptedAt(proposalDetails.getAcceptedAt());
             return proposalRepository.save(existingProposal);
         }).orElseThrow(() -> new EntityNotFoundException("Proposal not found with id: " + id));
+    }
+
+    @Transactional
+    public Proposal withdrawProposal(Long id) {
+        Proposal proposal = proposalRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Proposal not found with id: " + id));
+
+        if (!WITHDRAWABLE_STATUSES.contains(proposal.getStatus())) {
+            throw new IllegalArgumentException("Only SUBMITTED or SHORTLISTED proposals can be withdrawn");
+        }
+
+        long activeProposalCount = proposalRepository.countByJobIdAndStatusIn(
+                proposal.getJobId(),
+                WITHDRAWABLE_STATUSES);
+
+        proposal.setStatus(ProposalStatus.WITHDRAWN);
+        Proposal withdrawnProposal = proposalRepository.save(proposal);
+
+        if (activeProposalCount == 1) {
+            jobRepository.reopenIfInProgress(proposal.getJobId());
+        }
+
+        return withdrawnProposal;
     }
 
     public boolean deleteProposalById(Long id) {
