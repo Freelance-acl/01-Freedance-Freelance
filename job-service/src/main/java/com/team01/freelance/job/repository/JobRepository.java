@@ -1,24 +1,18 @@
 package com.team01.freelance.job.repository;
 
 import com.team01.freelance.job.dto.JobProposalSummaryDTO;
+import com.team01.freelance.job.dto.TopBudgetJobDTO;
 import com.team01.freelance.job.model.Job;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
-import java.util.List;
-
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Modifying;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-
-import java.util.List;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -54,12 +48,6 @@ public interface JobRepository extends JpaRepository<Job, Long> {
             @Param("startDate") LocalDateTime startDate,
             @Param("endDateExclusive") LocalDateTime endDateExclusive
     );
-}
-import com.team01.freelance.job.dto.TopBudgetJobDTO;
-import com.team01.freelance.job.model.Job;
-
-@Repository
-public interface JobRepository extends JpaRepository<Job, Long> {
 
     @Query(value = "SELECT * FROM jobs "
             + "WHERE (:status IS NULL OR status = :status) "
@@ -74,7 +62,7 @@ public interface JobRepository extends JpaRepository<Job, Long> {
             @Param("minBudget") Double minBudget,
             @Param("maxBudget") Double maxBudget,
             Pageable pageable);
-}
+
 
 	@Query(value = "SELECT DISTINCT j.* FROM jobs j JOIN job_attachments ja ON ja.job_id = j.id WHERE ja.expiry_date < CURRENT_DATE ORDER BY j.id", nativeQuery = true)
 	List<Job> findJobsWithExpiredAttachments();
