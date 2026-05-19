@@ -2,6 +2,9 @@ package com.team01.freelance.proposal.service;
 
 import com.team01.freelance.proposal.dto.ProposalAnalyticsDTO;
 import com.team01.freelance.proposal.model.Proposal;
+import com.team01.freelance.proposal.dto.ProposalDetailsDTO;
+import com.team01.freelance.proposal.model.MilestoneStatus;
+import com.team01.freelance.proposal.model.ProposalMilestone;
 import com.team01.freelance.proposal.model.ProposalStatus;
 import com.team01.freelance.proposal.repository.ProposalAnalyticsProjection;
 import com.team01.freelance.proposal.repository.ProposalRepository;
@@ -14,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
@@ -39,6 +43,32 @@ public class ProposalService {
 
     public Optional<Proposal> getProposalById(Long id) {
         return proposalRepository.findById(id);
+    }
+
+    public ProposalDetailsDTO getProposalDetails(Long proposalId) {
+        Proposal proposal = proposalRepository.findByIdWithMilestones(proposalId)
+                .orElseThrow(() -> new EntityNotFoundException("Proposal not found with id: " + proposalId));
+        List<ProposalDetailsDTO.MilestoneDTO> milestones = Optional.ofNullable(proposal.getProposalMilestones())
+                .orElseGet(List::of)
+                .stream()
+                .sorted(Comparator.comparing(ProposalMilestone::getMilestoneOrder))
+                .map(this::toMilestoneDTO)
+                .toList();
+
+        ProposalDetailsDTO details = new ProposalDetailsDTO();
+        details.setProposalId(proposal.getId());
+        details.setJobId(proposal.getJobId());
+        details.setFreelancerId(proposal.getFreelancerId());
+        details.setStatus(proposal.getStatus());
+        details.setBidAmount(proposal.getBidAmount());
+        details.setMetadata(proposal.getMetadata());
+        details.setMilestones(milestones);
+        details.setTotalMilestones(milestones.size());
+        details.setCompletedMilestones((int) milestones.stream()
+                .filter(milestone -> milestone.getStatus() == MilestoneStatus.COMPLETED
+                        || milestone.getStatus() == MilestoneStatus.APPROVED)
+                .count());
+        return details;
     }
 
     /**
@@ -148,6 +178,16 @@ public class ProposalService {
         proposalRepository.deleteAll();
     }
 
+    private ProposalDetailsDTO.MilestoneDTO toMilestoneDTO(ProposalMilestone proposalMilestone) {
+        ProposalDetailsDTO.MilestoneDTO dto = new ProposalDetailsDTO.MilestoneDTO();
+        dto.setId(proposalMilestone.getId());
+        dto.setMilestoneOrder(proposalMilestone.getMilestoneOrder());
+        dto.setTitle(proposalMilestone.getTitle());
+        dto.setDescription(proposalMilestone.getDescription());
+        dto.setAmount(proposalMilestone.getAmount());
+        dto.setStatus(proposalMilestone.getStatus());
+        dto.setMetadata(proposalMilestone.getMetadata());
+        return dto;
     private void validateDateRange(LocalDate startDate, LocalDate endDate) {
         if (startDate == null || endDate == null) {
             throw new IllegalArgumentException("startDate and endDate are required");

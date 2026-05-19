@@ -1,7 +1,10 @@
 package com.team01.freelance.proposal.service;
 
+import com.team01.freelance.proposal.dto.ProposalDetailsDTO;
+import com.team01.freelance.proposal.model.MilestoneStatus;
 import com.team01.freelance.proposal.dto.ProposalAnalyticsDTO;
 import com.team01.freelance.proposal.model.Proposal;
+import com.team01.freelance.proposal.model.ProposalMilestone;
 import com.team01.freelance.proposal.model.ProposalStatus;
 import com.team01.freelance.proposal.repository.ProposalAnalyticsProjection;
 import com.team01.freelance.proposal.repository.ProposalRepository;
@@ -17,7 +20,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -155,9 +160,79 @@ class ProposalServiceTest {
         proposalService.searchProposals("submitted", LocalDate.of(2026, 6, 1), LocalDate.of(2026, 6, 15));
 
         verify(proposalRepository).searchBySubmittedAtRangeAndOptionalStatus(
-                LocalDateTime.of(2026, 6, 1, 0, 0),
-                LocalDateTime.of(2026, 6, 16, 0, 0),
-                ProposalStatus.SUBMITTED);
+            LocalDateTime.of(2026, 6, 1, 0, 0),
+            LocalDateTime.of(2026, 6, 16, 0, 0),
+            ProposalStatus.SUBMITTED);
+    }
+
+    @Test
+    void getProposalDetailsBuildsOrderedDtoAndCountsCompletedStatuses() {
+        Proposal proposal = new Proposal();
+        proposal.setId(10L);
+        proposal.setJobId(20L);
+        proposal.setFreelancerId(30L);
+        proposal.setStatus(ProposalStatus.SUBMITTED);
+        proposal.setBidAmount(2000.0);
+        proposal.setMetadata(Map.of("source", "unit"));
+        proposal.setProposalMilestones(new ArrayList<>(List.of(
+                milestone(2L, 3, "Final", MilestoneStatus.PENDING),
+                milestone(3L, 1, "Start", MilestoneStatus.COMPLETED),
+                milestone(4L, 2, "Review", MilestoneStatus.APPROVED)
+        )));
+        when(proposalRepository.findByIdWithMilestones(10L)).thenReturn(Optional.of(proposal));
+
+        ProposalDetailsDTO details = proposalService.getProposalDetails(10L);
+
+        assertThat(details.getProposalId()).isEqualTo(10L);
+        assertThat(details.getJobId()).isEqualTo(20L);
+        assertThat(details.getFreelancerId()).isEqualTo(30L);
+        assertThat(details.getStatus()).isEqualTo(ProposalStatus.SUBMITTED);
+        assertThat(details.getBidAmount()).isEqualTo(2000.0);
+        assertThat(details.getMetadata()).containsEntry("source", "unit");
+        assertThat(details.getTotalMilestones()).isEqualTo(3);
+        assertThat(details.getCompletedMilestones()).isEqualTo(2);
+        assertThat(details.getMilestones())
+                .extracting(ProposalDetailsDTO.MilestoneDTO::getMilestoneOrder)
+                .containsExactly(1, 2, 3);
+    }
+
+    @Test
+    void getProposalDetailsReturnsEmptyMilestoneCountsWhenProposalHasNoMilestones() {
+        Proposal proposal = new Proposal();
+        proposal.setId(10L);
+        proposal.setJobId(20L);
+        proposal.setFreelancerId(30L);
+        proposal.setStatus(ProposalStatus.SUBMITTED);
+        proposal.setBidAmount(2000.0);
+        proposal.setProposalMilestones(List.of());
+        when(proposalRepository.findByIdWithMilestones(10L)).thenReturn(Optional.of(proposal));
+
+        ProposalDetailsDTO details = proposalService.getProposalDetails(10L);
+
+        assertThat(details.getTotalMilestones()).isZero();
+        assertThat(details.getCompletedMilestones()).isZero();
+        assertThat(details.getMilestones()).isEmpty();
+    }
+
+    @Test
+    void getProposalDetailsThrowsWhenProposalDoesNotExist() {
+        when(proposalRepository.findByIdWithMilestones(404L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> proposalService.getProposalDetails(404L))
+                .isInstanceOf(EntityNotFoundException.class)
+                .hasMessageContaining("Proposal not found");
+    }
+
+    private ProposalMilestone milestone(Long id, Integer milestoneOrder, String title, MilestoneStatus status) {
+        ProposalMilestone milestone = new ProposalMilestone();
+        milestone.setId(id);
+        milestone.setMilestoneOrder(milestoneOrder);
+        milestone.setTitle(title);
+        milestone.setDescription(title + " description");
+        milestone.setAmount(100.0);
+        milestone.setStatus(status);
+        milestone.setMetadata(Map.of("title", title));
+        return milestone;
     }
 
     @Test
