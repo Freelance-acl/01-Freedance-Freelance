@@ -26,6 +26,8 @@ import java.util.Optional;
 public class ProposalService {
 
     private static final List<ProposalStatus> MILESTONE_ALLOWED_STATUSES = List.of(
+            ProposalStatus.SUBMITTED,
+            ProposalStatus.SHORTLISTED);
     private static final List<ProposalStatus> WITHDRAWABLE_STATUSES = List.of(
             ProposalStatus.SUBMITTED,
             ProposalStatus.SHORTLISTED);
@@ -157,14 +159,12 @@ public class ProposalService {
             throw new IllegalArgumentException("At least one milestone is required");
         }
 
-        List<ProposalMilestone> existingMilestones = proposal.getProposalMilestones();
-        double existingTotal = existingMilestones == null
-                ? 0.0
-                : existingMilestones.stream()
-                        .map(ProposalMilestone::getAmount)
-                        .filter(amount -> amount != null)
-                        .mapToDouble(Double::doubleValue)
-                        .sum();
+        List<ProposalMilestone> existingMilestones = proposal.getProposalMilestonesForUpdate();
+        double existingTotal = existingMilestones.stream()
+                .map(ProposalMilestone::getAmount)
+                .filter(amount -> amount != null)
+                .mapToDouble(Double::doubleValue)
+                .sum();
         double newTotal = milestones.stream()
                 .peek(this::validateMilestone)
                 .mapToDouble(ProposalMilestone::getAmount)
@@ -174,13 +174,11 @@ public class ProposalService {
             throw new IllegalArgumentException("Total milestone amounts cannot exceed proposal bidAmount");
         }
 
-        int nextOrder = existingMilestones == null
-                ? 1
-                : existingMilestones.stream()
-                        .map(ProposalMilestone::getMilestoneOrder)
-                        .filter(order -> order != null)
-                        .max(Integer::compareTo)
-                        .orElse(0) + 1;
+        int nextOrder = existingMilestones.stream()
+                .map(ProposalMilestone::getMilestoneOrder)
+                .filter(order -> order != null)
+                .max(Integer::compareTo)
+                .orElse(0) + 1;
 
         for (ProposalMilestone milestone : milestones) {
             milestone.setId(null);
@@ -189,11 +187,7 @@ public class ProposalService {
             proposal.addProposalMilestone(milestone);
         }
 
-        Proposal savedProposal = proposalRepository.save(proposal);
-        if (savedProposal.getProposalMilestones() != null) {
-            savedProposal.getProposalMilestones().sort(Comparator.comparing(ProposalMilestone::getMilestoneOrder));
-        }
-        return savedProposal;
+        return proposalRepository.save(proposal);
     }
 
     private void validateMilestone(ProposalMilestone milestone) {
@@ -209,6 +203,9 @@ public class ProposalService {
         if (milestone.getAmount() == null || milestone.getAmount() <= 0) {
             throw new IllegalArgumentException("Milestone amount must be positive");
         }
+    }
+
+    @Transactional
     public Proposal withdrawProposal(Long id) {
         Proposal proposal = proposalRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Proposal not found with id: " + id));
@@ -253,6 +250,8 @@ public class ProposalService {
         dto.setStatus(proposalMilestone.getStatus());
         dto.setMetadata(proposalMilestone.getMetadata());
         return dto;
+    }
+
     private void validateDateRange(LocalDate startDate, LocalDate endDate) {
         if (startDate == null || endDate == null) {
             throw new IllegalArgumentException("startDate and endDate are required");
