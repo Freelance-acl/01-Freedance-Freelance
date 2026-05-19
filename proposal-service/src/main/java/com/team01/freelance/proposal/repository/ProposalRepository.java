@@ -58,9 +58,10 @@ public interface ProposalRepository extends JpaRepository<Proposal, Long> {
     long countActiveProposalsInSimilarBidRange(
             @Param("minBid") double minBid,
             @Param("maxBid") double maxBid);
-}
+
 
     long countByJobIdAndStatusIn(Long jobId, List<ProposalStatus> statuses);
+
     @Query("""
             SELECT DISTINCT p FROM Proposal p
             LEFT JOIN FETCH p.proposalMilestones
