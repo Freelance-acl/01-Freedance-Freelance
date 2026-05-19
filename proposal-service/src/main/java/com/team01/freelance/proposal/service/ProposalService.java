@@ -30,6 +30,17 @@ import com.team01.freelance.proposal.repository.ProposalRepository;
 import com.team01.freelance.user.repository.UserRepository;
 
 import jakarta.persistence.EntityNotFoundException;
+import jakarta.persistence.EntityNotFoundException;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataAccessException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Optional;
 
 @Service
 public class ProposalService {
@@ -116,6 +127,32 @@ public class ProposalService {
         return proposalRepository.searchBySubmittedAtRangeAndOptionalStatus(start, endExclusive, parsedStatus);
     }
 
+    /**
+     * Finds proposals whose metadata JSON contains the given key with the given string value.
+     *
+     * @param key metadata field name (required, non-blank)
+     * @param value metadata field value to match (required, non-blank)
+     * @return proposals matching the metadata key/value pair
+     * @throws IllegalArgumentException if key or value is null or blank
+     */
+    public List<Proposal> searchProposalsByMetadata(String key, String value) {
+        if (key == null || key.isBlank() || value == null || value.isBlank()) {
+            throw new IllegalArgumentException("key and value are required");
+        }
+        String trimmedKey = key.trim();
+        String trimmedValue = value.trim();
+        try {
+            List<Long> ids = proposalRepository.findIdsByMetadata(trimmedKey, trimmedValue);
+            if (ids.isEmpty()) {
+                return List.of();
+            }
+            return proposalRepository.findAllById(ids);
+        } catch (DataAccessException ex) {
+            return proposalRepository.findAll().stream()
+                    .filter(proposal -> proposal.getMetadata() != null)
+                    .filter(proposal -> trimmedValue.equals(String.valueOf(proposal.getMetadata().get(trimmedKey))))
+                    .toList();
+        }
     public ProposalAnalyticsDTO getProposalAnalytics(LocalDate startDate, LocalDate endDate) {
         validateDateRange(startDate, endDate);
 

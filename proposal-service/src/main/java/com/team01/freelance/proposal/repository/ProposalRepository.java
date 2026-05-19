@@ -44,6 +44,12 @@ public interface ProposalRepository extends JpaRepository<Proposal, Long> {
             @Param("endExclusive") LocalDateTime endExclusive,
             @Param("status") ProposalStatus status);
 
+    @Query(value = """
+            SELECT p.id
+            FROM proposals p
+            WHERE jsonb_extract_path_text(p.metadata, :key) = :value
+            """, nativeQuery = true)
+    List<Long> findIdsByMetadata(@Param("key") String key, @Param("value") String value);
     @Query(
             value = "SELECT COUNT(*) FROM proposals "
                     + "WHERE status IN ('SUBMITTED', 'SHORTLISTED') "
