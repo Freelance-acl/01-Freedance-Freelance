@@ -11,12 +11,14 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 @EnableJpaRepositories(basePackages = {
         "com.team01.freelance.proposal",
         "com.team01.freelance.job",
-        "com.team01.freelance.user"
+        "com.team01.freelance.user",
+        "com.team01.freelance.contract"
 })
 @EntityScan(basePackages = {
         "com.team01.freelance.proposal",
         "com.team01.freelance.job",
-        "com.team01.freelance.user"
+        "com.team01.freelance.user",
+        "com.team01.freelance.contract"
 })
 public class ProposalServiceApplication {
 
