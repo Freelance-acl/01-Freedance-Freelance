@@ -2,9 +2,11 @@ package com.team01.freelance.proposal.service;
 
 import com.team01.freelance.proposal.dto.ProposalDetailsDTO;
 import com.team01.freelance.proposal.model.MilestoneStatus;
+import com.team01.freelance.proposal.dto.ProposalAnalyticsDTO;
 import com.team01.freelance.proposal.model.Proposal;
 import com.team01.freelance.proposal.model.ProposalMilestone;
 import com.team01.freelance.proposal.model.ProposalStatus;
+import com.team01.freelance.proposal.repository.ProposalAnalyticsProjection;
 import com.team01.freelance.proposal.repository.ProposalRepository;
 import com.team01.freelance.job.repository.JobRepository;
 import com.team01.freelance.user.repository.UserRepository;
@@ -230,5 +232,92 @@ class ProposalServiceTest {
         milestone.setStatus(status);
         milestone.setMetadata(Map.of("title", title));
         return milestone;
+    }
+
+    @Test
+    void getProposalAnalyticsCalculatesMarchScenario() {
+        LocalDate start = LocalDate.of(2026, 3, 1);
+        LocalDate end = LocalDate.of(2026, 3, 31);
+        when(proposalRepository.calculateAnalyticsBySubmittedAtRange(
+                eq(LocalDateTime.of(2026, 3, 1, 0, 0)),
+                eq(LocalDateTime.of(2026, 4, 1, 0, 0))))
+                .thenReturn(analyticsProjection(10, 4, 3, 7100.0, 710.0, 40.0));
+
+        ProposalAnalyticsDTO analytics = proposalService.getProposalAnalytics(start, end);
+
+        assertThat(analytics.getTotalProposals()).isEqualTo(10);
+        assertThat(analytics.getAcceptedProposals()).isEqualTo(4);
+        assertThat(analytics.getRejectedProposals()).isEqualTo(3);
+        assertThat(analytics.getTotalBidValue()).isEqualTo(7100.0);
+        assertThat(analytics.getAverageBid()).isEqualTo(710.0);
+        assertThat(analytics.getAcceptanceRate()).isEqualTo(40.0);
+    }
+
+    @Test
+    void getProposalAnalyticsReturnsZeroValuesWhenNoProposalsMatch() {
+        when(proposalRepository.calculateAnalyticsBySubmittedAtRange(
+                eq(LocalDateTime.of(2026, 4, 1, 0, 0)),
+                eq(LocalDateTime.of(2026, 5, 1, 0, 0))))
+                .thenReturn(analyticsProjection(0, 0, 0, 0.0, 0.0, 0.0));
+
+        ProposalAnalyticsDTO analytics = proposalService.getProposalAnalytics(
+                LocalDate.of(2026, 4, 1),
+                LocalDate.of(2026, 4, 30));
+
+        assertThat(analytics.getTotalProposals()).isZero();
+        assertThat(analytics.getAcceptedProposals()).isZero();
+        assertThat(analytics.getRejectedProposals()).isZero();
+        assertThat(analytics.getTotalBidValue()).isZero();
+        assertThat(analytics.getAverageBid()).isZero();
+        assertThat(analytics.getAcceptanceRate()).isZero();
+    }
+
+    @Test
+    void getProposalAnalyticsRejectsStartAfterEnd() {
+        assertThatThrownBy(() -> proposalService.getProposalAnalytics(
+                LocalDate.of(2026, 4, 10),
+                LocalDate.of(2026, 4, 1)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("startDate");
+    }
+
+    private ProposalAnalyticsProjection analyticsProjection(
+            Number totalProposals,
+            Number acceptedProposals,
+            Number rejectedProposals,
+            Number totalBidValue,
+            Number averageBid,
+            Number acceptanceRate) {
+        return new ProposalAnalyticsProjection() {
+            @Override
+            public Number getTotalProposals() {
+                return totalProposals;
+            }
+
+            @Override
+            public Number getAcceptedProposals() {
+                return acceptedProposals;
+            }
+
+            @Override
+            public Number getRejectedProposals() {
+                return rejectedProposals;
+            }
+
+            @Override
+            public Number getTotalBidValue() {
+                return totalBidValue;
+            }
+
+            @Override
+            public Number getAverageBid() {
+                return averageBid;
+            }
+
+            @Override
+            public Number getAcceptanceRate() {
+                return acceptanceRate;
+            }
+        };
     }
 }

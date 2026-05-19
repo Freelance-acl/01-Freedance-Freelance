@@ -1,6 +1,7 @@
 package com.team01.freelance.proposal.controller;
 
 import com.team01.freelance.proposal.dto.ProposalDetailsDTO;
+import com.team01.freelance.proposal.dto.ProposalAnalyticsDTO;
 import com.team01.freelance.proposal.model.Proposal;
 import com.team01.freelance.proposal.service.ProposalService;
 import jakarta.persistence.EntityNotFoundException;
@@ -41,6 +42,13 @@ public class ProposalController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
         return ResponseEntity.ok(proposalService.searchProposals(status, startDate, endDate));
+    }
+
+    @GetMapping("/analytics")
+    public ResponseEntity<ProposalAnalyticsDTO> getProposalAnalytics(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        return ResponseEntity.ok(proposalService.getProposalAnalytics(startDate, endDate));
     }
 
     @GetMapping("/{id}")
