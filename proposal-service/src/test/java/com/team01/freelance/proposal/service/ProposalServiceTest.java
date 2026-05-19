@@ -647,6 +647,8 @@ class ProposalServiceTest {
 
         when(proposalRepository.findById(5L)).thenReturn(Optional.of(proposal));
         when(contractRepository.findActiveContractByProposalId(5L)).thenReturn(Optional.of(contract));
+        when(contractRepository.completeActiveContract(eq(20L), any(LocalDateTime.class))).thenReturn(1);
+        when(jobRepository.markJobClosed(7L)).thenReturn(1);
 
         Proposal result = proposalService.completeProposal(5L);
 
@@ -682,6 +684,30 @@ class ProposalServiceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("ACTIVE contract");
 
+        verify(payoutRepository, never()).insertPendingPayout(anyLong(), anyLong(), anyDouble(), any());
+    }
+
+    @Test
+    void completeProposal_abortsWhenContractAlreadyCompleted() {
+        Proposal proposal = new Proposal();
+        proposal.setId(5L);
+        proposal.setStatus(ProposalStatus.ACCEPTED);
+
+        Contract contract = new Contract();
+        contract.setId(20L);
+        contract.setJobId(7L);
+        contract.setFreelancerId(30L);
+        contract.setAgreedAmount(2000.0);
+
+        when(proposalRepository.findById(5L)).thenReturn(Optional.of(proposal));
+        when(contractRepository.findActiveContractByProposalId(5L)).thenReturn(Optional.of(contract));
+        when(contractRepository.completeActiveContract(eq(20L), any(LocalDateTime.class))).thenReturn(0);
+
+        assertThatThrownBy(() -> proposalService.completeProposal(5L))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Contract");
+
+        verify(jobRepository, never()).markJobClosed(anyLong());
         verify(payoutRepository, never()).insertPendingPayout(anyLong(), anyLong(), anyDouble(), any());
     }
 }

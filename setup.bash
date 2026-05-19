@@ -80,26 +80,26 @@ git config core.hooksPath .githooks
 
 if [ -f "$ROOT/mvnw" ]; then
   if [ -x "$ROOT/mvnw" ]; then
-    MVNW="./mvnw"
+    MVNW=("./mvnw")
   else
     chmod +x "$ROOT/mvnw" 2>/dev/null || true
     if [ -x "$ROOT/mvnw" ]; then
-      MVNW="./mvnw"
+      MVNW=("./mvnw")
     else
-      MVNW="bash ./mvnw"
+      MVNW=(bash "./mvnw")
     fi
   fi
 elif [ -f "$ROOT/mvnw.cmd" ]; then
-  MVNW="./mvnw.cmd"
+  MVNW=("./mvnw.cmd")
 else
   echo "setup: neither ./mvnw nor ./mvnw.cmd was found." >&2
   exit 1
 fi
 
 echo "[setup] Clean install..."
-"$MVNW" clean install
+"${MVNW[@]}" clean install
 
 echo "[setup] Packaging services (skip tests)..."
-"$MVNW" package -DskipTests
+"${MVNW[@]}" package -DskipTests
 
 echo "[setup] Done."

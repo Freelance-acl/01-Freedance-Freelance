@@ -69,6 +69,9 @@ public class ProposalController {
                     request.getEstimatedDays()));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().build();
+        }
+    }
+
     @GetMapping("/{proposalId}/details")
     public ResponseEntity<ProposalDetailsDTO> getProposalDetails(@PathVariable Long proposalId) {
         try {
@@ -110,6 +113,13 @@ public class ProposalController {
     public ResponseEntity<Proposal> acceptProposal(@PathVariable("id") Long proposalId) {
         try {
             return ResponseEntity.ok(proposalService.acceptProposal(proposalId));
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
     @PostMapping("/{proposalId}/milestones")
     public ResponseEntity<Proposal> addMilestones(
             @PathVariable Long proposalId,

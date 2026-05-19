@@ -3,6 +3,7 @@ package com.team01.freelance.proposal.service;
 import com.team01.freelance.proposal.dto.FeeEstimateDTO;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
@@ -219,7 +220,10 @@ public class ProposalService {
                 now
         );
 
+        acceptedProposal.setProposalMilestones(new ArrayList<>());
         return acceptedProposal;
+    }
+
     @Transactional
     public Proposal addMilestones(Long proposalId, List<ProposalMilestone> milestones) {
         Proposal proposal = proposalRepository.findById(proposalId)
@@ -298,6 +302,7 @@ public class ProposalService {
             jobRepository.reopenIfInProgress(proposal.getJobId());
         }
 
+        withdrawnProposal.setProposalMilestones(new ArrayList<>());
         return withdrawnProposal;
     }
 
@@ -323,8 +328,14 @@ public class ProposalService {
                 .orElseThrow(() -> new IllegalArgumentException("No ACTIVE contract found for proposal"));
 
         LocalDateTime now = LocalDateTime.now();
-        contractRepository.completeActiveContract(contract.getId(), now);
-        jobRepository.markJobClosed(contract.getJobId());
+        int contractsUpdated = contractRepository.completeActiveContract(contract.getId(), now);
+        if (contractsUpdated != 1) {
+            throw new IllegalStateException("Contract is no longer active or was already completed");
+        }
+        int jobsUpdated = jobRepository.markJobClosed(contract.getJobId());
+        if (jobsUpdated != 1) {
+            throw new IllegalStateException("Job could not be closed");
+        }
         payoutRepository.insertPendingPayout(
                 contract.getId(),
                 contract.getFreelancerId(),
@@ -332,6 +343,7 @@ public class ProposalService {
                 now
         );
 
+        proposal.setProposalMilestones(new ArrayList<>());
         return proposal;
     }
 
@@ -388,6 +400,8 @@ public class ProposalService {
             return 15;
         }
         return 10;
+    }
+
     private ProposalDetailsDTO.MilestoneDTO toMilestoneDTO(ProposalMilestone proposalMilestone) {
         ProposalDetailsDTO.MilestoneDTO dto = new ProposalDetailsDTO.MilestoneDTO();
         dto.setId(proposalMilestone.getId());
