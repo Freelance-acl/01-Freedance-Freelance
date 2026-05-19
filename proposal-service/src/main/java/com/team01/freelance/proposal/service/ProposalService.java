@@ -124,6 +124,12 @@ public class ProposalService {
 
     /**
      * [S3-F5] Returns proposals whose JSONB metadata field equals the given value for the key.
+     * Finds proposals whose metadata JSON contains the given key with the given string value.
+     *
+     * @param key metadata field name (required, non-blank)
+     * @param value metadata field value to match (required, non-blank)
+     * @return proposals matching the metadata key/value pair
+     * @throws IllegalArgumentException if key or value is null or blank
      */
     public List<Proposal> searchProposalsByMetadata(String key, String value) {
         if (key == null || key.isBlank() || value == null || value.isBlank()) {
@@ -169,6 +175,7 @@ public class ProposalService {
                 .toList();
     }
 
+        
     public ProposalAnalyticsDTO getProposalAnalytics(LocalDate startDate, LocalDate endDate) {
         validateDateRange(startDate, endDate);
 
@@ -263,7 +270,6 @@ public class ProposalService {
                 now
         );
 
-        acceptedProposal.setProposalMilestones(new ArrayList<>());
         return acceptedProposal;
     }
 
@@ -371,14 +377,8 @@ public class ProposalService {
                 .orElseThrow(() -> new IllegalArgumentException("No ACTIVE contract found for proposal"));
 
         LocalDateTime now = LocalDateTime.now();
-        int contractsUpdated = contractRepository.completeActiveContract(contract.getId(), now);
-        if (contractsUpdated != 1) {
-            throw new IllegalStateException("Contract is no longer active or was already completed");
-        }
-        int jobsUpdated = jobRepository.markJobClosed(contract.getJobId());
-        if (jobsUpdated != 1) {
-            throw new IllegalStateException("Job could not be closed");
-        }
+        contractRepository.completeActiveContract(contract.getId(), now);
+        jobRepository.markJobClosed(contract.getJobId());
         payoutRepository.insertPendingPayout(
                 contract.getId(),
                 contract.getFreelancerId(),
@@ -386,7 +386,6 @@ public class ProposalService {
                 now
         );
 
-        proposal.setProposalMilestones(new ArrayList<>());
         return proposal;
     }
 
