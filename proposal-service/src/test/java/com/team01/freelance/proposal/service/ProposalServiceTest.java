@@ -25,6 +25,9 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import javax.sql.DataSource;
+import java.sql.Connection;
+import java.sql.DatabaseMetaData;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -57,6 +60,8 @@ class ProposalServiceTest {
     private ContractRepository contractRepository;
     @Mock
     private PayoutRepository payoutRepository;
+    @Mock
+    private DataSource dataSource;
 
     @InjectMocks
     private ProposalService proposalService;
@@ -512,6 +517,47 @@ class ProposalServiceTest {
         proposal.setJobId(jobId);
         proposal.setStatus(status);
         return proposal;
+    }
+
+    @Test
+    void searchProposalsByMetadataDelegatesToRepository() throws Exception {
+        Connection connection = org.mockito.Mockito.mock(Connection.class);
+        DatabaseMetaData meta = org.mockito.Mockito.mock(DatabaseMetaData.class);
+        when(dataSource.getConnection()).thenReturn(connection);
+        when(connection.getMetaData()).thenReturn(meta);
+        when(meta.getDatabaseProductName()).thenReturn("PostgreSQL");
+
+        Proposal agile = new Proposal();
+        agile.setId(1L);
+        when(proposalRepository.findIdsByMetadataEquals("approach", "agile")).thenReturn(List.of(1L));
+        when(proposalRepository.findAllById(List.of(1L))).thenReturn(List.of(agile));
+
+        assertThat(proposalService.searchProposalsByMetadata("approach", "agile")).containsExactly(agile);
+    }
+
+    @Test
+    void searchProposalsByMetadataFallsBackToInMemoryFilterOnNonPostgres() {
+        Proposal agile = new Proposal();
+        agile.setId(1L);
+        agile.setMetadata(Map.of("approach", "agile"));
+        Proposal waterfall = new Proposal();
+        waterfall.setId(2L);
+        waterfall.setMetadata(Map.of("approach", "waterfall"));
+        when(proposalRepository.findAll()).thenReturn(List.of(agile, waterfall));
+
+        assertThat(proposalService.searchProposalsByMetadata("approach", "agile")).containsExactly(agile);
+        verify(proposalRepository, never()).findIdsByMetadataEquals(any(), any());
+    }
+
+    @Test
+    void searchProposalsByMetadataRejectsBlankKeyOrValue() {
+        assertThatThrownBy(() -> proposalService.searchProposalsByMetadata("", "agile"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("key and value");
+
+        assertThatThrownBy(() -> proposalService.searchProposalsByMetadata("approach", "   "))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("key and value");
     }
 
     @Test

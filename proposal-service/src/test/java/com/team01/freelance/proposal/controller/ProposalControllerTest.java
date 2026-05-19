@@ -256,4 +256,56 @@ class ProposalControllerTest {
         mockMvc.perform(delete("/api/proposals/all"))
                 .andExpect(status().isNoContent());
     }
+
+    @Test
+    void metadataSearchReturnsOk() throws Exception {
+        when(proposalService.searchProposalsByMetadata("approach", "agile")).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/proposals/metadata/search")
+                        .param("key", "approach")
+                        .param("value", "agile"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void metadataSearchReturnsBadRequestForInvalidParams() throws Exception {
+        when(proposalService.searchProposalsByMetadata("", "x"))
+                .thenThrow(new IllegalArgumentException("key and value are required"));
+
+        mockMvc.perform(get("/api/proposals/metadata/search")
+                        .param("key", "")
+                        .param("value", "x"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void completeReturnsOk() throws Exception {
+        Proposal proposal = new Proposal();
+        when(proposalService.completeProposal(1L)).thenReturn(proposal);
+
+        mockMvc.perform(put("/api/proposals/{id}/complete", 1L))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void completeReturnsNotFound() throws Exception {
+        when(proposalService.completeProposal(404L))
+                .thenThrow(new EntityNotFoundException("Proposal not found"));
+
+        mockMvc.perform(put("/api/proposals/{id}/complete", 404L))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void estimateReturnsOk() throws Exception {
+        when(proposalService.estimatePlatformFee(1000.0, 10))
+                .thenReturn(new com.team01.freelance.proposal.dto.FeeEstimateDTO(
+                        1000.0, 200.0, 800.0, 20, 80.0));
+
+        mockMvc.perform(post("/api/proposals/estimate")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"bidAmount\":1000,\"estimatedDays\":10}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.feePercentage").value(20));
+    }
 }

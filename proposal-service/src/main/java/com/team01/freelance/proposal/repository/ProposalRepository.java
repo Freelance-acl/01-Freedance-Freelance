@@ -56,6 +56,14 @@ public interface ProposalRepository extends JpaRepository<Proposal, Long> {
 
     long countByJobIdAndStatusIn(Long jobId, List<ProposalStatus> statuses);
 
+    @Query(value = """
+            SELECT id
+            FROM proposals
+            WHERE metadata ->> :key = :value
+            ORDER BY id ASC
+            """, nativeQuery = true)
+    List<Long> findIdsByMetadataEquals(@Param("key") String key, @Param("value") String value);
+
     @Query("""
             SELECT DISTINCT p FROM Proposal p
             LEFT JOIN FETCH p.proposalMilestones

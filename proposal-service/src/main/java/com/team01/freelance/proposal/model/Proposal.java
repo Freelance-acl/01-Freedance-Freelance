@@ -5,8 +5,6 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import org.hibernate.Hibernate;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -44,8 +42,8 @@ public class Proposal {
     @Enumerated(EnumType.STRING)
     private ProposalStatus status;
 
-    @Column(name = "metadata", columnDefinition = "jsonb")
-    @JdbcTypeCode(SqlTypes.JSON)
+    @Convert(converter = JsonMapConverter.class)
+    @Column(name = "metadata")
     private Map<String, Object> metadata;
 
     @Column(name = "submitted_at", nullable = false)

@@ -10,7 +10,10 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
+import javax.sql.DataSource;
+
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -59,6 +62,9 @@ public class ProposalService {
 
     @Autowired
     private PayoutRepository payoutRepository;
+
+    @Autowired
+    private DataSource dataSource;
 
     public List<Proposal> getAllProposals() {
         return proposalRepository.findAll();
@@ -114,6 +120,53 @@ public class ProposalService {
         LocalDateTime start = startDate.atStartOfDay();
         LocalDateTime endExclusive = endDate.plusDays(1).atStartOfDay();
         return proposalRepository.searchBySubmittedAtRangeAndOptionalStatus(start, endExclusive, parsedStatus);
+    }
+
+    /**
+     * [S3-F5] Returns proposals whose JSONB metadata field equals the given value for the key.
+     */
+    public List<Proposal> searchProposalsByMetadata(String key, String value) {
+        if (key == null || key.isBlank() || value == null || value.isBlank()) {
+            throw new IllegalArgumentException("key and value are required");
+        }
+        String normalizedKey = key.trim();
+        String normalizedValue = value.trim();
+        List<Proposal> matches = findProposalsByMetadata(normalizedKey, normalizedValue);
+        matches.forEach(proposal -> proposal.setProposalMilestones(new ArrayList<>()));
+        return matches;
+    }
+
+    private List<Proposal> findProposalsByMetadata(String key, String value) {
+        if (!usesPostgresDatabase()) {
+            return filterProposalsByMetadata(key, value);
+        }
+        try {
+            List<Long> ids = proposalRepository.findIdsByMetadataEquals(key, value);
+            if (ids.isEmpty()) {
+                return List.of();
+            }
+            return proposalRepository.findAllById(ids).stream()
+                    .sorted(Comparator.comparing(Proposal::getId))
+                    .toList();
+        } catch (DataAccessException ex) {
+            return filterProposalsByMetadata(key, value);
+        }
+    }
+
+    private boolean usesPostgresDatabase() {
+        try (var connection = dataSource.getConnection()) {
+            return "PostgreSQL".equalsIgnoreCase(connection.getMetaData().getDatabaseProductName());
+        } catch (Exception ex) {
+            return false;
+        }
+    }
+
+    private List<Proposal> filterProposalsByMetadata(String key, String value) {
+        return proposalRepository.findAll().stream()
+                .filter(proposal -> proposal.getMetadata() != null
+                        && value.equals(String.valueOf(proposal.getMetadata().get(key))))
+                .sorted(Comparator.comparing(Proposal::getId))
+                .toList();
     }
 
     public ProposalAnalyticsDTO getProposalAnalytics(LocalDate startDate, LocalDate endDate) {
@@ -293,7 +346,6 @@ public class ProposalService {
             jobRepository.reopenIfInProgress(proposal.getJobId());
         }
 
-        withdrawnProposal.setProposalMilestones(new ArrayList<>(withdrawnProposal.getProposalMilestones()));
         withdrawnProposal.setProposalMilestones(new ArrayList<>());
         return withdrawnProposal;
     }
