@@ -4,6 +4,8 @@ import com.team01.freelance.job.model.Job;
 import com.team01.freelance.job.dto.TopBudgetJobDTO;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -89,5 +91,9 @@ public interface JobRepository extends JpaRepository<Job, Long> {
 	 "LIMIT :limit", 
 	 nativeQuery = true)
 List<TopBudgetJobDTO> findTopBudgetJobs(@Param("limit") int limit);
-}
 
+
+	@Modifying
+	@Query(value = "UPDATE jobs SET status = 'OPEN' WHERE id = :jobId AND status = 'IN_PROGRESS'", nativeQuery = true)
+	int reopenIfInProgress(@Param("jobId") Long jobId);
+}

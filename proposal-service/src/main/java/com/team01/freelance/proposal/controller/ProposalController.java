@@ -3,6 +3,7 @@ package com.team01.freelance.proposal.controller;
 import com.team01.freelance.proposal.dto.ProposalDetailsDTO;
 import com.team01.freelance.proposal.dto.ProposalAnalyticsDTO;
 import com.team01.freelance.proposal.model.Proposal;
+import com.team01.freelance.proposal.model.ProposalMilestone;
 import com.team01.freelance.proposal.service.ProposalService;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -90,6 +91,30 @@ public class ProposalController {
         } catch (EntityNotFoundException e) {
             return ResponseEntity.notFound().build();
         
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @PostMapping("/{proposalId}/milestones")
+    public ResponseEntity<Proposal> addMilestones(
+            @PathVariable Long proposalId,
+            @RequestBody List<ProposalMilestone> milestones) {
+        try {
+            return ResponseEntity.ok(proposalService.addMilestones(proposalId, milestones));
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @PutMapping("/{id}/withdraw")
+    public ResponseEntity<Proposal> withdrawProposal(@PathVariable Long id) {
+        try {
+            return ResponseEntity.ok(proposalService.withdrawProposal(id));
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().build();
         }

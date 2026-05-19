@@ -44,6 +44,7 @@ public interface ProposalRepository extends JpaRepository<Proposal, Long> {
             @Param("endExclusive") LocalDateTime endExclusive,
             @Param("status") ProposalStatus status);
 
+    long countByJobIdAndStatusIn(Long jobId, List<ProposalStatus> statuses);
     @Query("""
             SELECT DISTINCT p FROM Proposal p
             LEFT JOIN FETCH p.proposalMilestones
