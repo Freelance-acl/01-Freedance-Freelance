@@ -259,6 +259,7 @@ class ProposalControllerTest {
 
     @Test
     void metadataSearchReturnsOk() throws Exception {
+    void searchByMetadataReturnsOk() throws Exception {
         when(proposalService.searchProposalsByMetadata("approach", "agile")).thenReturn(List.of());
 
         mockMvc.perform(get("/api/proposals/metadata/search")
@@ -269,6 +270,7 @@ class ProposalControllerTest {
 
     @Test
     void metadataSearchReturnsBadRequestForInvalidParams() throws Exception {
+    void searchByMetadataReturns400WhenInvalid() throws Exception {
         when(proposalService.searchProposalsByMetadata("", "x"))
                 .thenThrow(new IllegalArgumentException("key and value are required"));
 

@@ -47,6 +47,15 @@ public class ProposalController {
         return ResponseEntity.ok(proposalService.searchProposals(status, startDate, endDate));
     }
 
+    @GetMapping("/metadata/search")
+    public ResponseEntity<List<Proposal>> searchProposalsByMetadata(
+            @RequestParam String key,
+            @RequestParam String value) {
+        try {
+            return ResponseEntity.ok(proposalService.searchProposalsByMetadata(key, value));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
     @GetMapping("/analytics")
     public ResponseEntity<ProposalAnalyticsDTO> getProposalAnalytics(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
