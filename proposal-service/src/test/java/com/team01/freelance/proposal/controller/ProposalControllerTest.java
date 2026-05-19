@@ -1,5 +1,6 @@
 package com.team01.freelance.proposal.controller;
 
+import com.team01.freelance.proposal.dto.ProposalAnalyticsDTO;
 import com.team01.freelance.proposal.model.Proposal;
 import com.team01.freelance.proposal.service.ProposalService;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,11 +20,13 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class ProposalControllerTest {
@@ -60,6 +63,25 @@ class ProposalControllerTest {
                         .param("startDate", "2026-03-01")
                         .param("endDate", "2026-03-31"))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void analyticsReturnsDtoAndDelegatesToService() throws Exception {
+        when(proposalService.getProposalAnalytics(eq(LocalDate.of(2026, 3, 1)), eq(LocalDate.of(2026, 3, 31))))
+                .thenReturn(new ProposalAnalyticsDTO(10, 4, 3, 7100.0, 710.0, 40.0));
+
+        mockMvc.perform(get("/api/proposals/analytics")
+                        .param("startDate", "2026-03-01")
+                        .param("endDate", "2026-03-31"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalProposals").value(10))
+                .andExpect(jsonPath("$.acceptedProposals").value(4))
+                .andExpect(jsonPath("$.rejectedProposals").value(3))
+                .andExpect(jsonPath("$.totalBidValue").value(7100.0))
+                .andExpect(jsonPath("$.averageBid").value(710.0))
+                .andExpect(jsonPath("$.acceptanceRate").value(40.0));
+
+        verify(proposalService).getProposalAnalytics(LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 31));
     }
 
     @Test
