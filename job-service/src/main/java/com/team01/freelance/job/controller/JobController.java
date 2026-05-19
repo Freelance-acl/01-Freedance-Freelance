@@ -15,6 +15,8 @@ import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -39,6 +41,20 @@ public class JobController {
     @GetMapping
     public ResponseEntity<List<Job>> getAllJobs() {
         return ResponseEntity.ok(jobService.getAllJobs());
+    }
+
+    @GetMapping("/search")
+    public ResponseEntity<?> searchJobs(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = true) Double minBudget,
+            @RequestParam(required = true) Double maxBudget,
+            Pageable pageable) {
+        try {
+            Page<Job> results = jobService.searchJobsByStatusAndBudgetRange(status, minBudget, maxBudget, pageable);
+            return ResponseEntity.ok(results);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
     }
 
     @GetMapping("/{id}")
