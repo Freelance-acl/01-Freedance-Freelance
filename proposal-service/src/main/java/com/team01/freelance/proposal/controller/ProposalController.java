@@ -96,6 +96,10 @@ public class ProposalController {
         }
     }
 
+    @PutMapping("/{id}/accept")
+    public ResponseEntity<Proposal> acceptProposal(@PathVariable("id") Long proposalId) {
+        try {
+            return ResponseEntity.ok(proposalService.acceptProposal(proposalId));
     @PostMapping("/{proposalId}/milestones")
     public ResponseEntity<Proposal> addMilestones(
             @PathVariable Long proposalId,

@@ -1,7 +1,7 @@
 package com.team01.freelance.job.repository;
 
-import com.team01.freelance.job.model.Job;
-import com.team01.freelance.job.dto.TopBudgetJobDTO;
+import java.util.List;
+
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -9,10 +9,10 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.util.List;
+import com.team01.freelance.job.dto.TopBudgetJobDTO;
+import com.team01.freelance.job.model.Job;
 
 @Repository
 public interface JobRepository extends JpaRepository<Job, Long> {
@@ -73,6 +73,10 @@ public interface JobRepository extends JpaRepository<Job, Long> {
 			WHERE job_id = :jobId AND status = 'SUBMITTED'
 			""", nativeQuery = true)
 	int rejectSubmittedProposalsByJobId(@Param("jobId") Long jobId);
+
+	@Modifying(clearAutomatically = true)
+	@Query(value = "UPDATE jobs SET status = 'IN_PROGRESS' WHERE id = :jobId", nativeQuery = true)
+	int markJobInProgress(@Param("jobId") Long jobId);
 
 	 /**
      * Retrieves the top jobs ordered by budgetMax descending.

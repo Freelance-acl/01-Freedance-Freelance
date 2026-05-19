@@ -150,6 +150,11 @@ class ProposalControllerTest {
     }
 
     @Test
+    void acceptReturnsOk() throws Exception {
+        Proposal proposal = new Proposal();
+        when(proposalService.acceptProposal(1L)).thenReturn(proposal);
+
+        mockMvc.perform(put("/api/proposals/{id}/accept", 1L))
     void addMilestonesReturnsOk() throws Exception {
         Proposal proposal = new Proposal();
         ProposalMilestone milestone = new ProposalMilestone();
@@ -186,6 +191,11 @@ class ProposalControllerTest {
     }
 
     @Test
+    void acceptReturnsNotFound() throws Exception {
+        when(proposalService.acceptProposal(1L))
+                .thenThrow(new jakarta.persistence.EntityNotFoundException("Proposal not found"));
+
+        mockMvc.perform(put("/api/proposals/{id}/accept", 1L))
     void withdrawReturnsNotFoundWhenProposalMissing() throws Exception {
         when(proposalService.withdrawProposal(404L))
                 .thenThrow(new EntityNotFoundException("Proposal not found"));
@@ -195,6 +205,11 @@ class ProposalControllerTest {
     }
 
     @Test
+    void acceptReturnsBadRequest() throws Exception {
+        when(proposalService.acceptProposal(1L))
+                .thenThrow(new IllegalArgumentException("Only SUBMITTED or SHORTLISTED proposals can be accepted"));
+
+        mockMvc.perform(put("/api/proposals/{id}/accept", 1L))
     void addMilestonesReturnsBadRequestForInvalidMilestone() throws Exception {
         when(proposalService.addMilestones(eq(2L), any()))
                 .thenThrow(new IllegalArgumentException("Milestone title is required"));
