@@ -44,6 +44,16 @@ public interface ProposalRepository extends JpaRepository<Proposal, Long> {
             @Param("endExclusive") LocalDateTime endExclusive,
             @Param("status") ProposalStatus status);
 
+    @Query(
+            value = "SELECT COUNT(*) FROM proposals "
+                    + "WHERE status IN ('SUBMITTED', 'SHORTLISTED') "
+                    + "AND bid_amount BETWEEN :minBid AND :maxBid",
+            nativeQuery = true)
+    long countActiveProposalsInSimilarBidRange(
+            @Param("minBid") double minBid,
+            @Param("maxBid") double maxBid);
+
+
     long countByJobIdAndStatusIn(Long jobId, List<ProposalStatus> statuses);
     @Query("""
             SELECT DISTINCT p FROM Proposal p
