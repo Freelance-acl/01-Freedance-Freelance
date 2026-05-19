@@ -26,6 +26,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+/**
+ * [S3-F8] Integration tests for {@code POST /api/proposals/{proposalId}/milestones}.
+ */
 @Transactional
 class ProposalAddMilestonesIntegrationTest extends AbstractIntegrationTest {
 

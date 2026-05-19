@@ -27,6 +27,19 @@ import com.team01.freelance.user.model.User;
 import com.team01.freelance.user.model.UserRole;
 import com.team01.freelance.user.model.UserStatus;
 import com.team01.freelance.user.repository.UserRepository;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.WebApplicationContext;
+
+import java.util.Map;
+
+import static org.hamcrest.Matchers.hasSize;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
  * [S3-F5] Integration tests for {@code GET /api/proposals/metadata/search}.
@@ -48,6 +61,7 @@ class ProposalMetadataSearchIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private UserRepository userRepository;
 
+    private Job job;
     private User client;
     private User freelancer;
 
@@ -55,6 +69,35 @@ class ProposalMetadataSearchIntegrationTest extends AbstractIntegrationTest {
     void setUp() {
         mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext).build();
 
+        proposalRepository.deleteAll();
+        jobRepository.deleteAll();
+        userRepository.deleteAll();
+
+        job = new Job();
+        job.setClientId(1L);
+        job.setTitle("Metadata search job");
+        job.setDescription("Desc");
+        job.setCategory(JobCategory.WEB_DEV);
+        job.setStatus(JobStatus.OPEN);
+        job.setBudgetMin(100.0);
+        job.setBudgetMax(5000.0);
+        job = jobRepository.save(job);
+
+        freelancer = new User();
+        freelancer.setName("Metadata Freelancer");
+        freelancer.setEmail("metadata-" + System.nanoTime() + "@test.dev");
+        freelancer.setPassword("secret");
+        freelancer.setPhone("+5000" + (System.nanoTime() % 1_000_000_000L));
+        freelancer.setRole(UserRole.FREELANCER);
+        freelancer.setStatus(UserStatus.ACTIVE);
+        freelancer = userRepository.save(freelancer);
+    }
+
+    @Test
+    void metadataSearch_returnsMatchingProposals() throws Exception {
+        Proposal agile = saveProposal(Map.of("approach", "agile"));
+        saveProposal(Map.of("approach", "waterfall"));
+        saveProposal(Map.of("approach", "waterfall"));
         long suffix = System.nanoTime();
         client = saveUser("Client", "client-" + suffix + "@test.dev", UserRole.CLIENT);
         freelancer = saveUser("Freelancer", "freelancer-" + suffix + "@test.dev", UserRole.FREELANCER);
@@ -74,6 +117,12 @@ class ProposalMetadataSearchIntegrationTest extends AbstractIntegrationTest {
                         .param("key", "approach")
                         .param("value", "agile"))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].id").value(agile.getId().intValue()));
+    }
+
+    @Test
+    void metadataSearch_rejectsBlankKeyOrValue() throws Exception {
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].id").value(agile.getId().intValue()))
                 .andExpect(jsonPath("$[0].metadata.approach").value("agile"));
@@ -85,6 +134,22 @@ class ProposalMetadataSearchIntegrationTest extends AbstractIntegrationTest {
                         .param("key", "")
                         .param("value", "x"))
                 .andExpect(status().isBadRequest());
+
+        mockMvc.perform(get("/api/proposals/metadata/search")
+                        .param("key", "approach")
+                        .param("value", "   "))
+                .andExpect(status().isBadRequest());
+    }
+
+    private Proposal saveProposal(Map<String, Object> metadata) {
+        Proposal proposal = new Proposal();
+        proposal.setJobId(job.getId());
+        proposal.setFreelancerId(freelancer.getId());
+        proposal.setCoverLetter("Letter");
+        proposal.setBidAmount(250.0);
+        proposal.setEstimatedDays(7);
+        proposal.setStatus(ProposalStatus.SUBMITTED);
+        proposal.setMetadata(metadata);
     }
 
     private User saveUser(String name, String email, UserRole role) {

@@ -26,6 +26,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+/**
+ * [S3-F7] Integration tests for {@code PUT /api/proposals/{id}/withdraw}.
+ */
 @Transactional
 class ProposalWithdrawIntegrationTest extends AbstractIntegrationTest {
 

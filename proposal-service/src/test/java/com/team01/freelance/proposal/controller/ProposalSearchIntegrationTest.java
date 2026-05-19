@@ -29,6 +29,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+/**
+ * [S3-F1] Integration tests for {@code GET /api/proposals/search}.
+ */
 class ProposalSearchIntegrationTest extends AbstractIntegrationTest {
 
     private MockMvc mockMvc;
