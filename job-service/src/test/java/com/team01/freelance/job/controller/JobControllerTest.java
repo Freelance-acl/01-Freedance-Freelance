@@ -1,7 +1,10 @@
 package com.team01.freelance.job.controller;
 
+import com.team01.freelance.job.dto.JobProposalSummaryDTO;
+import com.team01.freelance.job.exception.GlobalExceptionHandler;
 import com.team01.freelance.job.model.Job;
 import com.team01.freelance.job.service.JobService;
+import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -9,6 +12,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import java.time.LocalDate;
 import java.util.Collections;
 import java.util.Optional;
 
@@ -33,7 +37,10 @@ class JobControllerTest {
         JobController controller = new JobController();
         jobService = mock(JobService.class);
         ReflectionTestUtils.setField(controller, "jobService", jobService);
-        mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
+       mockMvc = MockMvcBuilders
+        .standaloneSetup(controller)
+        .setControllerAdvice(new GlobalExceptionHandler())
+        .build();
     }
 
     @Test
@@ -89,5 +96,55 @@ class JobControllerTest {
 
         mockMvc.perform(delete("/api/jobs/all"))
                 .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void getProposalSummaryReturnsOkWithValidDateRange() throws Exception {
+        LocalDate startDate = LocalDate.of(2026, 3, 1);
+        LocalDate endDate = LocalDate.of(2026, 3, 31);
+
+        JobProposalSummaryDTO dto = new JobProposalSummaryDTO(
+                1L,
+                "Web Development",
+                5L,
+                800.0,
+                500.0,
+                1200.0
+        );
+
+        when(jobService.getJobProposalSummary(1L, startDate, endDate)).thenReturn(dto);
+
+        mockMvc.perform(get("/api/jobs/{id}/proposal-summary", 1L)
+                        .param("startDate", "2026-03-01")
+                        .param("endDate", "2026-03-31"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void getProposalSummaryReturnsBadRequestForInvalidDateRange() throws Exception {
+        LocalDate startDate = LocalDate.of(2026, 3, 31);
+        LocalDate endDate = LocalDate.of(2026, 3, 1);
+
+        when(jobService.getJobProposalSummary(1L, startDate, endDate))
+                .thenThrow(new IllegalArgumentException("startDate must be on or before endDate"));
+
+        mockMvc.perform(get("/api/jobs/{id}/proposal-summary", 1L)
+                        .param("startDate", "2026-03-31")
+                        .param("endDate", "2026-03-01"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void getProposalSummaryReturnsNotFoundForNonExistentJob() throws Exception {
+        LocalDate startDate = LocalDate.of(2026, 3, 1);
+        LocalDate endDate = LocalDate.of(2026, 3, 31);
+
+        when(jobService.getJobProposalSummary(999L, startDate, endDate))
+                .thenThrow(new EntityNotFoundException("Job not found with id: 999"));
+
+        mockMvc.perform(get("/api/jobs/{id}/proposal-summary", 999L)
+                        .param("startDate", "2026-03-01")
+                        .param("endDate", "2026-03-31"))
+                .andExpect(status().isNotFound());
     }
 }

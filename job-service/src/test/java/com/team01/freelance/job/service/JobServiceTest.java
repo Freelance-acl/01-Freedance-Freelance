@@ -1,5 +1,6 @@
 package com.team01.freelance.job.service;
 
+import com.team01.freelance.job.dto.JobProposalSummaryDTO;
 import com.team01.freelance.job.model.Job;
 import com.team01.freelance.job.repository.JobRepository;
 import com.team01.freelance.user.model.User;
@@ -11,6 +12,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -107,5 +110,156 @@ class JobServiceTest {
 
         assertNotNull(result);
         verify(jobRepository).save(job);
+    }
+
+    @Test
+    void getJobProposalSummaryReturnsProposalsInDateRange() {
+        // Arrange
+        Long jobId = 1L;
+        LocalDate startDate = LocalDate.of(2026, 3, 1);
+        LocalDate endDate = LocalDate.of(2026, 3, 31);
+        LocalDateTime queryStart = startDate.atStartOfDay();
+        LocalDateTime queryEndExclusive = endDate.plusDays(1).atStartOfDay();
+
+        JobProposalSummaryDTO expectedDTO = new JobProposalSummaryDTO(
+                jobId,
+                "Web Development",
+                5L,
+                800.0,
+                500.0,
+                1200.0
+        );
+
+        when(jobRepository.existsById(jobId)).thenReturn(true);
+        when(jobRepository.getProposalSummary(jobId, queryStart, queryEndExclusive))
+                .thenReturn(Optional.of(expectedDTO));
+
+        // Act
+        JobProposalSummaryDTO result = jobService.getJobProposalSummary(jobId, startDate, endDate);
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(5L, result.getTotalProposals());
+        assertEquals(800.0, result.getAverageBidAmount());
+        assertEquals(500.0, result.getLowestBid());
+        assertEquals(1200.0, result.getHighestBid());
+        verify(jobRepository).getProposalSummary(jobId, queryStart, queryEndExclusive);
+    }
+
+    @Test
+    void getJobProposalSummaryReturnsZeroProposalsWhenNoneExist() {
+        // Arrange
+        Long jobId = 1L;
+        LocalDate startDate = LocalDate.of(2026, 1, 1);
+        LocalDate endDate = LocalDate.of(2026, 1, 31);
+        LocalDateTime queryStart = startDate.atStartOfDay();
+        LocalDateTime queryEndExclusive = endDate.plusDays(1).atStartOfDay();
+
+        JobProposalSummaryDTO expectedDTO = new JobProposalSummaryDTO(
+                jobId,
+                "Web Development",
+                0L,
+                0.0,
+                0.0,
+                0.0
+        );
+
+        when(jobRepository.existsById(jobId)).thenReturn(true);
+        when(jobRepository.getProposalSummary(jobId, queryStart, queryEndExclusive))
+                .thenReturn(Optional.of(expectedDTO));
+
+        // Act
+        JobProposalSummaryDTO result = jobService.getJobProposalSummary(jobId, startDate, endDate);
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(0L, result.getTotalProposals());
+        assertEquals(0.0, result.getAverageBidAmount());
+        assertEquals(0.0, result.getLowestBid());
+        assertEquals(0.0, result.getHighestBid());
+    }
+
+    @Test
+    void getJobProposalSummaryThrowsIfJobNotFound() {
+        // Arrange
+        Long jobId = 999L;
+        LocalDate startDate = LocalDate.of(2026, 3, 1);
+        LocalDate endDate = LocalDate.of(2026, 3, 31);
+
+        when(jobRepository.existsById(jobId)).thenReturn(false);
+
+        // Act & Assert
+        assertThrows(EntityNotFoundException.class, () ->
+                jobService.getJobProposalSummary(jobId, startDate, endDate));
+        verify(jobRepository, never()).getProposalSummary(any(), any(), any());
+    }
+
+    @Test
+    void getJobProposalSummaryThrowsIfStartDateAfterEndDate() {
+        // Arrange
+        Long jobId = 1L;
+        LocalDate startDate = LocalDate.of(2026, 3, 31);
+        LocalDate endDate = LocalDate.of(2026, 3, 1);
+
+        when(jobRepository.existsById(jobId)).thenReturn(true);
+
+        // Act & Assert
+        assertThrows(IllegalArgumentException.class, () ->
+                jobService.getJobProposalSummary(jobId, startDate, endDate));
+        verify(jobRepository, never()).getProposalSummary(any(), any(), any());
+    }
+
+    @Test
+    void getJobProposalSummaryThrowsIfStartDateIsNull() {
+        // Arrange
+        Long jobId = 1L;
+        LocalDate endDate = LocalDate.of(2026, 3, 31);
+
+        // Act & Assert
+        assertThrows(IllegalArgumentException.class, () ->
+                jobService.getJobProposalSummary(jobId, null, endDate));
+        verify(jobRepository, never()).existsById(any());
+    }
+
+    @Test
+    void getJobProposalSummaryThrowsIfEndDateIsNull() {
+        // Arrange
+        Long jobId = 1L;
+        LocalDate startDate = LocalDate.of(2026, 3, 1);
+
+        // Act & Assert
+        assertThrows(IllegalArgumentException.class, () ->
+                jobService.getJobProposalSummary(jobId, startDate, null));
+        verify(jobRepository, never()).existsById(any());
+    }
+
+    @Test
+    void getJobProposalSummaryAcceptsSameDateRange() {
+        // Arrange
+        Long jobId = 1L;
+        LocalDate sameDate = LocalDate.of(2026, 3, 15);
+        LocalDateTime queryStart = sameDate.atStartOfDay();
+        LocalDateTime queryEndExclusive = sameDate.plusDays(1).atStartOfDay();
+
+        JobProposalSummaryDTO expectedDTO = new JobProposalSummaryDTO(
+                jobId,
+                "Web Development",
+                2L,
+                750.0,
+                700.0,
+                800.0
+        );
+
+        when(jobRepository.existsById(jobId)).thenReturn(true);
+        when(jobRepository.getProposalSummary(jobId, queryStart, queryEndExclusive))
+                .thenReturn(Optional.of(expectedDTO));
+
+        // Act
+        JobProposalSummaryDTO result = jobService.getJobProposalSummary(jobId, sameDate, sameDate);
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(2L, result.getTotalProposals());
+        verify(jobRepository).getProposalSummary(jobId, queryStart, queryEndExclusive);
     }
 }
