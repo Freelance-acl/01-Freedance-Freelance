@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.team01.freelance.contract.model.Contract;
+import com.team01.freelance.contract.model.ContractStatus;
 import com.team01.freelance.contract.repository.ContractRepository;
 import com.team01.freelance.job.model.Job;
 import com.team01.freelance.job.repository.JobRepository;
@@ -33,17 +34,6 @@ import com.team01.freelance.proposal.repository.ProposalRepository;
 import com.team01.freelance.user.repository.UserRepository;
 
 import jakarta.persistence.EntityNotFoundException;
-import jakarta.persistence.EntityNotFoundException;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.dao.DataAccessException;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Optional;
 
 @Service
 public class ProposalService {
@@ -186,20 +176,7 @@ public class ProposalService {
                 .toList();
     }
 
-        String trimmedKey = key.trim();
-        String trimmedValue = value.trim();
-        try {
-            List<Long> ids = proposalRepository.findIdsByMetadata(trimmedKey, trimmedValue);
-            if (ids.isEmpty()) {
-                return List.of();
-            }
-            return proposalRepository.findAllById(ids);
-        } catch (DataAccessException ex) {
-            return proposalRepository.findAll().stream()
-                    .filter(proposal -> proposal.getMetadata() != null)
-                    .filter(proposal -> trimmedValue.equals(String.valueOf(proposal.getMetadata().get(trimmedKey))))
-                    .toList();
-        }
+        
     public ProposalAnalyticsDTO getProposalAnalytics(LocalDate startDate, LocalDate endDate) {
         validateDateRange(startDate, endDate);
 
@@ -294,7 +271,6 @@ public class ProposalService {
                 now
         );
 
-        acceptedProposal.setProposalMilestones(new ArrayList<>(acceptedProposal.getProposalMilestones()));
         acceptedProposal.setProposalMilestones(new ArrayList<>());
         return acceptedProposal;
     }
@@ -399,7 +375,8 @@ public class ProposalService {
             throw new IllegalArgumentException("Only ACCEPTED proposals can be completed");
         }
 
-        Contract contract = contractRepository.findActiveContractByProposalId(id)
+        Contract contract = contractRepository.findByProposalId(id)
+                .filter(existing -> existing.getStatus() == ContractStatus.ACTIVE)
                 .orElseThrow(() -> new IllegalArgumentException("No ACTIVE contract found for proposal"));
 
         LocalDateTime now = LocalDateTime.now();

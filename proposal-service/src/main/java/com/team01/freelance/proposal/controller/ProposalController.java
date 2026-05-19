@@ -47,22 +47,6 @@ public class ProposalController {
         return ResponseEntity.ok(proposalService.searchProposals(status, startDate, endDate));
     }
 
-    @GetMapping("/metadata/search")
-    public ResponseEntity<List<Proposal>> searchProposalsByMetadata(
-            @RequestParam String key,
-            @RequestParam String value) {
-        try {
-            return ResponseEntity.ok(proposalService.searchProposalsByMetadata(key, value));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().build();
-        }
-    @GetMapping("/analytics")
-    public ResponseEntity<ProposalAnalyticsDTO> getProposalAnalytics(
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
-        return ResponseEntity.ok(proposalService.getProposalAnalytics(startDate, endDate));
-    }
-
     /**
      * [S3-F5] Filter proposals by a metadata key/value pair (JSONB equality).
      */
@@ -75,6 +59,13 @@ public class ProposalController {
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().build();
         }
+    }
+
+    @GetMapping("/analytics")
+    public ResponseEntity<ProposalAnalyticsDTO> getProposalAnalytics(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        return ResponseEntity.ok(proposalService.getProposalAnalytics(startDate, endDate));
     }
 
     @GetMapping("/{id}")
@@ -174,6 +165,8 @@ public class ProposalController {
         } catch (EntityNotFoundException e) {
             return ResponseEntity.notFound().build();
         } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        } catch (IllegalStateException e) {
             return ResponseEntity.badRequest().build();
         }
     }
