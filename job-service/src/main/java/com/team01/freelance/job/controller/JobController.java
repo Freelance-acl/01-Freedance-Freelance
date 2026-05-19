@@ -85,6 +85,16 @@ public class JobController {
         }
     }
 
+    @PutMapping("/{id}/requirements")
+    public ResponseEntity<Job> updateJobRequirements(@PathVariable Long id,
+                                                     @RequestBody Map<String, Object> requirements) {
+        try {
+            return ResponseEntity.ok(jobService.updateJobRequirements(id, requirements));
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteJobById(@PathVariable Long id) {
         if (jobService.deleteJobById(id)) {

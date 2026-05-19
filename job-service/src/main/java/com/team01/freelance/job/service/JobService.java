@@ -20,6 +20,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
@@ -111,6 +114,20 @@ public class JobService {
                 throw new IllegalArgumentException("Budget minimum cannot be greater than budget maximum");
             }
 
+            return jobRepository.save(existingJob);
+        }).orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + id));
+    }
+
+    public Job updateJobRequirements(Long id, Map<String, Object> requirements) {
+        return jobRepository.findById(id).map(existingJob -> {
+            Map<String, Object> mergedRequirements = new HashMap<>();
+            if (existingJob.getRequirements() != null) {
+                mergedRequirements.putAll(existingJob.getRequirements());
+            }
+            if (requirements != null) {
+                mergedRequirements.putAll(requirements);
+            }
+            existingJob.setRequirements(mergedRequirements);
             return jobRepository.save(existingJob);
         }).orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + id));
     }
