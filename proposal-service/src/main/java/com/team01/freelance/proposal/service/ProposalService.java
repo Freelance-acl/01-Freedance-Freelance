@@ -1,5 +1,6 @@
 package com.team01.freelance.proposal.service;
 
+import com.team01.freelance.proposal.dto.FeeEstimateDTO;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.EnumSet;
@@ -307,6 +308,47 @@ public class ProposalService {
         proposalRepository.deleteAll();
     }
 
+    /**
+     * Computes a read-only platform fee estimate from bid amount and duration.
+     *
+     * @param bidAmount the proposed bid (must be positive)
+     * @param estimatedDays expected delivery days (must be positive)
+     * @return fee breakdown for the freelancer
+     * @throws IllegalArgumentException if inputs are null or not positive
+     */
+    public FeeEstimateDTO estimatePlatformFee(Double bidAmount, Integer estimatedDays) {
+        if (bidAmount == null || bidAmount <= 0) {
+            throw new IllegalArgumentException("bidAmount must be positive");
+        }
+        if (estimatedDays == null || estimatedDays <= 0) {
+            throw new IllegalArgumentException("estimatedDays must be positive");
+        }
+
+        double minBid = bidAmount * 0.8;
+        double maxBid = bidAmount * 1.2;
+        long similarProposalCount = proposalRepository.countActiveProposalsInSimilarBidRange(minBid, maxBid);
+        int feePercentage = resolveFeePercentage(similarProposalCount);
+
+        double platformFee = bidAmount * feePercentage / 100.0;
+        double freelancerPayout = bidAmount - platformFee;
+        double estimatedDailyRate = freelancerPayout / estimatedDays;
+
+        return new FeeEstimateDTO(
+                bidAmount,
+                platformFee,
+                freelancerPayout,
+                feePercentage,
+                estimatedDailyRate);
+    }
+
+    private static int resolveFeePercentage(long similarProposalCount) {
+        if (similarProposalCount <= 5) {
+            return 20;
+        }
+        if (similarProposalCount <= 15) {
+            return 15;
+        }
+        return 10;
     private ProposalDetailsDTO.MilestoneDTO toMilestoneDTO(ProposalMilestone proposalMilestone) {
         ProposalDetailsDTO.MilestoneDTO dto = new ProposalDetailsDTO.MilestoneDTO();
         dto.setId(proposalMilestone.getId());

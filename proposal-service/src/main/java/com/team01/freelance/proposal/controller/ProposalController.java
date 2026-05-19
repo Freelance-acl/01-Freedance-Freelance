@@ -1,5 +1,7 @@
 package com.team01.freelance.proposal.controller;
 
+import com.team01.freelance.proposal.dto.FeeEstimateDTO;
+import com.team01.freelance.proposal.dto.FeeEstimateRequest;
 import com.team01.freelance.proposal.dto.ProposalDetailsDTO;
 import com.team01.freelance.proposal.dto.ProposalAnalyticsDTO;
 import com.team01.freelance.proposal.model.Proposal;
@@ -59,6 +61,14 @@ public class ProposalController {
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
+    @PostMapping("/estimate")
+    public ResponseEntity<FeeEstimateDTO> estimatePlatformFee(@RequestBody FeeEstimateRequest request) {
+        try {
+            return ResponseEntity.ok(proposalService.estimatePlatformFee(
+                    request.getBidAmount(),
+                    request.getEstimatedDays()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
     @GetMapping("/{proposalId}/details")
     public ResponseEntity<ProposalDetailsDTO> getProposalDetails(@PathVariable Long proposalId) {
         try {
