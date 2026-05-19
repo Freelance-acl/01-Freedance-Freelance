@@ -1,6 +1,9 @@
 package com.team01.freelance.proposal.controller;
 
+import com.team01.freelance.proposal.dto.ProposalDetailsDTO;
+import com.team01.freelance.proposal.dto.ProposalAnalyticsDTO;
 import com.team01.freelance.proposal.model.Proposal;
+import com.team01.freelance.proposal.model.ProposalMilestone;
 import com.team01.freelance.proposal.service.ProposalService;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -42,11 +45,27 @@ public class ProposalController {
         return ResponseEntity.ok(proposalService.searchProposals(status, startDate, endDate));
     }
 
+    @GetMapping("/analytics")
+    public ResponseEntity<ProposalAnalyticsDTO> getProposalAnalytics(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        return ResponseEntity.ok(proposalService.getProposalAnalytics(startDate, endDate));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<Proposal> getProposalById(@PathVariable Long id) {
         return proposalService.getProposalById(id)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/{proposalId}/details")
+    public ResponseEntity<ProposalDetailsDTO> getProposalDetails(@PathVariable Long proposalId) {
+        try {
+            return ResponseEntity.ok(proposalService.getProposalDetails(proposalId));
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        }
     }
 
     @PostMapping
@@ -81,6 +100,23 @@ public class ProposalController {
     public ResponseEntity<Proposal> acceptProposal(@PathVariable("id") Long proposalId) {
         try {
             return ResponseEntity.ok(proposalService.acceptProposal(proposalId));
+    @PostMapping("/{proposalId}/milestones")
+    public ResponseEntity<Proposal> addMilestones(
+            @PathVariable Long proposalId,
+            @RequestBody List<ProposalMilestone> milestones) {
+        try {
+            return ResponseEntity.ok(proposalService.addMilestones(proposalId, milestones));
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @PutMapping("/{id}/withdraw")
+    public ResponseEntity<Proposal> withdrawProposal(@PathVariable Long id) {
+        try {
+            return ResponseEntity.ok(proposalService.withdrawProposal(id));
         } catch (EntityNotFoundException e) {
             return ResponseEntity.notFound().build();
         } catch (IllegalArgumentException e) {

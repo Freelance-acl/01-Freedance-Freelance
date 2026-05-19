@@ -14,12 +14,28 @@ import org.springframework.transaction.annotation.Transactional;
 import com.team01.freelance.contract.repository.ContractRepository;
 import com.team01.freelance.job.model.Job;
 import com.team01.freelance.job.repository.JobRepository;
+import com.team01.freelance.proposal.dto.ProposalAnalyticsDTO;
 import com.team01.freelance.proposal.model.Proposal;
+import com.team01.freelance.proposal.dto.ProposalDetailsDTO;
+import com.team01.freelance.proposal.model.MilestoneStatus;
+import com.team01.freelance.proposal.model.ProposalMilestone;
 import com.team01.freelance.proposal.model.ProposalStatus;
+import com.team01.freelance.proposal.model.MilestoneStatus;
+import com.team01.freelance.proposal.repository.ProposalAnalyticsProjection;
 import com.team01.freelance.proposal.repository.ProposalRepository;
 import com.team01.freelance.user.repository.UserRepository;
 
 import jakarta.persistence.EntityNotFoundException;
+import jakarta.persistence.EntityNotFoundException;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Optional;
 
 @Service
 public class ProposalService {
@@ -28,6 +44,12 @@ public class ProposalService {
             ProposalStatus.SUBMITTED,
             ProposalStatus.SHORTLISTED
     );
+    private static final List<ProposalStatus> MILESTONE_ALLOWED_STATUSES = List.of(
+            ProposalStatus.SUBMITTED,
+            ProposalStatus.SHORTLISTED);
+    private static final List<ProposalStatus> WITHDRAWABLE_STATUSES = List.of(
+            ProposalStatus.SUBMITTED,
+            ProposalStatus.SHORTLISTED);
 
     @Autowired
     private ProposalRepository proposalRepository;
@@ -47,6 +69,32 @@ public class ProposalService {
 
     public Optional<Proposal> getProposalById(Long id) {
         return proposalRepository.findById(id);
+    }
+
+    public ProposalDetailsDTO getProposalDetails(Long proposalId) {
+        Proposal proposal = proposalRepository.findByIdWithMilestones(proposalId)
+                .orElseThrow(() -> new EntityNotFoundException("Proposal not found with id: " + proposalId));
+        List<ProposalDetailsDTO.MilestoneDTO> milestones = Optional.ofNullable(proposal.getProposalMilestones())
+                .orElseGet(List::of)
+                .stream()
+                .sorted(Comparator.comparing(ProposalMilestone::getMilestoneOrder))
+                .map(this::toMilestoneDTO)
+                .toList();
+
+        ProposalDetailsDTO details = new ProposalDetailsDTO();
+        details.setProposalId(proposal.getId());
+        details.setJobId(proposal.getJobId());
+        details.setFreelancerId(proposal.getFreelancerId());
+        details.setStatus(proposal.getStatus());
+        details.setBidAmount(proposal.getBidAmount());
+        details.setMetadata(proposal.getMetadata());
+        details.setMilestones(milestones);
+        details.setTotalMilestones(milestones.size());
+        details.setCompletedMilestones((int) milestones.stream()
+                .filter(milestone -> milestone.getStatus() == MilestoneStatus.COMPLETED
+                        || milestone.getStatus() == MilestoneStatus.APPROVED)
+                .count());
+        return details;
     }
 
     /**
@@ -69,6 +117,22 @@ public class ProposalService {
         LocalDateTime start = startDate.atStartOfDay();
         LocalDateTime endExclusive = endDate.plusDays(1).atStartOfDay();
         return proposalRepository.searchBySubmittedAtRangeAndOptionalStatus(start, endExclusive, parsedStatus);
+    }
+
+    public ProposalAnalyticsDTO getProposalAnalytics(LocalDate startDate, LocalDate endDate) {
+        validateDateRange(startDate, endDate);
+
+        LocalDateTime start = startDate.atStartOfDay();
+        LocalDateTime endExclusive = endDate.plusDays(1).atStartOfDay();
+        ProposalAnalyticsProjection analytics = proposalRepository.calculateAnalyticsBySubmittedAtRange(start, endExclusive);
+
+        return new ProposalAnalyticsDTO(
+                analytics.getTotalProposals().longValue(),
+                analytics.getAcceptedProposals().longValue(),
+                analytics.getRejectedProposals().longValue(),
+                analytics.getTotalBidValue().doubleValue(),
+                analytics.getAverageBid().doubleValue(),
+                analytics.getAcceptanceRate().doubleValue());
     }
 
     public Proposal createProposal(Proposal proposal) {
@@ -150,6 +214,85 @@ public class ProposalService {
         );
 
         return acceptedProposal;
+    @Transactional
+    public Proposal addMilestones(Long proposalId, List<ProposalMilestone> milestones) {
+        Proposal proposal = proposalRepository.findById(proposalId)
+                .orElseThrow(() -> new EntityNotFoundException("Proposal not found with id: " + proposalId));
+
+        if (!MILESTONE_ALLOWED_STATUSES.contains(proposal.getStatus())) {
+            throw new IllegalArgumentException("Milestones can only be added to SUBMITTED or SHORTLISTED proposals");
+        }
+        if (milestones == null || milestones.isEmpty()) {
+            throw new IllegalArgumentException("At least one milestone is required");
+        }
+
+        List<ProposalMilestone> existingMilestones = proposal.getProposalMilestonesForUpdate();
+        double existingTotal = existingMilestones.stream()
+                .map(ProposalMilestone::getAmount)
+                .filter(amount -> amount != null)
+                .mapToDouble(Double::doubleValue)
+                .sum();
+        double newTotal = milestones.stream()
+                .peek(this::validateMilestone)
+                .mapToDouble(ProposalMilestone::getAmount)
+                .sum();
+
+        if (proposal.getBidAmount() == null || existingTotal + newTotal > proposal.getBidAmount()) {
+            throw new IllegalArgumentException("Total milestone amounts cannot exceed proposal bidAmount");
+        }
+
+        int nextOrder = existingMilestones.stream()
+                .map(ProposalMilestone::getMilestoneOrder)
+                .filter(order -> order != null)
+                .max(Integer::compareTo)
+                .orElse(0) + 1;
+
+        for (ProposalMilestone milestone : milestones) {
+            milestone.setId(null);
+            milestone.setMilestoneOrder(nextOrder++);
+            milestone.setStatus(MilestoneStatus.PENDING);
+            proposal.addProposalMilestone(milestone);
+        }
+
+        return proposalRepository.save(proposal);
+    }
+
+    private void validateMilestone(ProposalMilestone milestone) {
+        if (milestone == null) {
+            throw new IllegalArgumentException("Milestone is required");
+        }
+        if (milestone.getTitle() == null || milestone.getTitle().isBlank()) {
+            throw new IllegalArgumentException("Milestone title is required");
+        }
+        if (milestone.getDescription() == null || milestone.getDescription().isBlank()) {
+            throw new IllegalArgumentException("Milestone description is required");
+        }
+        if (milestone.getAmount() == null || milestone.getAmount() <= 0) {
+            throw new IllegalArgumentException("Milestone amount must be positive");
+        }
+    }
+
+    @Transactional
+    public Proposal withdrawProposal(Long id) {
+        Proposal proposal = proposalRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Proposal not found with id: " + id));
+
+        if (!WITHDRAWABLE_STATUSES.contains(proposal.getStatus())) {
+            throw new IllegalArgumentException("Only SUBMITTED or SHORTLISTED proposals can be withdrawn");
+        }
+
+        long activeProposalCount = proposalRepository.countByJobIdAndStatusIn(
+                proposal.getJobId(),
+                WITHDRAWABLE_STATUSES);
+
+        proposal.setStatus(ProposalStatus.WITHDRAWN);
+        Proposal withdrawnProposal = proposalRepository.save(proposal);
+
+        if (activeProposalCount == 1) {
+            jobRepository.reopenIfInProgress(proposal.getJobId());
+        }
+
+        return withdrawnProposal;
     }
 
     public boolean deleteProposalById(Long id) {
@@ -162,5 +305,26 @@ public class ProposalService {
 
     public void deleteAllProposals() {
         proposalRepository.deleteAll();
+    }
+
+    private ProposalDetailsDTO.MilestoneDTO toMilestoneDTO(ProposalMilestone proposalMilestone) {
+        ProposalDetailsDTO.MilestoneDTO dto = new ProposalDetailsDTO.MilestoneDTO();
+        dto.setId(proposalMilestone.getId());
+        dto.setMilestoneOrder(proposalMilestone.getMilestoneOrder());
+        dto.setTitle(proposalMilestone.getTitle());
+        dto.setDescription(proposalMilestone.getDescription());
+        dto.setAmount(proposalMilestone.getAmount());
+        dto.setStatus(proposalMilestone.getStatus());
+        dto.setMetadata(proposalMilestone.getMetadata());
+        return dto;
+    }
+
+    private void validateDateRange(LocalDate startDate, LocalDate endDate) {
+        if (startDate == null || endDate == null) {
+            throw new IllegalArgumentException("startDate and endDate are required");
+        }
+        if (startDate.isAfter(endDate)) {
+            throw new IllegalArgumentException("startDate must be on or before endDate");
+        }
     }
 }
