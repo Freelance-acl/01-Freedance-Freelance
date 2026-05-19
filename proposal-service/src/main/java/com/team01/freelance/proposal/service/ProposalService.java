@@ -263,7 +263,6 @@ public class ProposalService {
                 now
         );
 
-        acceptedProposal.setProposalMilestones(new ArrayList<>(acceptedProposal.getProposalMilestones()));
         acceptedProposal.setProposalMilestones(new ArrayList<>());
         return acceptedProposal;
     }
