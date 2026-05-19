@@ -1,5 +1,6 @@
 package com.team01.freelance.job.service;
 
+import com.team01.freelance.job.dto.JobProposalSummaryDTO;
 import com.team01.freelance.job.client.ContractLookupClient;
 import com.team01.freelance.job.client.ContractSummary;
 import com.team01.freelance.job.exception.ForbiddenOperationException;
@@ -144,6 +145,39 @@ public class JobService {
         jobRepository.deleteAll();
     }
 
+    /**
+     * Retrieves proposal summary statistics for a job within a date range.
+     * Aggregates total proposals, average bid amount, lowest bid, and highest bid.
+     *
+     * @param jobId the job ID
+     * @param startDate inclusive start date of the range
+     * @param endDate inclusive end date of the range
+     * @return JobProposalSummaryDTO with aggregated proposal data
+     * @throws IllegalArgumentException if startDate is after endDate
+     * @throws EntityNotFoundException if job is not found
+     */
+    public JobProposalSummaryDTO getJobProposalSummary(Long jobId, LocalDate startDate, LocalDate endDate) {
+        if (startDate == null || endDate == null) {
+            throw new IllegalArgumentException("startDate and endDate are required");
+        }
+
+        if (startDate.isAfter(endDate)) {
+            throw new IllegalArgumentException("startDate must be on or before endDate");
+        }
+
+        // Verify job exists
+        if (!jobRepository.existsById(jobId)) {
+            throw new EntityNotFoundException("Job not found with id: " + jobId);
+        }
+
+        // Convert LocalDate to LocalDateTime for database query
+        // Use half-open interval: [startDate, endDate+1) for inclusive end date
+        LocalDateTime queryStart = startDate.atStartOfDay();
+        LocalDateTime queryEndExclusive = endDate.plusDays(1).atStartOfDay();
+
+        return jobRepository.getProposalSummary(jobId, queryStart, queryEndExclusive)
+                .orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + jobId));
+    }
     @Transactional(readOnly = true)
     public List<JobAttachmentAlertDTO> getJobsWithExpiredAttachments() {
         LocalDate today = LocalDate.now();

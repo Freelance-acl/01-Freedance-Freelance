@@ -1,5 +1,6 @@
 package com.team01.freelance.job.controller;
 
+import com.team01.freelance.job.dto.JobProposalSummaryDTO;
 import com.team01.freelance.job.exception.ForbiddenOperationException;
 import com.team01.freelance.job.model.JobAttachmentAlertDTO;
 import com.team01.freelance.job.model.JobAttachmentVerificationRequest;
@@ -27,6 +28,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -62,6 +64,22 @@ public class JobController {
         return jobService.getJobById(id)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    /**
+     * [S2-F3] Retrieves job proposal summary statistics within a date range.
+     *
+     * @param id the job ID
+     * @param startDate inclusive start date (ISO 8601 format: YYYY-MM-DD)
+     * @param endDate inclusive end date (ISO 8601 format: YYYY-MM-DD)
+     * @return 200 with JobProposalSummaryDTO, 400 for invalid date range, or 404 if job not found
+     */
+    @GetMapping("/{id}/proposal-summary")
+    public ResponseEntity<JobProposalSummaryDTO> getJobProposalSummary(
+            @PathVariable Long id,
+            @RequestParam LocalDate startDate,
+            @RequestParam LocalDate endDate) {
+        return ResponseEntity.ok(jobService.getJobProposalSummary(id, startDate, endDate));
     }
 
     @PostMapping
