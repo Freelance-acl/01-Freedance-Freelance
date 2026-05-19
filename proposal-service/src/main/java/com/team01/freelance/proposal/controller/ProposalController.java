@@ -3,6 +3,7 @@ package com.team01.freelance.proposal.controller;
 import com.team01.freelance.proposal.dto.ProposalDetailsDTO;
 import com.team01.freelance.proposal.dto.ProposalAnalyticsDTO;
 import com.team01.freelance.proposal.model.Proposal;
+import com.team01.freelance.proposal.model.ProposalMilestone;
 import com.team01.freelance.proposal.service.ProposalService;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -95,6 +96,12 @@ public class ProposalController {
         }
     }
 
+    @PostMapping("/{proposalId}/milestones")
+    public ResponseEntity<Proposal> addMilestones(
+            @PathVariable Long proposalId,
+            @RequestBody List<ProposalMilestone> milestones) {
+        try {
+            return ResponseEntity.ok(proposalService.addMilestones(proposalId, milestones));
     @PutMapping("/{id}/withdraw")
     public ResponseEntity<Proposal> withdrawProposal(@PathVariable Long id) {
         try {
