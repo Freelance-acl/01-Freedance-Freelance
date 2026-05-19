@@ -71,6 +71,7 @@ public class ProposalController {
             return ResponseEntity.badRequest().build();
         }
     }
+
     @GetMapping("/{proposalId}/details")
     public ResponseEntity<ProposalDetailsDTO> getProposalDetails(@PathVariable Long proposalId) {
         try {
@@ -136,6 +137,17 @@ public class ProposalController {
     public ResponseEntity<Proposal> withdrawProposal(@PathVariable Long id) {
         try {
             return ResponseEntity.ok(proposalService.withdrawProposal(id));
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @PutMapping("/{id}/complete")
+    public ResponseEntity<Proposal> completeProposal(@PathVariable("id") Long proposalId) {
+        try {
+            return ResponseEntity.ok(proposalService.completeProposal(proposalId));
         } catch (EntityNotFoundException e) {
             return ResponseEntity.notFound().build();
         } catch (IllegalArgumentException e) {

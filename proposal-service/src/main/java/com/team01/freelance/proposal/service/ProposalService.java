@@ -14,9 +14,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.team01.freelance.contract.model.Contract;
 import com.team01.freelance.contract.repository.ContractRepository;
 import com.team01.freelance.job.model.Job;
 import com.team01.freelance.job.repository.JobRepository;
+import com.team01.freelance.wallet.repository.PayoutRepository;
 import com.team01.freelance.proposal.dto.ProposalAnalyticsDTO;
 import com.team01.freelance.proposal.dto.ProposalDetailsDTO;
 import com.team01.freelance.proposal.model.MilestoneStatus;
@@ -54,6 +56,9 @@ public class ProposalService {
 
     @Autowired
     private ContractRepository contractRepository;
+
+    @Autowired
+    private PayoutRepository payoutRepository;
 
     public List<Proposal> getAllProposals() {
         return proposalRepository.findAll();
@@ -206,6 +211,7 @@ public class ProposalService {
         );
 
         acceptedProposal.setProposalMilestones(new ArrayList<>(acceptedProposal.getProposalMilestones()));
+        acceptedProposal.setProposalMilestones(new ArrayList<>());
         return acceptedProposal;
     }
 
@@ -288,7 +294,49 @@ public class ProposalService {
         }
 
         withdrawnProposal.setProposalMilestones(new ArrayList<>(withdrawnProposal.getProposalMilestones()));
+        withdrawnProposal.setProposalMilestones(new ArrayList<>());
         return withdrawnProposal;
+    }
+
+    /**
+     * Completes work for an accepted proposal: closes the active contract, closes the job,
+     * and creates a pending payout transactionally.
+     *
+     * @param id the proposal ID
+     * @return the proposal (status remains ACCEPTED)
+     * @throws EntityNotFoundException if the proposal is not found
+     * @throws IllegalArgumentException if the proposal is not ACCEPTED or has no ACTIVE contract
+     */
+    @Transactional
+    public Proposal completeProposal(Long id) {
+        Proposal proposal = proposalRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Proposal not found with id: " + id));
+
+        if (proposal.getStatus() != ProposalStatus.ACCEPTED) {
+            throw new IllegalArgumentException("Only ACCEPTED proposals can be completed");
+        }
+
+        Contract contract = contractRepository.findActiveContractByProposalId(id)
+                .orElseThrow(() -> new IllegalArgumentException("No ACTIVE contract found for proposal"));
+
+        LocalDateTime now = LocalDateTime.now();
+        int contractsUpdated = contractRepository.completeActiveContract(contract.getId(), now);
+        if (contractsUpdated != 1) {
+            throw new IllegalStateException("Contract is no longer active or was already completed");
+        }
+        int jobsUpdated = jobRepository.markJobClosed(contract.getJobId());
+        if (jobsUpdated != 1) {
+            throw new IllegalStateException("Job could not be closed");
+        }
+        payoutRepository.insertPendingPayout(
+                contract.getId(),
+                contract.getFreelancerId(),
+                contract.getAgreedAmount(),
+                now
+        );
+
+        proposal.setProposalMilestones(new ArrayList<>());
+        return proposal;
     }
 
     public boolean deleteProposalById(Long id) {
@@ -345,6 +393,7 @@ public class ProposalService {
         }
         return 10;
     }
+
     private ProposalDetailsDTO.MilestoneDTO toMilestoneDTO(ProposalMilestone proposalMilestone) {
         ProposalDetailsDTO.MilestoneDTO dto = new ProposalDetailsDTO.MilestoneDTO();
         dto.setId(proposalMilestone.getId());

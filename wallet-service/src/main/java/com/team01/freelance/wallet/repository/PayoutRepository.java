@@ -2,6 +2,7 @@ package com.team01.freelance.wallet.repository;
 
 import com.team01.freelance.wallet.model.Payout;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import com.team01.freelance.wallet.model.PayoutStatus;
@@ -119,6 +120,21 @@ public interface PayoutRepository extends JpaRepository<Payout, Long> {
 
     @Query(value = "SELECT COUNT(*) FROM payouts WHERE status = 'REFUNDED' AND created_at BETWEEN :start AND :end", nativeQuery = true)
     Long countRefundedBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    @Modifying(clearAutomatically = true)
+    @Query(value = """
+            INSERT INTO payouts (
+                contract_id, freelancer_id, amount, method, status, created_at
+            )
+            VALUES (
+                :contractId, :freelancerId, :amount, 'BANK_TRANSFER', 'PENDING', :createdAt
+            )
+            """, nativeQuery = true)
+    void insertPendingPayout(
+            @Param("contractId") Long contractId,
+            @Param("freelancerId") Long freelancerId,
+            @Param("amount") Double amount,
+            @Param("createdAt") LocalDateTime createdAt);
 
 }
 

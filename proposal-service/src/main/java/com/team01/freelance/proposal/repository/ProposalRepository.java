@@ -55,6 +55,7 @@ public interface ProposalRepository extends JpaRepository<Proposal, Long> {
 
 
     long countByJobIdAndStatusIn(Long jobId, List<ProposalStatus> statuses);
+
     @Query("""
             SELECT DISTINCT p FROM Proposal p
             LEFT JOIN FETCH p.proposalMilestones
