@@ -2,13 +2,16 @@ package com.team01.freelance.wallet.service;
 
 import com.team01.freelance.contract.repository.ContractRepository;
 import com.team01.freelance.user.repository.UserRepository;
+import com.team01.freelance.wallet.dto.AppliedPromoCodeDTO;
+import com.team01.freelance.wallet.dto.PayoutDetailsDTO;
+import com.team01.freelance.wallet.dto.PromoCodeUsageDTO;
 import com.team01.freelance.wallet.dto.FreelancerPayoutSummaryDTO;
 import com.team01.freelance.wallet.dto.RevenueReportDTO;
 import com.team01.freelance.wallet.model.Payout;
+import com.team01.freelance.wallet.model.PayoutPromo;
 import com.team01.freelance.wallet.model.PayoutStatus;
 import com.team01.freelance.wallet.dto.ProcessPayoutRequest;
 import com.team01.freelance.wallet.model.PromoCode;
-import com.team01.freelance.wallet.model.PayoutPromo;
 import com.team01.freelance.wallet.repository.PayoutRepository;
 import com.team01.freelance.wallet.repository.PayoutPromoRepository;
 import com.team01.freelance.wallet.repository.PromoCodeRepository;
@@ -16,6 +19,10 @@ import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.ArrayList;
+import java.util.Collections;
 import org.springframework.web.server.ResponseStatusException;
 import com.team01.freelance.wallet.model.DiscountType;
 import java.time.LocalDate;
@@ -25,7 +32,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import org.springframework.transaction.annotation.Transactional;
 import java.util.HashMap;
 
 @Service
@@ -115,6 +121,116 @@ public class PayoutService {
 
     public void deleteAllPayouts() {
         payoutRepository.deleteAll();
+    }
+
+    @Transactional
+    public Payout retryPayout(Long id) {
+
+        Payout payout = payoutRepository.findById(id)
+                .orElseThrow(() ->
+                        new EntityNotFoundException("Payout not found with id: " + id));
+
+        if (payout.getStatus() != PayoutStatus.FAILED) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only FAILED payouts can be retried");
+        }
+
+        Map<String, Object> transactionDetails = payout.getTransactionDetails();
+
+        if (transactionDetails == null) {
+            throw new IllegalArgumentException("Transaction details are missing");
+        }
+
+        int retryAttempt = 0;
+
+        Object retryValue = transactionDetails.get("retryAttempt");
+
+        if (retryValue instanceof Number) {
+            retryAttempt = ((Number) retryValue).intValue();
+        }
+
+        // Hardcoded to COMPLETED as there does not exist payments.
+
+        transactionDetails.put("retryAttempt", retryAttempt + 1);
+        transactionDetails.put("gatewayResponse", "approved");
+
+        payout.setStatus(PayoutStatus.COMPLETED);
+
+        payout.setTransactionDetails(transactionDetails);
+
+        return payoutRepository.save(payout);
+    }
+
+    public PayoutDetailsDTO getPayoutDetails(Long payoutId) {
+
+        Payout payout = payoutRepository.findByIdWithPromos(payoutId)
+                .orElseThrow(() ->
+                        new EntityNotFoundException("Payout not found with id: " + payoutId));
+
+        PayoutDetailsDTO dto = new PayoutDetailsDTO();
+
+        dto.payoutId = payout.getId();
+        dto.contractId = payout.getContractId();
+        dto.freelancerId = payout.getFreelancerId();
+
+        dto.originalAmount = payout.getAmount();
+        dto.method = payout.getMethod();
+        dto.status = payout.getStatus();
+        dto.transactionDetails = payout.getTransactionDetails();
+
+        List<AppliedPromoCodeDTO> promoList = new ArrayList<>();
+        double totalDiscount = 0.0;
+
+        List<PayoutPromo> promos = Optional.ofNullable(payout.getPayoutPromos())
+                .orElse(Collections.emptyList());
+
+        for (PayoutPromo pp : promos) {
+
+            AppliedPromoCodeDTO p = new AppliedPromoCodeDTO();
+
+            p.promoCode = pp.getPromoCode().getCode();
+            p.discountType = pp.getPromoCode().getDiscountType().toString();
+            p.discountApplied = pp.getDiscountApplied();
+            p.appliedAt = pp.getAppliedAt();
+
+            totalDiscount += pp.getDiscountApplied();
+            promoList.add(p);
+        }
+
+        dto.appliedPromoCodes = promoList;
+        dto.totalDiscount = totalDiscount;
+        dto.finalAmount = dto.originalAmount - totalDiscount;
+
+        return dto;
+    }
+
+    public List<PromoCodeUsageDTO> getTopUsedPromoCodes(int limit) {
+
+        List<Object[]> rows = payoutRepository.findTopUsedPromoCodes(limit);
+
+        List<PromoCodeUsageDTO> result = new ArrayList<>();
+
+        for (Object[] r : rows) {
+
+            PromoCodeUsageDTO dto = new PromoCodeUsageDTO();
+
+            dto.promoCodeId = ((Number) r[0]).longValue();
+            dto.code = (String) r[1];
+            dto.discountType = String.valueOf(r[2]);
+            dto.discountValue = r[3] != null ? ((Number) r[3]).doubleValue() : 0;
+
+            dto.timesUsed = r[4] != null ? ((Number) r[4]).intValue() : 0;
+            dto.totalDiscountGiven = r[5] != null ? ((Number) r[5]).doubleValue() : 0;
+
+            dto.active = (Boolean) r[6];
+
+            LocalDateTime expiry = (LocalDateTime) r[7];
+
+            dto.expired = expiry != null && expiry.isBefore(LocalDateTime.now());
+
+            result.add(dto);
+        }
+
+        return result;
     }
 
     /**
@@ -319,5 +435,5 @@ public class PayoutService {
                 refundCount == null ? 0L : refundCount
         );
     }
-    
+
 }

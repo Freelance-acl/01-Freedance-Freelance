@@ -1,10 +1,12 @@
 package com.team01.freelance.wallet.service;
 
+import com.team01.freelance.wallet.dto.PromoCodeUsageDTO;
 import com.team01.freelance.wallet.model.PromoCode;
 import com.team01.freelance.wallet.repository.PromoCodeRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 

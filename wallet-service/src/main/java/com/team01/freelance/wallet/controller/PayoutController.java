@@ -1,5 +1,7 @@
 package com.team01.freelance.wallet.controller;
 
+import com.team01.freelance.wallet.dto.PayoutDetailsDTO;
+import com.team01.freelance.wallet.dto.PromoCodeUsageDTO;
 import com.team01.freelance.wallet.dto.FreelancerPayoutSummaryDTO;
 import com.team01.freelance.wallet.dto.RefundRequest;
 import com.team01.freelance.wallet.dto.RevenueReportDTO;
@@ -77,7 +79,7 @@ public class PayoutController {
         payoutService.deleteAllPayouts();
         return ResponseEntity.noContent().build();
     }
-    
+
     @GetMapping("/search")
     public ResponseEntity<List<Payout>> searchPayouts(
             @RequestParam(required = false) PayoutStatus status,
@@ -152,4 +154,22 @@ public class PayoutController {
          return ResponseEntity.ok(payoutService.getRevenueReport(startDate, endDate));
      }
 
+
+    @GetMapping("/{payoutId:\\d+}/details")
+    public ResponseEntity<PayoutDetailsDTO> getDetails(@PathVariable Long payoutId) {
+        return ResponseEntity.ok(payoutService.getPayoutDetails(payoutId));
+    }
+
+    // Create promo code task is required to complete getTopUsedPromos
+    @GetMapping("/promos/top-used")
+    public ResponseEntity<List<PromoCodeUsageDTO>> getTopUsedPromos(
+            @RequestParam int limit) {
+
+        return ResponseEntity.ok(payoutService.getTopUsedPromoCodes(limit));
+    }
+
+    @PutMapping("/{id}/retry")
+    public ResponseEntity<Payout> retryPayout(@PathVariable Long id) {
+        return ResponseEntity.ok(payoutService.retryPayout(id));
+    }
 }
