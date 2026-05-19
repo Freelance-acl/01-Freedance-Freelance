@@ -18,6 +18,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.data.web.PageableHandlerMethodArgumentResolver;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.time.LocalDate;
@@ -52,10 +53,11 @@ class JobControllerTest {
         JobController controller = new JobController();
         jobService = mock(JobService.class);
         ReflectionTestUtils.setField(controller, "jobService", jobService);
-       mockMvc = MockMvcBuilders
-        .standaloneSetup(controller)
-        .setControllerAdvice(new GlobalExceptionHandler())
-        .build();
+        mockMvc = MockMvcBuilders
+                .standaloneSetup(controller)
+                .setCustomArgumentResolvers(new PageableHandlerMethodArgumentResolver())
+                .setControllerAdvice(new GlobalExceptionHandler())
+                .build();
     }
 
     @Test
@@ -353,6 +355,21 @@ class JobControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"status\":\"CLOSED\"}"))
                 .andExpect(status().isNotFound());
+    }
+
+    // -----------------------------------------------------------------------
+    // [S2-F1] Search Jobs by Status and Budget Range
+    // -----------------------------------------------------------------------
+
+    @Test
+    void searchJobs_returnsBadRequestForInvalidBudgetRange() throws Exception {
+        when(jobService.searchJobsByStatusAndBudgetRange(any(), eq(5000.0), eq(1000.0), any()))
+                .thenThrow(new IllegalArgumentException("minBudget cannot be greater than maxBudget"));
+
+        mockMvc.perform(get("/api/jobs/search")
+                        .param("minBudget", "5000")
+                        .param("maxBudget", "1000"))
+                .andExpect(status().isBadRequest());
     }
 
     // -----------------------------------------------------------------------

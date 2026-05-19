@@ -9,6 +9,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import javax.sql.DataSource;
+import java.sql.Connection;
+import java.sql.DatabaseMetaData;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.LocalDate;
@@ -30,10 +33,21 @@ class UserServiceTest {
     private UserRepository userRepository;
 
     @BeforeEach
-    void setUp() {
+    void setUp() throws Exception {
         userService = new UserService();
         userRepository = mock(UserRepository.class);
         ReflectionTestUtils.setField(userService, "userRepository", userRepository);
+        stubPostgresDatabase();
+    }
+
+    private void stubPostgresDatabase() throws Exception {
+        DataSource dataSource = mock(DataSource.class);
+        Connection connection = mock(Connection.class);
+        DatabaseMetaData metaData = mock(DatabaseMetaData.class);
+        when(dataSource.getConnection()).thenReturn(connection);
+        when(connection.getMetaData()).thenReturn(metaData);
+        when(metaData.getDatabaseProductName()).thenReturn("PostgreSQL");
+        ReflectionTestUtils.setField(userService, "dataSource", dataSource);
     }
 
     @Test

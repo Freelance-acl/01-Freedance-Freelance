@@ -43,7 +43,7 @@ public interface JobRepository extends JpaRepository<Job, Long> {
             WHERE j.id = :jobId
             GROUP BY j.id, j.title
             """, nativeQuery = true)
-    Optional<JobProposalSummaryDTO> getProposalSummary(
+    List<Object[]> getProposalSummary(
             @Param("jobId") Long jobId,
             @Param("startDate") LocalDateTime startDate,
             @Param("endDateExclusive") LocalDateTime endDateExclusive

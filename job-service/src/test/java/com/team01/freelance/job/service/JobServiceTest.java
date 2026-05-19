@@ -24,11 +24,16 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
+import javax.sql.DataSource;
+import java.sql.Connection;
+import java.sql.DatabaseMetaData;
+
 import java.util.Arrays;
 import java.util.HashMap;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -51,12 +56,20 @@ class JobServiceTest {
     @Mock
     private JobAttachmentRepository jobAttachmentRepository;
 
+    @Mock
+    private DataSource dataSource;
+
     @InjectMocks
     private JobService jobService;
 
     @BeforeEach
-    void setUp() {
+    void setUp() throws Exception {
         MockitoAnnotations.openMocks(this);
+        Connection connection = mock(Connection.class);
+        DatabaseMetaData metaData = mock(DatabaseMetaData.class);
+        when(dataSource.getConnection()).thenReturn(connection);
+        when(connection.getMetaData()).thenReturn(metaData);
+        when(metaData.getDatabaseProductName()).thenReturn("PostgreSQL");
     }
 
     @Test
@@ -156,7 +169,14 @@ class JobServiceTest {
 
         when(jobRepository.existsById(jobId)).thenReturn(true);
         when(jobRepository.getProposalSummary(jobId, queryStart, queryEndExclusive))
-                .thenReturn(Optional.of(expectedDTO));
+                .thenReturn(Collections.singletonList(new Object[]{
+                        expectedDTO.getJobId(),
+                        expectedDTO.getTitle(),
+                        expectedDTO.getTotalProposals(),
+                        expectedDTO.getAverageBidAmount(),
+                        expectedDTO.getLowestBid(),
+                        expectedDTO.getHighestBid()
+                }));
 
         // Act
         JobProposalSummaryDTO result = jobService.getJobProposalSummary(jobId, startDate, endDate);
@@ -190,7 +210,14 @@ class JobServiceTest {
 
         when(jobRepository.existsById(jobId)).thenReturn(true);
         when(jobRepository.getProposalSummary(jobId, queryStart, queryEndExclusive))
-                .thenReturn(Optional.of(expectedDTO));
+                .thenReturn(Collections.singletonList(new Object[]{
+                        expectedDTO.getJobId(),
+                        expectedDTO.getTitle(),
+                        expectedDTO.getTotalProposals(),
+                        expectedDTO.getAverageBidAmount(),
+                        expectedDTO.getLowestBid(),
+                        expectedDTO.getHighestBid()
+                }));
 
         // Act
         JobProposalSummaryDTO result = jobService.getJobProposalSummary(jobId, startDate, endDate);
@@ -276,7 +303,14 @@ class JobServiceTest {
 
         when(jobRepository.existsById(jobId)).thenReturn(true);
         when(jobRepository.getProposalSummary(jobId, queryStart, queryEndExclusive))
-                .thenReturn(Optional.of(expectedDTO));
+                .thenReturn(Collections.singletonList(new Object[]{
+                        expectedDTO.getJobId(),
+                        expectedDTO.getTitle(),
+                        expectedDTO.getTotalProposals(),
+                        expectedDTO.getAverageBidAmount(),
+                        expectedDTO.getLowestBid(),
+                        expectedDTO.getHighestBid()
+                }));
 
         // Act
         JobProposalSummaryDTO result = jobService.getJobProposalSummary(jobId, sameDate, sameDate);
@@ -669,6 +703,26 @@ class JobServiceTest {
 
         assertThrows(IllegalArgumentException.class, () -> jobService.closeJob(jobId));
         verify(jobRepository, never()).rejectSubmittedProposalsByJobId(anyLong());
+    }
+
+    @Test
+    void searchJobsByStatusAndBudgetRange_delegatesToRepository() {
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(0, 10);
+        org.springframework.data.domain.Page<Job> page = new org.springframework.data.domain.PageImpl<>(List.of(new Job()));
+        when(jobRepository.searchJobsByStatusAndBudgetRange("OPEN", 100.0, 500.0, pageable)).thenReturn(page);
+
+        org.springframework.data.domain.Page<Job> result =
+                jobService.searchJobsByStatusAndBudgetRange("OPEN", 100.0, 500.0, pageable);
+
+        assertEquals(1, result.getTotalElements());
+        verify(jobRepository).searchJobsByStatusAndBudgetRange("OPEN", 100.0, 500.0, pageable);
+    }
+
+    @Test
+    void searchJobsByStatusAndBudgetRange_rejectsInvertedRange() {
+        assertThrows(IllegalArgumentException.class,
+                () -> jobService.searchJobsByStatusAndBudgetRange(null, 5000.0, 1000.0,
+                        org.springframework.data.domain.PageRequest.of(0, 10)));
     }
 
     @Test

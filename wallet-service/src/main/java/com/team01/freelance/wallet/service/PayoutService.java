@@ -181,7 +181,11 @@ public class PayoutService {
         double totalDiscount = 0.0;
 
         List<PayoutPromo> promos = Optional.ofNullable(payout.getPayoutPromos())
-                .orElse(Collections.emptyList());
+                .filter(list -> !list.isEmpty())
+                .orElseGet(() -> payoutPromoRepository.findByPayout_Id(payoutId));
+        if (promos == null) {
+            promos = Collections.emptyList();
+        }
 
         for (PayoutPromo pp : promos) {
 
