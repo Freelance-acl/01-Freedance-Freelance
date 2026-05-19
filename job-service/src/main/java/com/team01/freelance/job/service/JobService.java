@@ -9,6 +9,8 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 @Service
 public class JobService {
@@ -27,9 +29,13 @@ public class JobService {
         return jobRepository.findById(id);
     }
 
-    public List<Job> searchJobsByStatusAndBudgetRange(String status, Double minBudget, Double maxBudget) {
+    public Page<Job> searchJobsByStatusAndBudgetRange(String status, Double minBudget, Double maxBudget, Pageable pageable) {
         if (minBudget == null || maxBudget == null) {
             throw new IllegalArgumentException("minBudget and maxBudget are required");
+        }
+
+        if (minBudget < 0 || maxBudget < 0) {
+            throw new IllegalArgumentException("minBudget and maxBudget must be non-negative");
         }
 
         if (minBudget > maxBudget) {
@@ -37,7 +43,7 @@ public class JobService {
         }
 
         String normalizedStatus = (status == null || status.trim().isEmpty()) ? null : status.trim();
-        return jobRepository.searchJobsByStatusAndBudgetRange(normalizedStatus, minBudget, maxBudget);
+        return jobRepository.searchJobsByStatusAndBudgetRange(normalizedStatus, minBudget, maxBudget, pageable);
     }
 
     public Job createJob(Job job) {

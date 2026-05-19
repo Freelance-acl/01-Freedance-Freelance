@@ -4,6 +4,8 @@ import com.team01.freelance.job.model.Job;
 import com.team01.freelance.job.service.JobService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -29,11 +31,17 @@ public class JobController {
     }
 
     @GetMapping("/search")
-    public ResponseEntity<List<Job>> searchJobs(
+    public ResponseEntity<?> searchJobs(
             @RequestParam(required = false) String status,
-            @RequestParam Double minBudget,
-            @RequestParam Double maxBudget) {
-        return ResponseEntity.ok(jobService.searchJobsByStatusAndBudgetRange(status, minBudget, maxBudget));
+            @RequestParam(required = true) Double minBudget,
+            @RequestParam(required = true) Double maxBudget,
+            Pageable pageable) {
+        try {
+            Page<Job> results = jobService.searchJobsByStatusAndBudgetRange(status, minBudget, maxBudget, pageable);
+            return ResponseEntity.ok(results);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
     }
 
     @GetMapping("/{id}")
