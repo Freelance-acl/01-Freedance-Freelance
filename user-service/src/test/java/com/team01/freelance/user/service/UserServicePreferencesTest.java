@@ -1,5 +1,6 @@
 package com.team01.freelance.user.service;
 
+
 import com.team01.freelance.user.model.User;
 import com.team01.freelance.user.repository.UserRepository;
 import jakarta.persistence.EntityNotFoundException;

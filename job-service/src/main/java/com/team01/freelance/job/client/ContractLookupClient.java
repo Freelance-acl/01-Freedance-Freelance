@@ -33,4 +33,24 @@ public class ContractLookupClient {
             throw new EntityNotFoundException("Contract not found with id: " + contractId);
         }
     }
+
+    /**
+     * Checks if there is an ACTIVE contract for a given job.
+     *
+     * @param jobId the job ID
+     * @return true if an ACTIVE contract exists, false otherwise
+     */
+    public boolean hasActiveContract(Long jobId) {
+        try {
+            Boolean hasActive = restTemplate.getForObject(
+                    contractServiceBaseUrl + "/api/contracts/jobs/{jobId}/has-active",
+                    Boolean.class,
+                    jobId
+            );
+            return hasActive != null && hasActive;
+        } catch (Exception e) {
+            // If contract service is unavailable or returns error, assume no active contract
+            return false;
+        }
+    }
 }
