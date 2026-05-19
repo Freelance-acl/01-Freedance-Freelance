@@ -1,5 +1,9 @@
 version: '3.8'
 
+x-db-env: &db-env
+  SPRING_DATASOURCE_URL: ${DB_URL:-jdbc:postgresql://postgres:5432/freelancedb}
+  SPRING_DATASOURCE_USERNAME: ${DB_USER:-postgres}
+  SPRING_DATASOURCE_PASSWORD: ${DB_PASS:-postgres}
 
 services:
   # PostgreSQL Database
@@ -25,12 +29,17 @@ services:
     restart: unless-stopped
 
   user-service:
-    build: ./user-service
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.service
+      args:
+        MODULE: user-service
     ports:
       - "8081:8080"
     environment:
       PORT: 8080
       SERVICE_NAME: "user-service"
+      <<: *db-env
     depends_on:
       postgres:
         condition: service_healthy
@@ -38,12 +47,17 @@ services:
       - freelance-network
 
   job-service:
-    build: ./job-service
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.service
+      args:
+        MODULE: job-service
     ports:
       - "8082:8080"
     environment:
       PORT: 8080
       SERVICE_NAME: "job-service"
+      <<: *db-env
     depends_on:
       postgres:
         condition: service_healthy
@@ -53,12 +67,17 @@ services:
       - freelance-network
 
   proposal-service:
-    build: ./proposal-service
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.service
+      args:
+        MODULE: proposal-service
     ports:
       - "8083:8080"
     environment:
       PORT: 8080
       SERVICE_NAME: "proposal-service"
+      <<: *db-env
     depends_on:
       postgres:
         condition: service_healthy
@@ -70,12 +89,17 @@ services:
       - freelance-network
 
   contract-service:
-    build: ./contract-service
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.service
+      args:
+        MODULE: contract-service
     ports:
       - "8084:8080"
     environment:
       PORT: 8080
       SERVICE_NAME: "contract-service"
+      <<: *db-env
     depends_on:
       postgres:
         condition: service_healthy
@@ -89,12 +113,17 @@ services:
       - freelance-network
 
   wallet-service:
-    build: ./wallet-service
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.service
+      args:
+        MODULE: wallet-service
     ports:
       - "8085:8080"
     environment:
       PORT: 8080
       SERVICE_NAME: "wallet-service"
+      <<: *db-env
     depends_on:
       postgres:
         condition: service_healthy
