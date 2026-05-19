@@ -240,6 +240,8 @@ public class ContractService {
                 endExclusive,
                 ContractStatus.fromString(status)
         );
+    }
+
     public List<Contract> findContractsByMetadata(String key, String operator, String value) {
         if (key == null || key.isBlank() || value == null || value.isBlank()) {
             throw new IllegalArgumentException("key and value are required");
@@ -341,6 +343,9 @@ public class ContractService {
             return Double.valueOf(value.trim());
         } catch (NumberFormatException e) {
             throw new IllegalArgumentException("value must be numeric for gt and lt operators");
+        }
+    }
+
     @Transactional
     public BatchContractStatusUpdateResponse batchUpdateContractStatus(List<BatchContractStatusUpdateRequest> updates) {
         if (updates == null || updates.isEmpty()) {

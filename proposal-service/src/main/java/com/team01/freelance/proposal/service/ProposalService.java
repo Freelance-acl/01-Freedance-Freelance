@@ -160,6 +160,8 @@ public class ProposalService {
         dto.setStatus(proposalMilestone.getStatus());
         dto.setMetadata(proposalMilestone.getMetadata());
         return dto;
+    }
+
     private void validateDateRange(LocalDate startDate, LocalDate endDate) {
         if (startDate == null || endDate == null) {
             throw new IllegalArgumentException("startDate and endDate are required");
