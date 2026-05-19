@@ -33,6 +33,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -94,6 +95,29 @@ class JobControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void updateRequirementsReturnsOk() throws Exception {
+        Job job = new Job();
+        when(jobService.updateJobRequirements(eq(1L), any())).thenReturn(job);
+
+        mockMvc.perform(put("/api/jobs/{id}/requirements", 1L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"experienceLevel\":\"SENIOR\",\"duration\":\"8 weeks\"}"))
+                .andExpect(status().isOk());
+
+        verify(jobService).updateJobRequirements(eq(1L), any());
+    }
+
+    @Test
+    void updateRequirementsReturnsNotFoundWhenJobMissing() throws Exception {
+        when(jobService.updateJobRequirements(eq(999L), any())).thenThrow(new RuntimeException());
+
+        mockMvc.perform(put("/api/jobs/{id}/requirements", 999L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"experienceLevel\":\"SENIOR\"}"))
+                .andExpect(status().isNotFound());
     }
 
     @Test

@@ -21,12 +21,17 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import java.util.Map;
 
 @Service
@@ -50,6 +55,23 @@ public class JobService {
 
     public Optional<Job> getJobById(Long id) {
         return jobRepository.findById(id);
+    }
+
+    public Page<Job> searchJobsByStatusAndBudgetRange(String status, Double minBudget, Double maxBudget, Pageable pageable) {
+        if (minBudget == null || maxBudget == null) {
+            throw new IllegalArgumentException("minBudget and maxBudget are required");
+        }
+
+        if (minBudget < 0 || maxBudget < 0) {
+            throw new IllegalArgumentException("minBudget and maxBudget must be non-negative");
+        }
+
+        if (minBudget > maxBudget) {
+            throw new IllegalArgumentException("minBudget cannot be greater than maxBudget");
+        }
+
+        String normalizedStatus = (status == null || status.trim().isEmpty()) ? null : status.trim();
+        return jobRepository.searchJobsByStatusAndBudgetRange(normalizedStatus, minBudget, maxBudget, pageable);
     }
 
     public Job createJob(Job job) {
@@ -93,6 +115,20 @@ public class JobService {
                 throw new IllegalArgumentException("Budget minimum cannot be greater than budget maximum");
             }
 
+            return jobRepository.save(existingJob);
+        }).orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + id));
+    }
+
+    public Job updateJobRequirements(Long id, Map<String, Object> requirements) {
+        return jobRepository.findById(id).map(existingJob -> {
+            Map<String, Object> mergedRequirements = new HashMap<>();
+            if (existingJob.getRequirements() != null) {
+                mergedRequirements.putAll(existingJob.getRequirements());
+            }
+            if (requirements != null) {
+                mergedRequirements.putAll(requirements);
+            }
+            existingJob.setRequirements(mergedRequirements);
             return jobRepository.save(existingJob);
         }).orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + id));
     }

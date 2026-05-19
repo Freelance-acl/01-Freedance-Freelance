@@ -27,6 +27,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+/**
+ * [S3-F9] Integration tests for {@code GET /api/proposals/{proposalId}/details}.
+ */
 class ProposalDetailsIntegrationTest extends AbstractIntegrationTest {
 
     private MockMvc mockMvc;
@@ -101,6 +104,17 @@ class ProposalDetailsIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.milestones[1].title").value("Review"))
                 .andExpect(jsonPath("$.milestones[2].milestoneOrder").value(3))
                 .andExpect(jsonPath("$.milestones[2].title").value("Final"));
+    }
+
+    @Test
+    void detailsCountsApprovedMilestonesAsCompleted() throws Exception {
+        Proposal proposal = saveProposal();
+        saveMilestone(proposal, 1, "Approved work", MilestoneStatus.APPROVED);
+
+        mockMvc.perform(get("/api/proposals/{proposalId}/details", proposal.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalMilestones").value(1))
+                .andExpect(jsonPath("$.completedMilestones").value(1));
     }
 
     @Test

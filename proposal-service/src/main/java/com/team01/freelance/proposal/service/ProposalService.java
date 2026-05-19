@@ -3,40 +3,37 @@ package com.team01.freelance.proposal.service;
 import com.team01.freelance.proposal.dto.FeeEstimateDTO;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
+import javax.sql.DataSource;
+
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.team01.freelance.contract.model.Contract;
+import com.team01.freelance.contract.model.ContractStatus;
 import com.team01.freelance.contract.repository.ContractRepository;
 import com.team01.freelance.job.model.Job;
 import com.team01.freelance.job.repository.JobRepository;
+import com.team01.freelance.wallet.repository.PayoutRepository;
 import com.team01.freelance.proposal.dto.ProposalAnalyticsDTO;
-import com.team01.freelance.proposal.model.Proposal;
 import com.team01.freelance.proposal.dto.ProposalDetailsDTO;
 import com.team01.freelance.proposal.model.MilestoneStatus;
+import com.team01.freelance.proposal.model.Proposal;
 import com.team01.freelance.proposal.model.ProposalMilestone;
 import com.team01.freelance.proposal.model.ProposalStatus;
-import com.team01.freelance.proposal.model.MilestoneStatus;
 import com.team01.freelance.proposal.repository.ProposalAnalyticsProjection;
 import com.team01.freelance.proposal.repository.ProposalRepository;
 import com.team01.freelance.user.repository.UserRepository;
 
 import jakarta.persistence.EntityNotFoundException;
-import jakarta.persistence.EntityNotFoundException;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Optional;
 
 @Service
 public class ProposalService {
@@ -63,6 +60,12 @@ public class ProposalService {
 
     @Autowired
     private ContractRepository contractRepository;
+
+    @Autowired
+    private PayoutRepository payoutRepository;
+
+    @Autowired
+    private DataSource dataSource;
 
     public List<Proposal> getAllProposals() {
         return proposalRepository.findAll();
@@ -120,6 +123,60 @@ public class ProposalService {
         return proposalRepository.searchBySubmittedAtRangeAndOptionalStatus(start, endExclusive, parsedStatus);
     }
 
+    /**
+     * [S3-F5] Returns proposals whose JSONB metadata field equals the given value for the key.
+     * Finds proposals whose metadata JSON contains the given key with the given string value.
+     *
+     * @param key metadata field name (required, non-blank)
+     * @param value metadata field value to match (required, non-blank)
+     * @return proposals matching the metadata key/value pair
+     * @throws IllegalArgumentException if key or value is null or blank
+     */
+    public List<Proposal> searchProposalsByMetadata(String key, String value) {
+        if (key == null || key.isBlank() || value == null || value.isBlank()) {
+            throw new IllegalArgumentException("key and value are required");
+        }
+        String normalizedKey = key.trim();
+        String normalizedValue = value.trim();
+        List<Proposal> matches = findProposalsByMetadata(normalizedKey, normalizedValue);
+        matches.forEach(proposal -> proposal.setProposalMilestones(new ArrayList<>()));
+        return matches;
+    }
+
+    private List<Proposal> findProposalsByMetadata(String key, String value) {
+        if (!usesPostgresDatabase()) {
+            return filterProposalsByMetadata(key, value);
+        }
+        try {
+            List<Long> ids = proposalRepository.findIdsByMetadataEquals(key, value);
+            if (ids.isEmpty()) {
+                return List.of();
+            }
+            return proposalRepository.findAllById(ids).stream()
+                    .sorted(Comparator.comparing(Proposal::getId))
+                    .toList();
+        } catch (DataAccessException ex) {
+            return filterProposalsByMetadata(key, value);
+        }
+    }
+
+    private boolean usesPostgresDatabase() {
+        try (var connection = dataSource.getConnection()) {
+            return "PostgreSQL".equalsIgnoreCase(connection.getMetaData().getDatabaseProductName());
+        } catch (Exception ex) {
+            return false;
+        }
+    }
+
+    private List<Proposal> filterProposalsByMetadata(String key, String value) {
+        return proposalRepository.findAll().stream()
+                .filter(proposal -> proposal.getMetadata() != null
+                        && value.equals(String.valueOf(proposal.getMetadata().get(key))))
+                .sorted(Comparator.comparing(Proposal::getId))
+                .toList();
+    }
+
+        
     public ProposalAnalyticsDTO getProposalAnalytics(LocalDate startDate, LocalDate endDate) {
         validateDateRange(startDate, endDate);
 
@@ -214,7 +271,10 @@ public class ProposalService {
                 now
         );
 
+        acceptedProposal.setProposalMilestones(new ArrayList<>());
         return acceptedProposal;
+    }
+
     @Transactional
     public Proposal addMilestones(Long proposalId, List<ProposalMilestone> milestones) {
         Proposal proposal = proposalRepository.findById(proposalId)
@@ -293,7 +353,50 @@ public class ProposalService {
             jobRepository.reopenIfInProgress(proposal.getJobId());
         }
 
+        withdrawnProposal.setProposalMilestones(new ArrayList<>());
         return withdrawnProposal;
+    }
+
+    /**
+     * Completes work for an accepted proposal: closes the active contract, closes the job,
+     * and creates a pending payout transactionally.
+     *
+     * @param id the proposal ID
+     * @return the proposal (status remains ACCEPTED)
+     * @throws EntityNotFoundException if the proposal is not found
+     * @throws IllegalArgumentException if the proposal is not ACCEPTED or has no ACTIVE contract
+     */
+    @Transactional
+    public Proposal completeProposal(Long id) {
+        Proposal proposal = proposalRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Proposal not found with id: " + id));
+
+        if (proposal.getStatus() != ProposalStatus.ACCEPTED) {
+            throw new IllegalArgumentException("Only ACCEPTED proposals can be completed");
+        }
+
+        Contract contract = contractRepository.findByProposalId(id)
+                .filter(existing -> existing.getStatus() == ContractStatus.ACTIVE)
+                .orElseThrow(() -> new IllegalArgumentException("No ACTIVE contract found for proposal"));
+
+        LocalDateTime now = LocalDateTime.now();
+        int contractsUpdated = contractRepository.completeActiveContract(contract.getId(), now);
+        if (contractsUpdated != 1) {
+            throw new IllegalStateException("Contract is no longer active or was already completed");
+        }
+        int jobsUpdated = jobRepository.markJobClosed(contract.getJobId());
+        if (jobsUpdated != 1) {
+            throw new IllegalStateException("Job could not be closed");
+        }
+        payoutRepository.insertPendingPayout(
+                contract.getId(),
+                contract.getFreelancerId(),
+                contract.getAgreedAmount(),
+                now
+        );
+
+        proposal.setProposalMilestones(new ArrayList<>());
+        return proposal;
     }
 
     public boolean deleteProposalById(Long id) {
@@ -349,6 +452,8 @@ public class ProposalService {
             return 15;
         }
         return 10;
+    }
+
     private ProposalDetailsDTO.MilestoneDTO toMilestoneDTO(ProposalMilestone proposalMilestone) {
         ProposalDetailsDTO.MilestoneDTO dto = new ProposalDetailsDTO.MilestoneDTO();
         dto.setId(proposalMilestone.getId());

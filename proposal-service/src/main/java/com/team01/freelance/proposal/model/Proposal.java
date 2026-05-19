@@ -1,10 +1,10 @@
 package com.team01.freelance.proposal.model;
 
 import com.fasterxml.jackson.annotation.JsonAlias;
-import com.fasterxml.jackson.annotation.JsonManagedReference;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
+import org.hibernate.Hibernate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -42,8 +42,8 @@ public class Proposal {
     @Enumerated(EnumType.STRING)
     private ProposalStatus status;
 
-    @Column(name = "metadata", columnDefinition = "jsonb")
-    @JdbcTypeCode(SqlTypes.JSON)
+    @Convert(converter = JsonMapConverter.class)
+    @Column(name = "metadata")
     private Map<String, Object> metadata;
 
     @Column(name = "submitted_at", nullable = false)
@@ -54,7 +54,7 @@ public class Proposal {
     @JsonAlias({"acceptedAt", "accepted_at"})
     private LocalDateTime acceptedAt;
 
-    @JsonManagedReference
+    @JsonIgnore
     @OrderBy("milestoneOrder ASC")
     @OneToMany(mappedBy = "proposal", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ProposalMilestone> proposalMilestones;
@@ -153,8 +153,9 @@ public class Proposal {
         this.acceptedAt = acceptedAt;
     }
 
+    @JsonProperty("proposalMilestones")
     public List<ProposalMilestone> getProposalMilestones() {
-        if (proposalMilestones == null) {
+        if (proposalMilestones == null || !Hibernate.isInitialized(proposalMilestones)) {
             return List.of();
         }
         return proposalMilestones.stream()

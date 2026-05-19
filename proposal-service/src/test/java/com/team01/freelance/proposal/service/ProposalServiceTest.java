@@ -1,5 +1,8 @@
 package com.team01.freelance.proposal.service;
 
+import com.team01.freelance.contract.model.Contract;
+import com.team01.freelance.contract.model.ContractStatus;
+import com.team01.freelance.contract.repository.ContractRepository;
 import com.team01.freelance.proposal.dto.FeeEstimateDTO;
 import com.team01.freelance.job.model.Job;
 import com.team01.freelance.proposal.dto.ProposalDetailsDTO;
@@ -8,6 +11,7 @@ import com.team01.freelance.proposal.dto.ProposalAnalyticsDTO;
 import com.team01.freelance.proposal.model.Proposal;
 import com.team01.freelance.proposal.model.ProposalMilestone;
 import com.team01.freelance.proposal.model.ProposalStatus;
+import com.team01.freelance.wallet.repository.PayoutRepository;
 import com.team01.freelance.contract.repository.ContractRepository;
 import com.team01.freelance.proposal.model.MilestoneStatus;
 import com.team01.freelance.proposal.repository.ProposalAnalyticsProjection;
@@ -22,6 +26,9 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import javax.sql.DataSource;
+import java.sql.Connection;
+import java.sql.DatabaseMetaData;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -35,6 +42,8 @@ import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.ArgumentMatchers.anyDouble;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -50,6 +59,10 @@ class ProposalServiceTest {
     private UserRepository userRepository;
     @Mock
     private ContractRepository contractRepository;
+    @Mock
+    private PayoutRepository payoutRepository;
+    @Mock
+    private DataSource dataSource;
 
     @InjectMocks
     private ProposalService proposalService;
@@ -508,6 +521,47 @@ class ProposalServiceTest {
     }
 
     @Test
+    void searchProposalsByMetadataDelegatesToRepository() throws Exception {
+        Connection connection = org.mockito.Mockito.mock(Connection.class);
+        DatabaseMetaData meta = org.mockito.Mockito.mock(DatabaseMetaData.class);
+        when(dataSource.getConnection()).thenReturn(connection);
+        when(connection.getMetaData()).thenReturn(meta);
+        when(meta.getDatabaseProductName()).thenReturn("PostgreSQL");
+
+        Proposal agile = new Proposal();
+        agile.setId(1L);
+        when(proposalRepository.findIdsByMetadataEquals("approach", "agile")).thenReturn(List.of(1L));
+        when(proposalRepository.findAllById(List.of(1L))).thenReturn(List.of(agile));
+
+        assertThat(proposalService.searchProposalsByMetadata("approach", "agile")).containsExactly(agile);
+    }
+
+    @Test
+    void searchProposalsByMetadataFallsBackToInMemoryFilterOnNonPostgres() {
+        Proposal agile = new Proposal();
+        agile.setId(1L);
+        agile.setMetadata(Map.of("approach", "agile"));
+        Proposal waterfall = new Proposal();
+        waterfall.setId(2L);
+        waterfall.setMetadata(Map.of("approach", "waterfall"));
+        when(proposalRepository.findAll()).thenReturn(List.of(agile, waterfall));
+
+        assertThat(proposalService.searchProposalsByMetadata("approach", "agile")).containsExactly(agile);
+        verify(proposalRepository, never()).findIdsByMetadataEquals(any(), any());
+    }
+
+    @Test
+    void searchProposalsByMetadataRejectsBlankKeyOrValue() {
+        assertThatThrownBy(() -> proposalService.searchProposalsByMetadata("", "agile"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("key and value");
+
+        assertThatThrownBy(() -> proposalService.searchProposalsByMetadata("approach", "   "))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("key and value");
+    }
+
+    @Test
     void getProposalAnalyticsCalculatesMarchScenario() {
         LocalDate start = LocalDate.of(2026, 3, 1);
         LocalDate end = LocalDate.of(2026, 3, 31);
@@ -624,5 +678,85 @@ class ProposalServiceTest {
         assertThatThrownBy(() -> proposalService.estimatePlatformFee(0.0, 10))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("bidAmount");
+    }
+
+    @Test
+    void completeProposal_updatesContractJobAndCreatesPayout() {
+        Proposal proposal = new Proposal();
+        proposal.setId(5L);
+        proposal.setStatus(ProposalStatus.ACCEPTED);
+
+        Contract contract = new Contract();
+        contract.setId(20L);
+        contract.setJobId(7L);
+        contract.setFreelancerId(30L);
+        contract.setAgreedAmount(2000.0);
+        contract.setStatus(ContractStatus.ACTIVE);
+
+        when(proposalRepository.findById(5L)).thenReturn(Optional.of(proposal));
+        when(contractRepository.findByProposalId(5L)).thenReturn(Optional.of(contract));
+        when(contractRepository.completeActiveContract(eq(20L), any(LocalDateTime.class))).thenReturn(1);
+        when(jobRepository.markJobClosed(7L)).thenReturn(1);
+
+        Proposal result = proposalService.completeProposal(5L);
+
+        assertThat(result.getStatus()).isEqualTo(ProposalStatus.ACCEPTED);
+        verify(contractRepository).completeActiveContract(eq(20L), any(LocalDateTime.class));
+        verify(jobRepository).markJobClosed(7L);
+        verify(payoutRepository).insertPendingPayout(eq(20L), eq(30L), eq(2000.0), any(LocalDateTime.class));
+    }
+
+    @Test
+    void completeProposal_rejectsNonAcceptedStatus() {
+        Proposal proposal = new Proposal();
+        proposal.setId(5L);
+        proposal.setStatus(ProposalStatus.SUBMITTED);
+        when(proposalRepository.findById(5L)).thenReturn(Optional.of(proposal));
+
+        assertThatThrownBy(() -> proposalService.completeProposal(5L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("ACCEPTED");
+
+        verify(contractRepository, never()).findByProposalId(anyLong());
+    }
+
+    @Test
+    void completeProposal_requiresActiveContract() {
+        Proposal proposal = new Proposal();
+        proposal.setId(5L);
+        proposal.setStatus(ProposalStatus.ACCEPTED);
+        when(proposalRepository.findById(5L)).thenReturn(Optional.of(proposal));
+        when(contractRepository.findByProposalId(5L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> proposalService.completeProposal(5L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("ACTIVE contract");
+
+        verify(payoutRepository, never()).insertPendingPayout(anyLong(), anyLong(), anyDouble(), any());
+    }
+
+    @Test
+    void completeProposal_abortsWhenContractAlreadyCompleted() {
+        Proposal proposal = new Proposal();
+        proposal.setId(5L);
+        proposal.setStatus(ProposalStatus.ACCEPTED);
+
+        Contract contract = new Contract();
+        contract.setId(20L);
+        contract.setJobId(7L);
+        contract.setFreelancerId(30L);
+        contract.setAgreedAmount(2000.0);
+        contract.setStatus(ContractStatus.ACTIVE);
+
+        when(proposalRepository.findById(5L)).thenReturn(Optional.of(proposal));
+        when(contractRepository.findByProposalId(5L)).thenReturn(Optional.of(contract));
+        when(contractRepository.completeActiveContract(eq(20L), any(LocalDateTime.class))).thenReturn(0);
+
+        assertThatThrownBy(() -> proposalService.completeProposal(5L))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Contract");
+
+        verify(jobRepository, never()).markJobClosed(anyLong());
+        verify(payoutRepository, never()).insertPendingPayout(anyLong(), anyLong(), anyDouble(), any());
     }
 }
