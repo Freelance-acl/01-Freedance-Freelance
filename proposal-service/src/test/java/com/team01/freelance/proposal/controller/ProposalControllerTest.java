@@ -1,8 +1,10 @@
 package com.team01.freelance.proposal.controller;
 
+import com.team01.freelance.proposal.dto.ProposalDetailsDTO;
 import com.team01.freelance.proposal.dto.ProposalAnalyticsDTO;
 import com.team01.freelance.proposal.model.Proposal;
 import com.team01.freelance.proposal.service.ProposalService;
+import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -99,6 +101,27 @@ class ProposalControllerTest {
 
         mockMvc.perform(get("/api/proposals/{id}", 1L))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void getDetailsReturnsOk() throws Exception {
+        ProposalDetailsDTO details = new ProposalDetailsDTO();
+        details.setProposalId(1L);
+        details.setMilestones(List.of());
+        details.setTotalMilestones(0);
+        details.setCompletedMilestones(0);
+        when(proposalService.getProposalDetails(1L)).thenReturn(details);
+
+        mockMvc.perform(get("/api/proposals/{proposalId}/details", 1L))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void getDetailsReturnsNotFoundWhenProposalDoesNotExist() throws Exception {
+        when(proposalService.getProposalDetails(404L)).thenThrow(new EntityNotFoundException("Proposal not found"));
+
+        mockMvc.perform(get("/api/proposals/{proposalId}/details", 404L))
+                .andExpect(status().isNotFound());
     }
 
     @Test
