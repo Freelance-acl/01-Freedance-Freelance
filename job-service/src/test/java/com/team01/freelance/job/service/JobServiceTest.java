@@ -11,6 +11,9 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -107,5 +110,41 @@ class JobServiceTest {
 
         assertNotNull(result);
         verify(jobRepository).save(job);
+    }
+
+    @Test
+    void updateJobRequirementsMergesIncomingFields() {
+        Long jobId = 1L;
+        Job existingJob = new Job();
+        existingJob.setId(jobId);
+        Map<String, Object> originalRequirements = new HashMap<>();
+        originalRequirements.put("experienceLevel", "MID");
+        originalRequirements.put("remote", true);
+        originalRequirements.put("skills", Arrays.asList("Java"));
+        existingJob.setRequirements(originalRequirements);
+
+        Map<String, Object> updatedFields = new HashMap<>();
+        updatedFields.put("experienceLevel", "SENIOR");
+        updatedFields.put("duration", "8 weeks");
+
+        when(jobRepository.findById(jobId)).thenReturn(Optional.of(existingJob));
+        when(jobRepository.save(existingJob)).thenReturn(existingJob);
+
+        Job result = jobService.updateJobRequirements(jobId, updatedFields);
+
+        assertNotNull(result);
+        assertEquals("SENIOR", result.getRequirements().get("experienceLevel"));
+        assertEquals(true, result.getRequirements().get("remote"));
+        assertEquals(Arrays.asList("Java"), result.getRequirements().get("skills"));
+        assertEquals("8 weeks", result.getRequirements().get("duration"));
+        verify(jobRepository).save(existingJob);
+    }
+
+    @Test
+    void updateJobRequirementsThrowsWhenJobNotFound() {
+        when(jobRepository.findById(1L)).thenReturn(Optional.empty());
+
+        assertThrows(EntityNotFoundException.class, () -> jobService.updateJobRequirements(1L, Map.of("foo", "bar")));
+        verify(jobRepository, never()).save(any(Job.class));
     }
 }

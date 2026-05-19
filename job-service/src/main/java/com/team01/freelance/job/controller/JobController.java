@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/jobs")
@@ -50,6 +51,16 @@ public class JobController {
     public ResponseEntity<Job> updateJob(@PathVariable Long id, @RequestBody Job job) {
         try {
             return ResponseEntity.ok(jobService.updateJob(id, job));
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    @PutMapping("/{id}/requirements")
+    public ResponseEntity<Job> updateJobRequirements(@PathVariable Long id,
+                                                     @RequestBody Map<String, Object> requirements) {
+        try {
+            return ResponseEntity.ok(jobService.updateJobRequirements(id, requirements));
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
