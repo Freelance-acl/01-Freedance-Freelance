@@ -5,13 +5,21 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team01.freelance.contract.dto.ContractSummaryDTO;
 import com.team01.freelance.contract.dto.BatchContractStatusUpdateRequest;
 import com.team01.freelance.contract.dto.BatchContractStatusUpdateResponse;
+import com.team01.freelance.contract.dto.ContractMilestoneDTO;
+import com.team01.freelance.contract.dto.ContractMilestoneTrackRequest;
 import com.team01.freelance.contract.dto.FreelancerPerformanceDTO;
 import com.team01.freelance.contract.dto.StalledContractDTO;
+import com.team01.freelance.contract.milestone.ContractMilestoneEvent;
+import com.team01.freelance.contract.milestone.ContractMilestoneStatus;
+import com.team01.freelance.contract.milestone.ContractMilestoneTimelineRepository;
 import com.team01.freelance.contract.model.Contract;
 import com.team01.freelance.contract.model.ContractStatus;
+import com.team01.freelance.contract.observer.EntityObserver;
 import com.team01.freelance.contract.repository.ContractRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -25,6 +33,7 @@ import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.time.OffsetDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -41,6 +50,12 @@ public class ContractService {
 
     @Autowired
     private DataSource dataSource;
+
+    @Autowired(required = false)
+    private List<EntityObserver> observers = Collections.emptyList();
+
+    @Autowired
+    private ContractMilestoneTimelineRepository milestoneTimelineRepository;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -78,7 +93,11 @@ public class ContractService {
             throw new IllegalArgumentException("Start date is required");
         }
 
-        return contractRepository.save(contract);
+        Contract created = contractRepository.save(contract);
+        notifyObservers("CONTRACT_CREATED", Map.of(
+                "contractId", created.getId(),
+                "status", created.getStatus() == null ? "UNKNOWN" : created.getStatus().name()));
+        return created;
     }
 
     /**
@@ -98,7 +117,11 @@ public class ContractService {
                 if (contractDetails.getEndDate() != null) existingContract.setEndDate(contractDetails.getEndDate());
                 if (contractDetails.getMetadata() != null) existingContract.setMetadata(contractDetails.getMetadata());
                 if (contractDetails.getCreatedAt() != null) existingContract.setCreatedAt(contractDetails.getCreatedAt());
-            return contractRepository.save(existingContract);
+            Contract updated = contractRepository.save(existingContract);
+            notifyObservers("CONTRACT_UPDATED", Map.of(
+                    "contractId", updated.getId(),
+                    "status", updated.getStatus() == null ? "UNKNOWN" : updated.getStatus().name()));
+            return updated;
         }).orElseThrow(() -> new EntityNotFoundException("Contract not found with id: " + id));
     }
 
@@ -114,7 +137,13 @@ public class ContractService {
         }
 
         contract.setMetadata(mergedMetadata);
-        return contractRepository.save(contract);
+        Contract updated = contractRepository.save(contract);
+        Map<String, Object> eventPayload = new LinkedHashMap<>();
+        eventPayload.put("contractId", contractId);
+        eventPayload.put("progressPercentage", mergedMetadata.get("progressPercentage"));
+        eventPayload.put("lastActivityDate", mergedMetadata.get("lastActivityDate"));
+        notifyObservers("PROGRESS_UPDATED", eventPayload);
+        return updated;
     }
 
     public List<ContractSummaryDTO> searchContracts(Double minAmount, Double maxAmount, String status) {
@@ -142,8 +171,15 @@ public class ContractService {
     }
 
     public boolean deleteContractById(Long id) {
+        Optional<Contract> contract = contractRepository.findById(id);
+        if (contract.isEmpty()) {
+            return false;
+        }
         try {
             contractRepository.deleteById(id);
+            notifyObservers("CONTRACT_DELETED", Map.of(
+                    "contractId", id,
+                    "previousStatus", contract.get().getStatus() == null ? "UNKNOWN" : contract.get().getStatus().name()));
         } catch (Exception e) {
             return false;
         }
@@ -151,7 +187,11 @@ public class ContractService {
     }
 
     public void deleteAllContracts() {
+        List<Long> ids = contractRepository.findAll().stream().map(Contract::getId).toList();
         contractRepository.deleteAll();
+        for (Long id : ids) {
+            notifyObservers("CONTRACT_DELETED", Map.of("contractId", id, "deletedVia", "DELETE_ALL"));
+        }
     }
 
     @Transactional
@@ -163,6 +203,10 @@ public class ContractService {
         LocalDateTime cutoff = LocalDateTime.now().minusDays(olderThanDays);
         long deletedCount = contractRepository.countPurgeCandidates(cutoff);
         contractRepository.purgeOldContracts(cutoff);
+        notifyObservers("OLD_DATA_PURGED", Map.of(
+                "contractId", -1L,
+                "olderThanDays", olderThanDays,
+                "deletedCount", deletedCount));
         return deletedCount;
     }
 
@@ -195,14 +239,14 @@ public class ContractService {
             double averageDurationDays = toDouble(raw[4]);
             double completionRate = totalContracts == 0 ? 0.0 : (completedContracts * 100.0) / totalContracts;
 
-            return new FreelancerPerformanceDTO(
-                    freelancerId,
-                    totalContracts,
-                    averageContractValue,
-                    completionRate,
-                    averageDurationDays,
-                    totalEarnings
-            );
+            return FreelancerPerformanceDTO.builder()
+                    .freelancerId(freelancerId)
+                    .totalContracts(totalContracts)
+                    .averageContractValue(averageContractValue)
+                    .completionRate(completionRate)
+                    .averageDurationDays(averageDurationDays)
+                    .totalEarnings(totalEarnings)
+                    .build();
         } catch (DataAccessException ex) {
             return buildFreelancerPerformanceInMemory(freelancerId, start, endExclusive);
         }
@@ -437,14 +481,14 @@ public class ContractService {
                 .orElse(0.0);
         double completionRate = totalContracts == 0 ? 0.0 : (completedContracts * 100.0) / totalContracts;
 
-        return new FreelancerPerformanceDTO(
-                freelancerId,
-                totalContracts,
-                averageContractValue,
-                completionRate,
-                averageDurationDays,
-                totalEarnings
-        );
+        return FreelancerPerformanceDTO.builder()
+                .freelancerId(freelancerId)
+                .totalContracts(totalContracts)
+                .averageContractValue(averageContractValue)
+                .completionRate(completionRate)
+                .averageDurationDays(averageDurationDays)
+                .totalEarnings(totalEarnings)
+                .build();
     }
 
     private List<StalledContractDTO> findStalledContractsInMemory(Double maxProgress, Integer stalledDays) {
@@ -460,15 +504,56 @@ public class ContractService {
                     long daysSince = lastActivity == null
                             ? 0L
                             : ChronoUnit.DAYS.between(lastActivity, LocalDateTime.now());
-                    return new StalledContractDTO(
-                            contract.getId(),
-                            "Freelancer " + contract.getFreelancerId(),
-                            "Job " + contract.getJobId(),
-                            contract.getAgreedAmount(),
-                            readMetadataDouble(contract, "progressPercentage"),
-                            daysSince
-                    );
+                    return StalledContractDTO.builder()
+                            .contractId(contract.getId())
+                            .freelancerName("Freelancer " + contract.getFreelancerId())
+                            .jobTitle("Job " + contract.getJobId())
+                            .agreedAmount(contract.getAgreedAmount())
+                            .progressPercentage(readMetadataDouble(contract, "progressPercentage"))
+                            .daysSinceLastActivity(daysSince)
+                            .build();
                 })
+                .toList();
+    }
+
+    @Transactional
+    @CacheEvict(value = "contractMilestoneTimeline", allEntries = true)
+    public void recordContractMilestone(Long contractId, ContractMilestoneTrackRequest request) {
+        Contract contract = contractRepository.findById(contractId)
+                .orElseThrow(() -> new EntityNotFoundException("Contract not found with id: " + contractId));
+
+        if (request.getMilestoneOrder() == null || request.getMilestoneOrder() <= 0) {
+            throw new IllegalArgumentException("milestoneOrder must be greater than 0");
+        }
+        ContractMilestoneStatus status = ContractMilestoneStatus.fromString(request.getStatus());
+        ContractMilestoneEvent event = new ContractMilestoneEvent(
+                contractId,
+                LocalDateTime.now(),
+                request.getMilestoneOrder(),
+                status,
+                request.getRecordedBy(),
+                request.getNotes()
+        );
+        milestoneTimelineRepository.save(event);
+        notifyObservers("MILESTONE_TRACKED", Map.of(
+                "contractId", contract.getId(),
+                "milestoneOrder", event.milestoneOrder(),
+                "status", event.status().name(),
+                "recordedBy", event.recordedBy() == null ? "" : event.recordedBy()));
+    }
+
+    @Cacheable(value = "contractMilestoneTimeline", key = "#contractId + '|' + (#startTime == null ? 'null' : #startTime.toString()) + '|' + (#endTime == null ? 'null' : #endTime.toString())")
+    public List<ContractMilestoneDTO> getContractMilestoneTimeline(Long contractId, LocalDateTime startTime, LocalDateTime endTime) {
+        contractRepository.findById(contractId)
+                .orElseThrow(() -> new EntityNotFoundException("Contract not found with id: " + contractId));
+        return milestoneTimelineRepository.findByContractId(contractId, startTime, endTime).stream()
+                .map(event -> ContractMilestoneDTO.builder()
+                        .timestamp(event.timestamp())
+                        .milestoneOrder(event.milestoneOrder())
+                        .status(event.status().name())
+                        .recordedBy(event.recordedBy())
+                        .notes(event.notes())
+                        .build())
                 .toList();
     }
 
@@ -545,5 +630,11 @@ public class ContractService {
             return LocalDateTime.parse(stringValue);
         }
         throw new IllegalArgumentException("Unsupported date value: " + value.getClass().getName());
+    }
+
+    private void notifyObservers(String eventType, Map<String, Object> payload) {
+        for (EntityObserver observer : observers) {
+            observer.onEvent(eventType, payload);
+        }
     }
 }
