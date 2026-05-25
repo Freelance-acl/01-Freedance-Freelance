@@ -85,6 +85,10 @@ public class JwtService {
     }
 
     private static SecretKey buildSigningKey(String base64Secret) {
+        if (base64Secret == null || base64Secret.isBlank()) {
+            throw new IllegalStateException(
+                    "jwt.secret is not set; provide JWT_SECRET (Base64, at least 32 bytes when decoded)");
+        }
         byte[] keyBytes = Decoders.BASE64.decode(base64Secret);
         if (keyBytes.length < 32) {
             throw new IllegalStateException(

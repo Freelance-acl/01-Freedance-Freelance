@@ -124,6 +124,9 @@ public class UserService {
     }
 
     public User updateUserRole(Long id, UserRole role) {
+        if (role == null) {
+            throw new IllegalArgumentException("role must not be null");
+        }
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("User not found with id: " + id));
         user.setRole(role);

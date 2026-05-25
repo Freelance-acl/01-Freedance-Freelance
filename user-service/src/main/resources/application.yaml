@@ -1,16 +1,11 @@
 spring:
-  datasource:
-    url: jdbc:postgresql://localhost:5432/freelancedb
-    username: postgres
-    password: postgres
   jpa:
     hibernate:
       ddl-auto: update
     show-sql: true
 
 jwt:
-  # 44+ char Base64 → ≥32 bytes for HS256 (JJWT WeakKeyException if shorter)
-  secret: dGhpcyBpcyBhIHNlY3JldCBrZXkgZm9yIEpXVCBzaWduaW5n
+  secret: ${JWT_SECRET}
   expiration: 86400000 # 24 hours (ms)
 
 server:

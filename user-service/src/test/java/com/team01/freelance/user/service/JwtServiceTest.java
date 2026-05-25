@@ -43,6 +43,15 @@ class JwtServiceTest {
     }
 
     @Test
+    void blankSecret_rejectedAtStartup() {
+        jwtConfig.setSecret("   ");
+
+        IllegalStateException ex =
+                assertThrows(IllegalStateException.class, () -> new JwtService(jwtConfig));
+        assertTrue(ex.getMessage().contains("JWT_SECRET"));
+    }
+
+    @Test
     void shortSecret_rejectedAtStartup() {
         jwtConfig.setSecret("bXlTZWNyZXQxMjM="); // "mySecret123" — too few bytes for HS256
 

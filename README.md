@@ -32,6 +32,9 @@ Microservices backend for a freelance marketplace, using Spring Boot + PostgreSQ
 ```bash
 # Copy environment configuration (do this once)
 cp .env.example .env
+# Fill DB_URL, DB_USER, DB_PASS, and JWT_SECRET in .env (required for run / Compose)
+# JWT: openssl rand -base64 32
+# DB (local): DB_URL=jdbc:postgresql://localhost:5432/freelancedb
 
 # Then run setup
 ./setup.bash
@@ -48,7 +51,9 @@ This runs:
 ./run.bash
 ```
 
-`docker-compose.yaml` sets `SPRING_DATASOURCE_URL` (and credentials) on each service so JDBC uses the hostname `postgres` on the Compose network. `application.properties` uses `localhost` for running `./mvnw spring-boot:run` directly on your machine.
+`docker-compose.yaml` injects `SPRING_DATASOURCE_*` (from `DB_URL` / `DB_USER` / `DB_PASS` in `.env`) and `JWT_SECRET` into each service. For `./mvnw spring-boot:run` on the host, export the same variables or load `.env` — `user-service` maps them via `spring.datasource.*` and `jwt.secret=${JWT_SECRET}` with no committed defaults.
+
+Compose fails to start if `JWT_SECRET` is unset. Spring fails at startup if any required placeholder (`DB_URL`, `DB_USER`, `DB_PASS`, `JWT_SECRET`) is missing when not using the `test` profile.
 
 Each service **Dockerfile** is **multi-stage**: builds in a JDK layer, ships a JRE-only runtime (smaller image). You do **not** need a local `target/*.jar` before `docker compose build`.
 
