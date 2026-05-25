@@ -16,10 +16,10 @@ import com.team01.freelance.user.model.UserRole;
 import com.team01.freelance.user.model.UserStatus;
 import com.team01.freelance.user.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 import static org.hamcrest.Matchers.hasSize;
@@ -30,6 +30,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * [S3-F9] Integration tests for {@code GET /api/proposals/{proposalId}/details}.
  */
+@WithMockUser(roles = "ADMIN")
 class ProposalDetailsIntegrationTest extends AbstractIntegrationTest {
 
     private MockMvc mockMvc;
@@ -54,7 +55,7 @@ class ProposalDetailsIntegrationTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext).build();
+        mockMvc = buildMockMvc(webApplicationContext);
 
         proposalMilestoneRepository.deleteAll();
         proposalRepository.deleteAll();

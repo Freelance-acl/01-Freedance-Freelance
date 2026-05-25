@@ -10,6 +10,7 @@ x-common-service: &common-service
     SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/freelancedb
     SPRING_DATASOURCE_USERNAME: postgres
     SPRING_DATASOURCE_PASSWORD: postgres
+    JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env — see .env.example}
   depends_on:
     postgres:
       condition: service_healthy

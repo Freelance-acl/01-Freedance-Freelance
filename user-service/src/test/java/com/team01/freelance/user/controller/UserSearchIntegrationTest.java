@@ -6,10 +6,10 @@ import com.team01.freelance.user.model.UserStatus;
 import com.team01.freelance.user.repository.UserRepository;
 import com.team01.freelance.user.support.AbstractIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
 
@@ -23,6 +23,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * [S1-F1] Integration tests for {@code GET /api/users/search}.
  */
 @Transactional
+@WithMockUser(roles = "ADMIN")
 class UserSearchIntegrationTest extends AbstractIntegrationTest {
 
     private static final String SEARCH_URL = "/api/users/search";
@@ -41,7 +42,7 @@ class UserSearchIntegrationTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext).build();
+        mockMvc = buildMockMvc(webApplicationContext);
 
         long suffix = System.nanoTime();
         ahmed = saveUser("Ahmed", "ahmed-" + suffix + "@test.dev", "+10001" + (suffix % 1_000_000L),

@@ -13,11 +13,11 @@ import com.team01.freelance.wallet.model.PayoutStatus;
 import com.team01.freelance.wallet.repository.PayoutRepository;
 import com.team01.freelance.wallet.support.AbstractIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
 
@@ -35,6 +35,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * [S5-F4] Integration tests for {@code POST /api/payouts/contract/{contractId}}.
  */
 @Transactional
+@WithMockUser(roles = "ADMIN")
 class ProcessContractPayoutIntegrationTest extends AbstractIntegrationTest {
 
     private static final String PROCESS_URL = "/api/payouts/contract/{contractId}";
@@ -58,7 +59,7 @@ class ProcessContractPayoutIntegrationTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext).build();
+        mockMvc = buildMockMvc(webApplicationContext);
 
         client = saveUser("Client", UserRole.CLIENT);
         freelancer = saveUser("Freelancer", UserRole.FREELANCER);
