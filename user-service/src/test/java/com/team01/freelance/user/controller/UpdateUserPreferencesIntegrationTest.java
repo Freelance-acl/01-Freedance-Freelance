@@ -6,11 +6,11 @@ import com.team01.freelance.user.model.UserStatus;
 import com.team01.freelance.user.repository.UserRepository;
 import com.team01.freelance.user.support.AbstractIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
 
@@ -26,6 +26,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * [S1-F2] Integration tests for {@code PUT /api/users/{id}/preferences}.
  */
 @Transactional
+@WithMockUser(roles = "ADMIN")
 class UpdateUserPreferencesIntegrationTest extends AbstractIntegrationTest {
 
     private static final String PREFERENCES_URL = "/api/users/{id}/preferences";
@@ -42,7 +43,7 @@ class UpdateUserPreferencesIntegrationTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext).build();
+        mockMvc = buildMockMvc(webApplicationContext);
 
         Map<String, Object> preferences = new LinkedHashMap<>();
         preferences.put("language", "en");

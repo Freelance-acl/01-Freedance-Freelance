@@ -123,6 +123,13 @@ public class UserService {
         }).orElseThrow(() -> new EntityNotFoundException("User not found with id: " + id));
     }
 
+    public User updateUserRole(Long id, UserRole role) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("User not found with id: " + id));
+        user.setRole(role);
+        return userRepository.save(user);
+    }
+
     public boolean deleteUserById(Long id) {
         if (!userRepository.existsById(id)) {
             return false;

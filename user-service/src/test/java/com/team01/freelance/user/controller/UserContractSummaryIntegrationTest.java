@@ -6,11 +6,11 @@ import com.team01.freelance.user.model.UserStatus;
 import com.team01.freelance.user.repository.UserRepository;
 import com.team01.freelance.user.support.AbstractIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
 
@@ -25,6 +25,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * [S1-F3] Integration tests for {@code GET /api/users/{id}/contract-summary}.
  */
 @Transactional
+@WithMockUser(roles = "ADMIN")
 class UserContractSummaryIntegrationTest extends AbstractIntegrationTest {
 
     private static final String SUMMARY_URL = "/api/users/{id}/contract-summary";
@@ -45,7 +46,7 @@ class UserContractSummaryIntegrationTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext).build();
+        mockMvc = buildMockMvc(webApplicationContext);
 
         long suffix = System.nanoTime();
         client = saveUser("Client", "client-" + suffix + "@test.dev", "+20001" + (suffix % 1_000_000L),

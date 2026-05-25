@@ -8,10 +8,10 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
 
@@ -32,6 +32,7 @@ import com.team01.freelance.user.repository.UserRepository;
  * [S3-F5] Integration tests for {@code GET /api/proposals/metadata/search}.
  */
 @Transactional
+@WithMockUser(roles = "ADMIN")
 class ProposalMetadataSearchIntegrationTest extends AbstractIntegrationTest {
 
     private MockMvc mockMvc;
@@ -53,7 +54,7 @@ class ProposalMetadataSearchIntegrationTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext).build();
+        mockMvc = buildMockMvc(webApplicationContext);
 
         long suffix = System.nanoTime();
         client = saveUser("Client", "client-" + suffix + "@test.dev", UserRole.CLIENT);

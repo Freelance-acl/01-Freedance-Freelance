@@ -6,11 +6,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 import com.team01.freelance.job.model.Job;
@@ -29,6 +29,7 @@ import com.team01.freelance.user.repository.UserRepository;
 /**
  * [S3-F3] Integration tests for {@code POST /api/proposals/estimate}.
  */
+@WithMockUser(roles = "ADMIN")
 class ProposalFeeEstimateIntegrationTest extends AbstractIntegrationTest {
 
     private MockMvc mockMvc;
@@ -50,7 +51,7 @@ class ProposalFeeEstimateIntegrationTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext).build();
+        mockMvc = buildMockMvc(webApplicationContext);
 
         proposalRepository.deleteAll();
         jobRepository.deleteAll();

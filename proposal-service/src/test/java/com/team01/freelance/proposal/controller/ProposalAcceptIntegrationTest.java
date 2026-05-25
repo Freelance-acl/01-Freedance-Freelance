@@ -2,13 +2,13 @@ package com.team01.freelance.proposal.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.BeforeEach;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.servlet.MockMvc;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 import com.team01.freelance.contract.model.Contract;
@@ -30,6 +30,7 @@ import com.team01.freelance.user.repository.UserRepository;
 /**
  * [S3-F2] Integration tests for {@code PUT /api/proposals/{proposalId}/accept}.
  */
+@WithMockUser(roles = "ADMIN")
 class ProposalAcceptIntegrationTest extends AbstractIntegrationTest {
 
     private MockMvc mockMvc;
@@ -54,7 +55,7 @@ class ProposalAcceptIntegrationTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext).build();
+        mockMvc = buildMockMvc(webApplicationContext);
 
         contractRepository.deleteAll();
         proposalRepository.deleteAll();

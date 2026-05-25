@@ -13,12 +13,12 @@ import com.team01.freelance.user.model.UserRole;
 import com.team01.freelance.user.model.UserStatus;
 import com.team01.freelance.user.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -30,6 +30,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * [S3-F7] Integration tests for {@code PUT /api/proposals/{id}/withdraw}.
  */
 @Transactional
+@WithMockUser(roles = "ADMIN")
 class ProposalWithdrawIntegrationTest extends AbstractIntegrationTest {
 
     private MockMvc mockMvc;
@@ -53,7 +54,7 @@ class ProposalWithdrawIntegrationTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext).build();
+        mockMvc = buildMockMvc(webApplicationContext);
 
         proposalRepository.deleteAll();
         jobRepository.deleteAll();

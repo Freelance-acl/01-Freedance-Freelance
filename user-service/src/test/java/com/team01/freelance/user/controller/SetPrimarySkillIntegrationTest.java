@@ -1,5 +1,4 @@
 package com.team01.freelance.user.controller;
-import static org.hamcrest.Matchers.contains;
 import com.team01.freelance.user.model.ProficiencyLevel;
 import com.team01.freelance.user.model.User;
 import com.team01.freelance.user.model.UserRole;
@@ -9,10 +8,10 @@ import com.team01.freelance.user.repository.UserRepository;
 import com.team01.freelance.user.repository.UserSkillRepository;
 import com.team01.freelance.user.support.AbstractIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
 
@@ -29,6 +28,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * [S1-F7] Integration tests for {@code PUT /api/users/{userId}/skills/{skillId}/primary}.
  */
 @Transactional
+@WithMockUser(roles = "ADMIN")
 class SetPrimarySkillIntegrationTest extends AbstractIntegrationTest {
 
     private static final String PRIMARY_URL = "/api/users/{userId}/skills/{skillId}/primary";
@@ -51,7 +51,7 @@ class SetPrimarySkillIntegrationTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext).build();
+        mockMvc = buildMockMvc(webApplicationContext);
 
         long suffix = System.nanoTime();
         user = new User();
@@ -84,19 +84,14 @@ class SetPrimarySkillIntegrationTest extends AbstractIntegrationTest {
     @Test
     void setPrimarySkill_switchesPrimaryBetweenUserSkills() throws Exception {
         mockMvc.perform(put(PRIMARY_URL, user.getId(), skill2.getId()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.userSkills[?(@.skillName=='Spring')].isPrimary").value(contains(true)))
-                .andExpect(jsonPath("$.userSkills[?(@.skillName=='Java')].isPrimary").value(contains(false)))
-                .andExpect(jsonPath("$.userSkills[?(@.skillName=='PostgreSQL')].isPrimary").value(contains(false)));
+                .andExpect(status().isOk());
 
         assertTrue(findSkill(skill2.getId()).getIsPrimary());
         assertFalse(findSkill(skill1.getId()).getIsPrimary());
         assertFalse(findSkill(skill3.getId()).getIsPrimary());
 
         mockMvc.perform(put(PRIMARY_URL, user.getId(), skill3.getId()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.userSkills[?(@.skillName=='PostgreSQL')].isPrimary").value(contains(true)))
-                .andExpect(jsonPath("$.userSkills[?(@.skillName=='Spring')].isPrimary").value(contains(false)));
+                .andExpect(status().isOk());
 
         assertTrue(findSkill(skill3.getId()).getIsPrimary());
         assertFalse(findSkill(skill2.getId()).getIsPrimary());

@@ -405,8 +405,7 @@ class UserControllerTest {
         mockMvc.perform(put("/api/users/{userId}/skills/{skillId}/primary", 1L, 2L))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(1))
-                .andExpect(jsonPath("$.userSkills[0].skillName").value("Spring"))
-                .andExpect(jsonPath("$.userSkills[0].isPrimary").value(true));
+                .andExpect(jsonPath("$.userSkills").doesNotExist());
     }
 
     @Test

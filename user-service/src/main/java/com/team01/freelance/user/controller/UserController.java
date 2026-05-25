@@ -8,6 +8,7 @@ import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -16,14 +17,13 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import com.team01.freelance.user.model.UserRole;
 import java.util.Map;
 
 import java.time.LocalDate;
 import java.util.List;
+import com.team01.freelance.user.dto.UpdateUserRoleRequest;
 import com.team01.freelance.user.dto.UserContractSummaryDTO;
 import com.team01.freelance.user.dto.UserProfileDTO;
 
@@ -38,11 +38,13 @@ public class UserController {
     private UserSkillService userSkillService;
 
     @GetMapping
+    @PreAuthorize("hasRole('FREELANCER') or hasRole('CLIENT') or hasRole('ADMIN')")
     public ResponseEntity<List<User>> getAllUsers() {
         return ResponseEntity.ok(userService.getAllUsers());
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasRole('FREELANCER') or hasRole('CLIENT') or hasRole('ADMIN')")
     public ResponseEntity<User> getUserById(@PathVariable Long id) {
         return userService.getUserById(id)
                 .map(ResponseEntity::ok)
@@ -50,11 +52,13 @@ public class UserController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('FREELANCER') or hasRole('CLIENT') or hasRole('ADMIN')")
     public ResponseEntity<User> createUser(@RequestBody User user) {
         return ResponseEntity.ok(userService.createUser(user));
     }
 
     @PutMapping("/{id}/deactivate")
+    @PreAuthorize("hasRole('FREELANCER') or hasRole('CLIENT') or hasRole('ADMIN')")
     public ResponseEntity<User> deactivateUser(@PathVariable Long id) {
         try {
             return ResponseEntity.ok(userService.deactivateUser(id));
@@ -66,6 +70,7 @@ public class UserController {
     }
 
     @GetMapping("/preferences/search")
+    @PreAuthorize("hasRole('FREELANCER') or hasRole('CLIENT') or hasRole('ADMIN')")
     public ResponseEntity<List<User>> searchByPreference(
             @RequestParam String key,
             @RequestParam String value) {
@@ -77,6 +82,7 @@ public class UserController {
     }
 
     @GetMapping("/reports/top-freelancers")
+    @PreAuthorize("hasRole('FREELANCER') or hasRole('CLIENT') or hasRole('ADMIN')")
     public ResponseEntity<List<TopFreelancerDTO>> getTopFreelancers(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
@@ -96,6 +102,7 @@ public class UserController {
      * @return 200 with updated user, or 404 if not found
      */
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('FREELANCER') or hasRole('CLIENT') or hasRole('ADMIN')")
     public ResponseEntity<User> updateUser(@PathVariable Long id, @RequestBody User user) {
         try {
             return ResponseEntity.ok(userService.updateUser(id, user));
@@ -106,7 +113,18 @@ public class UserController {
         }
     }
 
+    @PutMapping("/{id}/role")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<User> updateUserRole(@PathVariable Long id, @RequestBody UpdateUserRoleRequest request) {
+        try {
+            return ResponseEntity.ok(userService.updateUserRole(id, request.role()));
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('FREELANCER') or hasRole('CLIENT') or hasRole('ADMIN')")
     public ResponseEntity<Void> deleteUserById(@PathVariable Long id) {
         if (userService.deleteUserById(id)) {
             return ResponseEntity.noContent().build();
@@ -115,12 +133,14 @@ public class UserController {
     }
 
     @DeleteMapping("/all")
+    @PreAuthorize("hasRole('FREELANCER') or hasRole('CLIENT') or hasRole('ADMIN')")
     public ResponseEntity<Void> deleteAllUsers() {
         userService.deleteAllUsers();
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/search")
+    @PreAuthorize("hasRole('FREELANCER') or hasRole('CLIENT') or hasRole('ADMIN')")
     public ResponseEntity<List<User>> searchUsers(
             @RequestParam(required = false) String name,
             @RequestParam(required = false) String email,
@@ -130,6 +150,7 @@ public class UserController {
 
     
     @PutMapping("/{id}/preferences")
+    @PreAuthorize("hasRole('FREELANCER') or hasRole('CLIENT') or hasRole('ADMIN')")
     public ResponseEntity<User> updatePreferences(
         @PathVariable Long id,
         @RequestBody Map<String, Object> preferences) {
@@ -142,6 +163,7 @@ public class UserController {
         
     
         @GetMapping("/{id}/contract-summary")
+        @PreAuthorize("hasRole('FREELANCER') or hasRole('CLIENT') or hasRole('ADMIN')")
         public ResponseEntity<UserContractSummaryDTO> getUserContractSummary(@PathVariable Long id) {
             try {
                 return ResponseEntity.ok(userService.getUserContractSummary(id));
@@ -158,6 +180,7 @@ public class UserController {
         * @return 200 with user and skills, 400 if skill belongs to another user, or 404 if not found
         */
    @PutMapping("/{userId}/skills/{skillId}/primary")
+   @PreAuthorize("hasRole('FREELANCER') or hasRole('CLIENT') or hasRole('ADMIN')")
    public ResponseEntity<User> setPrimarySkill(
        @PathVariable Long userId,
        @PathVariable Long skillId) {
@@ -171,6 +194,7 @@ public class UserController {
         }
         
         @GetMapping("/{id}/profile")
+        @PreAuthorize("hasRole('FREELANCER') or hasRole('CLIENT') or hasRole('ADMIN')")
         public ResponseEntity<UserProfileDTO> getUserProfile(@PathVariable Long id) {
             try {
                 return ResponseEntity.ok(userService.getUserProfile(id));
@@ -179,6 +203,7 @@ public class UserController {
             }
         }
         @GetMapping("/preferences/language")
+        @PreAuthorize("hasRole('FREELANCER') or hasRole('CLIENT') or hasRole('ADMIN')")
         public ResponseEntity<List<User>> getUsersByLanguageAndMinimumCompletedContracts(
                 @RequestParam String lang,
                 @RequestParam(defaultValue = "0") Long minContracts) {
