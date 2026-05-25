@@ -13,7 +13,6 @@ import com.team01.freelance.user.model.UserRole;
 import com.team01.freelance.user.model.UserStatus;
 import com.team01.freelance.user.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
-import org.springframework.security.test.context.support.WithMockUser;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -32,7 +31,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * [S3-F1] Integration tests for {@code GET /api/proposals/search}.
  */
-@WithMockUser(roles = "ADMIN")
 class ProposalSearchIntegrationTest extends AbstractIntegrationTest {
 
     private MockMvc mockMvc;

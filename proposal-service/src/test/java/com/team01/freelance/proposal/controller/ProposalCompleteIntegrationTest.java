@@ -8,7 +8,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.time.LocalDateTime;
 
 import org.junit.jupiter.api.BeforeEach;
-import org.springframework.security.test.context.support.WithMockUser;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.servlet.MockMvc;
@@ -36,7 +35,6 @@ import com.team01.freelance.wallet.repository.PayoutRepository;
 /**
  * [S3-F4] Integration tests for {@code PUT /api/proposals/{id}/complete}.
  */
-@WithMockUser(roles = "ADMIN")
 class ProposalCompleteIntegrationTest extends AbstractIntegrationTest {
 
     private MockMvc mockMvc;

@@ -2,7 +2,6 @@ package com.team01.freelance.proposal.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.BeforeEach;
-import org.springframework.security.test.context.support.WithMockUser;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.servlet.MockMvc;
@@ -30,7 +29,6 @@ import com.team01.freelance.user.repository.UserRepository;
 /**
  * [S3-F2] Integration tests for {@code PUT /api/proposals/{proposalId}/accept}.
  */
-@WithMockUser(roles = "ADMIN")
 class ProposalAcceptIntegrationTest extends AbstractIntegrationTest {
 
     private MockMvc mockMvc;

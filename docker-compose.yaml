@@ -32,13 +32,13 @@ services:
     # ── MongoDB ──────────────────────────────────────────────────
   mongo:
     image: mongo:latest
-    container_name: lab05-mongo
+    container_name: freelance-mongo
     ports:
       - "27017:27017"
     environment:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: rootpass
-      MONGO_INITDB_DATABASE: lab05mongo
+      MONGO_INITDB_DATABASE: freelancedb
     volumes:
       - mongo-data:/data/db
     healthcheck:
@@ -50,7 +50,7 @@ services:
   # ── Mongo Express (GUI for MongoDB) ──────────────────────────
   mongo-express:
     image: mongo-express:latest
-    container_name: lab05-mongo-express
+    container_name: freelance-mongo-express
     ports:
       - "8081:8081"
     environment:
@@ -65,7 +65,7 @@ services:
   # ── Redis ────────────────────────────────────────────────────
   redis:
     image: redis:latest
-    container_name: lab05-redis
+    container_name: freelance-redis
     ports:
       - "6379:6379"
     command: redis-server --requirepass redispass --maxmemory 256mb --maxmemory-policy allkeys-lru
@@ -78,7 +78,7 @@ services:
   # ── Redis Insight (GUI for Redis) ──────────────────────────
   redisinsight:
     image: redis/redisinsight:latest
-    container_name: lab05-redisinsight
+    container_name: freelance-redisinsight
     ports:
       - "5540:5540"
     depends_on:
@@ -87,13 +87,13 @@ services:
   # ── Cassandra ────────────────────────────────────────────────
   cassandra:
     image: cassandra:latest
-    container_name: lab05-cassandra
+    container_name: freelance-cassandra
     ports:
       - "9042:9042"
     environment:
-      CASSANDRA_CLUSTER_NAME: lab05cluster
+      CASSANDRA_CLUSTER_NAME: freelancecluster
       CASSANDRA_DC: datacenter1
-      CASSANDRA_KEYSPACE: lab05ks
+      CASSANDRA_KEYSPACE: freelancedb
     volumes:
       - cassandra-data:/var/lib/cassandra
     command: >
@@ -113,7 +113,7 @@ services:
   # ── Neo4j ────────────────────────────────────────────────────
   neo4j:
     image: neo4j:latest
-    container_name: lab05-neo4j
+    container_name: freelance-neo4j
     ports:
       - "7474:7474"   # Browser UI
       - "7687:7687"   # Bolt protocol
@@ -131,7 +131,7 @@ services:
   # ── Elasticsearch ────────────────────────────────────────────
   elasticsearch:
     image: elasticsearch:8.19.12
-    container_name: lab05-elasticsearch
+    container_name: freelance-elasticsearch
     ports:
       - "9200:9200"
     environment:
@@ -150,7 +150,7 @@ services:
   # ── Kibana (GUI for Elasticsearch) ───────────────────────────
   kibana:
     image: kibana:8.19.12
-    container_name: lab05-kibana
+    container_name: freelance-kibana
     ports:
       - "5601:5601"
     environment:
