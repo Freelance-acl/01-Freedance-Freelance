@@ -6,7 +6,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import org.junit.jupiter.api.BeforeEach;
-import org.springframework.security.test.context.support.WithMockUser;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -29,7 +28,6 @@ import com.team01.freelance.user.repository.UserRepository;
 /**
  * [S3-F3] Integration tests for {@code POST /api/proposals/estimate}.
  */
-@WithMockUser(roles = "ADMIN")
 class ProposalFeeEstimateIntegrationTest extends AbstractIntegrationTest {
 
     private MockMvc mockMvc;

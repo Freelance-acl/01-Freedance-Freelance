@@ -125,11 +125,11 @@ prefer_java25_for_maven
 
 run_mvn_test() {
   if [ -x "$ROOT/mvnw" ]; then
-    "$ROOT/mvnw" -q test
+    "$ROOT/mvnw" -q test-compile test
   elif [ -f "$ROOT/mvnw" ]; then
-    sh "$ROOT/mvnw" -q test
+    sh "$ROOT/mvnw" -q test-compile test
   elif command -v mvn >/dev/null 2>&1; then
-    mvn -q test
+    mvn -q test-compile test
   else
     echo "pre-push: neither ./mvnw nor mvn found; cannot run tests." >&2
     return 1

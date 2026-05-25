@@ -17,4 +17,15 @@ public final class TestAuthHelper {
     public static String bearer(String token) {
         return "Bearer " + token;
     }
+
+    public static String clientToken(JwtService jwtService, UserRepository userRepository) {
+        User client = UserTestFixtures.saveUser(
+                userRepository,
+                "CC1 Client",
+                "cc1-client-" + System.nanoTime() + "@test.dev",
+                "+1555" + (System.nanoTime() % 10_000_000L),
+                com.team01.freelance.user.model.UserRole.CLIENT,
+                UserTestFixtures.SEED_PASSWORD);
+        return jwtService.generateToken(client);
+    }
 }
