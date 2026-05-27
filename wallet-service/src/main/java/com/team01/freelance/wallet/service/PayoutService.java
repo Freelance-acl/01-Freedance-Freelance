@@ -17,6 +17,9 @@ import com.team01.freelance.wallet.repository.PayoutPromoRepository;
 import com.team01.freelance.wallet.repository.PromoCodeRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -56,10 +59,12 @@ public class PayoutService {
         return payoutRepository.findAll();
     }
 
+    @Cacheable(value = "payout", key = "#id")
     public Optional<Payout> getPayoutById(Long id) {
         return payoutRepository.findById(id);
     }
 
+    @Cacheable(value = "S5-F1", key = "#status + ':' + #startDate + ':' + #endDate")
     public List<Payout> searchPayouts(PayoutStatus status, LocalDate startDate, LocalDate endDate) {
         if (startDate != null && endDate != null && startDate.isAfter(endDate)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "startDate cannot be after endDate");
@@ -100,6 +105,7 @@ public class PayoutService {
      * @return The updated payout
      * @throws EntityNotFoundException if the payout is not found
      */
+    @CacheEvict(value = "payout", allEntries = true)
     public Payout updatePayout(Long id, Payout payoutDetails) {
         return payoutRepository.findById(id).map(existingPayout -> {
                 if (payoutDetails.getAmount() != null) existingPayout.setAmount(payoutDetails.getAmount());
@@ -111,6 +117,7 @@ public class PayoutService {
         }).orElseThrow(() -> new EntityNotFoundException("Payout not found with id: " + id));
     }
 
+    @CacheEvict(value = "payout", allEntries = true)
     public boolean deletePayoutById(Long id) {
         if (!payoutRepository.existsById(id)) {
             return false;
@@ -119,10 +126,16 @@ public class PayoutService {
         return true;
     }
 
+    @CacheEvict(value = "payout", allEntries = true)
     public void deleteAllPayouts() {
         payoutRepository.deleteAll();
     }
 
+    @Caching(evict = {
+            @CacheEvict(value = "payout", key = "#id"),
+            @CacheEvict(value = "S5-F10", allEntries = true),
+            @CacheEvict(value = "S5-F11", allEntries = true)
+    })
     @Transactional
     public Payout retryPayout(Long id) {
 
@@ -160,6 +173,7 @@ public class PayoutService {
         return payoutRepository.save(payout);
     }
 
+    @Cacheable(value = "S5-F8", key = "#payoutId")
     public PayoutDetailsDTO getPayoutDetails(Long payoutId) {
 
         Payout payout = payoutRepository.findByIdWithPromos(payoutId)
@@ -207,6 +221,7 @@ public class PayoutService {
         return dto;
     }
 
+    @Cacheable(value = "S5-F9", key = "#limit")
     public List<PromoCodeUsageDTO> getTopUsedPromoCodes(int limit) {
 
         List<Object[]> rows = payoutRepository.findTopUsedPromoCodes(limit);
@@ -245,6 +260,7 @@ public class PayoutService {
      * @return summary with totalPayouts, totalAmount and per-method breakdown
      * @throws ResponseStatusException 404 if the user does not exist
      */
+    @Cacheable(value = "S5-F3", key = "#freelancerId")
     public FreelancerPayoutSummaryDTO getFreelancerPayoutSummary(Long freelancerId) {
         if (!userRepository.existsById(freelancerId)) {
             throw new ResponseStatusException(
@@ -286,6 +302,11 @@ public class PayoutService {
      * @return the updated payout
      * @throws ResponseStatusException 404 if not found, 400 if not COMPLETED
      */
+    @Caching(evict = {
+            @CacheEvict(value = "payout", key = "#id"),
+            @CacheEvict(value = "S5-F10", allEntries = true),
+            @CacheEvict(value = "S5-F11", allEntries = true)
+    })
     @Transactional
     public Payout refundPayout(Long id, String reason) {
         Payout payout = payoutRepository.findById(id)
@@ -321,6 +342,11 @@ public class PayoutService {
      * @throws IllegalStateException if the contract is not COMPLETED
      * @throws IllegalArgumentException if the payout method is not provided
      */
+    @Caching(evict = {
+            @CacheEvict(value = "payout", key = "#contractId"),
+            @CacheEvict(value = "S5-F10", allEntries = true),
+            @CacheEvict(value = "S5-F11", allEntries = true)
+    })
     @Transactional
     public Payout processContractPayout(Long contractId, ProcessPayoutRequest request) {
         if (payoutRepository.countContractById(contractId) == 0) {
@@ -363,6 +389,12 @@ public class PayoutService {
     }
 
     // S5-F5
+    @Caching(evict = {
+            @CacheEvict(value = "payout", key = "#payoutId"),
+            @CacheEvict(value = "S5-F5", allEntries = true),
+            @CacheEvict(value = "S5-F10", allEntries = true),
+            @CacheEvict(value = "S5-F11", allEntries = true)
+    })
     @Transactional
     public Payout applyPromoCode(Long payoutId, Long promoCodeId) {
         Payout payout = payoutRepository.findById(payoutId)
@@ -413,6 +445,7 @@ public class PayoutService {
     }
 
     // S5-F6
+    @Cacheable(value = "S5-F6", key = "#startDate + ':' + #endDate")
     public RevenueReportDTO getRevenueReport(LocalDate startDate, LocalDate endDate) {
         if (startDate.isAfter(endDate)) {
             throw new IllegalStateException("startDate cannot be after endDate");
