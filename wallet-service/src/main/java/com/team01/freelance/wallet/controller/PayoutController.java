@@ -1,5 +1,6 @@
 package com.team01.freelance.wallet.controller;
 
+import com.team01.freelance.wallet.dto.CategoryRevenueDTO;
 import com.team01.freelance.wallet.dto.PayoutDetailsDTO;
 import com.team01.freelance.wallet.dto.PromoCodeUsageDTO;
 import com.team01.freelance.wallet.dto.FreelancerPayoutSummaryDTO;
@@ -171,5 +172,12 @@ public class PayoutController {
     @PutMapping("/{id}/retry")
     public ResponseEntity<Payout> retryPayout(@PathVariable Long id) {
         return ResponseEntity.ok(payoutService.retryPayout(id));
+    }
+
+    @GetMapping("/analytics/category")
+    public ResponseEntity<List<CategoryRevenueDTO>> getCategoryRevenue(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        return ResponseEntity.ok(payoutService.getCategoryRevenue(startDate, endDate));
     }
 }
