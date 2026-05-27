@@ -105,7 +105,13 @@ public class PayoutService {
      * @return The updated payout
      * @throws EntityNotFoundException if the payout is not found
      */
-    @CacheEvict(value = "payout", allEntries = true)
+    @Caching(evict = {
+            @CacheEvict(value = "payout", allEntries = true),
+            @CacheEvict(value = "S5-F1", allEntries = true),
+            @CacheEvict(value = "S5-F3", allEntries = true),
+            @CacheEvict(value = "S5-F6", allEntries = true),
+            @CacheEvict(value = "S5-F8", allEntries = true)
+    })
     public Payout updatePayout(Long id, Payout payoutDetails) {
         return payoutRepository.findById(id).map(existingPayout -> {
                 if (payoutDetails.getAmount() != null) existingPayout.setAmount(payoutDetails.getAmount());
@@ -343,7 +349,7 @@ public class PayoutService {
      * @throws IllegalArgumentException if the payout method is not provided
      */
     @Caching(evict = {
-            @CacheEvict(value = "payout", key = "#contractId"),
+            @CacheEvict(value = "payout", allEntries = true),
             @CacheEvict(value = "S5-F10", allEntries = true),
             @CacheEvict(value = "S5-F11", allEntries = true)
     })
@@ -392,8 +398,11 @@ public class PayoutService {
     @Caching(evict = {
             @CacheEvict(value = "payout", key = "#payoutId"),
             @CacheEvict(value = "S5-F5", allEntries = true),
+            @CacheEvict(value = "S5-F8", key = "#payoutId"),
+            @CacheEvict(value = "S5-F9", allEntries = true),
             @CacheEvict(value = "S5-F10", allEntries = true),
-            @CacheEvict(value = "S5-F11", allEntries = true)
+            @CacheEvict(value = "S5-F11", allEntries = true),
+            @CacheEvict(value = "promo-code", key = "#promoCodeId")
     })
     @Transactional
     public Payout applyPromoCode(Long payoutId, Long promoCodeId) {
@@ -464,13 +473,13 @@ public class PayoutService {
         Double refundedAmount = payoutRepository.sumRefundedAmountBetween(start, end);
         Long refundCount = payoutRepository.countRefundedBetween(start, end);
 
-        return new RevenueReportDTO(
-                totalRevenue == null ? 0.0 : totalRevenue,
-                totalTransactions == null ? 0L : totalTransactions,
-                averagePayout,
-                refundedAmount == null ? 0.0 : refundedAmount,
-                refundCount == null ? 0L : refundCount
-        );
+        return RevenueReportDTO.builder()
+                .totalRevenue(totalRevenue == null ? 0.0 : totalRevenue)
+                .totalTransactions(totalTransactions == null ? 0L : totalTransactions)
+                .averagePayout(averagePayout)
+                .refundedAmount(refundedAmount == null ? 0.0 : refundedAmount)
+                .refundCount(refundCount == null ? 0L : refundCount)
+                .build();
     }
 
 }
