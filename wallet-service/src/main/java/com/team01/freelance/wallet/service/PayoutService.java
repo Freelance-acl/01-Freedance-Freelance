@@ -10,7 +10,13 @@ import com.team01.freelance.wallet.dto.RevenueReportDTO;
 import com.team01.freelance.wallet.model.Payout;
 import com.team01.freelance.wallet.model.PayoutPromo;
 import com.team01.freelance.wallet.model.PayoutStatus;
+import com.team01.freelance.wallet.dto.MilestoneReversalRequest;
 import com.team01.freelance.wallet.dto.ProcessPayoutRequest;
+import com.team01.freelance.common.observer.EventSubject;
+import com.team01.freelance.wallet.strategy.NoReversalStrategy;
+import com.team01.freelance.wallet.strategy.RefundResult;
+import com.team01.freelance.wallet.strategy.RefundStrategy;
+import com.team01.freelance.wallet.strategy.RefundStrategySelector;
 import com.team01.freelance.wallet.model.PromoCode;
 import com.team01.freelance.wallet.repository.PayoutRepository;
 import com.team01.freelance.wallet.repository.PayoutPromoRepository;
@@ -51,6 +57,12 @@ public class PayoutService {
 
     @Autowired
     private PromoCodeRepository promoCodeRepository;
+
+    @Autowired
+    private RefundStrategySelector refundStrategySelector;
+
+    @Autowired
+    private EventSubject payoutEventSubject;
 
     public List<Payout> getAllPayouts() {
         return payoutRepository.findAll();
@@ -310,6 +322,93 @@ public class PayoutService {
 
         return payoutRepository.save(payout);
     }
+
+    /**
+     * [S5-F12] Reverse a milestone-based payout using DP-1 strategy selection.
+     */
+    @Transactional
+    public Payout reverseMilestone(Long id, MilestoneReversalRequest request) {
+        Payout payout = payoutRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Payout not found with id: " + id));
+
+        if (payout.getStatus() != PayoutStatus.COMPLETED) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Only COMPLETED payouts can be reversed (current status: "
+                            + payout.getStatus() + ")");
+        }
+
+        RefundStrategy strategy = refundStrategySelector.select(payout, request);
+
+        if (strategy instanceof NoReversalStrategy) {
+            Map<String, Object> deniedAudit = buildAuditPayload(
+                    id, payout, request, "REFUND_DENIED", 0.0);
+            Map<String, Object> deniedDetails = castDetails(deniedAudit);
+            deniedDetails.put("strategy", "NoReversalStrategy");
+            deniedDetails.put("denialReason", "reversal window expired");
+            payoutEventSubject.notifyObservers("PAYOUT_AUDIT", deniedAudit);
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "reversal window expired");
+        }
+
+        RefundResult result = strategy.calculateRefund(payout, request);
+        double refundAmount = result.amount();
+        String reversalScope = request != null ? request.getReversalScope() : null;
+        String refundReason = request != null ? request.getReason() : null;
+        String refundedAt = LocalDateTime.now().toString();
+
+        payout.setStatus(PayoutStatus.REFUNDED);
+        Map<String, Object> txDetails = payout.getTransactionDetails() != null
+                ? new HashMap<>(payout.getTransactionDetails())
+                : new HashMap<>();
+        txDetails.put("refundAmount", refundAmount);
+        txDetails.put("reversalScope", reversalScope);
+        txDetails.put("refundReason", refundReason);
+        txDetails.put("refundedAt", refundedAt);
+        payout.setTransactionDetails(txDetails);
+
+        Payout saved = payoutRepository.save(payout);
+
+        Map<String, Object> refundedAudit = buildAuditPayload(
+                id, payout, request, "REFUNDED", refundAmount);
+        Map<String, Object> refundedDetails = castDetails(refundedAudit);
+        refundedDetails.put("strategy", result.strategyName());
+        refundedDetails.put("reason", refundReason);
+        refundedDetails.put("originalAmount", payout.getAmount());
+        refundedDetails.put("reversalAmount", refundAmount);
+        refundedDetails.put("reversalScope", reversalScope);
+        payoutEventSubject.notifyObservers("PAYOUT_AUDIT", refundedAudit);
+
+        return saved;
+    }
+
+    private static Map<String, Object> buildAuditPayload(
+            Long payoutId,
+            Payout payout,
+            MilestoneReversalRequest request,
+            String action,
+            double amount) {
+        Map<String, Object> auditParams = new HashMap<>();
+        auditParams.put("payoutId", payoutId);
+        auditParams.put("method", payout.getMethod());
+        auditParams.put("action", action);
+        auditParams.put("amount", amount);
+        Map<String, Object> details = new HashMap<>();
+        if (request != null && request.getReason() != null) {
+            details.put("reason", request.getReason());
+        }
+        if (request != null && request.getReversalScope() != null) {
+            details.put("reversalScope", request.getReversalScope());
+        }
+        auditParams.put("details", details);
+        return auditParams;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> castDetails(Map<String, Object> auditParams) {
+        return (Map<String, Object>) auditParams.get("details");
+    }
+
     // [S5-F4] Process a payout for a COMPLETED contract.
     /**
      * [S5-F4] Process a payout for a COMPLETED contract.
