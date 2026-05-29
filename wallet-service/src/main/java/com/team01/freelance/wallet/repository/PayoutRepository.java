@@ -168,5 +168,14 @@ public interface PayoutRepository extends JpaRepository<Payout, Long> {
             @Param("amount") Double amount,
             @Param("createdAt") LocalDateTime createdAt);
 
+    @Query(value = """
+            SELECT COALESCE(SUM(pm.amount), 0)
+            FROM contracts c
+            JOIN proposal_milestones pm ON pm.proposal_id = c.proposal_id
+            WHERE c.id = :contractId
+              AND pm.status NOT IN ('COMPLETED', 'APPROVED')
+            """, nativeQuery = true)
+    Double sumIncompleteMilestoneAmounts(@Param("contractId") Long contractId);
+
 }
 

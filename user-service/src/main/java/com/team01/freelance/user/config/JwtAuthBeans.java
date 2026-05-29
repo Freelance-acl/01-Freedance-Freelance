@@ -1,6 +1,7 @@
 package com.team01.freelance.user.config;
 
 import com.team01.freelance.user.security.JwtAuthFilter;
+import com.team01.freelance.user.security.chain.AuthHandlerChainFactory;
 import com.team01.freelance.user.service.CustomUserDetailsService;
 import com.team01.freelance.user.service.JwtService;
 import org.springframework.context.annotation.Bean;
@@ -18,9 +19,11 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
         includeFilters = @ComponentScan.Filter(
                 type = FilterType.ASSIGNABLE_TYPE,
                 classes = {
+                        JwtConfigurationBootstrap.class,
                         JwtConfig.class,
                         JwtService.class,
                         JwtAuthFilter.class,
+                        AuthHandlerChainFactory.class,
                         CustomUserDetailsService.class
                 }),
         useDefaultFilters = false)

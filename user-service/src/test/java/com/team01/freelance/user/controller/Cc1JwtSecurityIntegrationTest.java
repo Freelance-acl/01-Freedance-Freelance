@@ -98,7 +98,7 @@ class Cc1JwtSecurityIntegrationTest extends AbstractIntegrationTest {
                                           "phone": "+15551234099"
                                         }
                                         """.formatted(email, UserTestFixtures.SEED_PASSWORD)))
-                        .andExpect(status().isOk());
+                        .andExpect(status().isCreated());
             } else if (Cc1PublicEndpoints.LOGIN.equals(endpoint.path()) && HttpMethod.POST.equals(endpoint.method())) {
                 UserTestFixtures.seedAdmin(userRepository);
                 mockMvc.perform(post(endpoint.path())

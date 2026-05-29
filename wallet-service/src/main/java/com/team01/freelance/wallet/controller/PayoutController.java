@@ -4,6 +4,7 @@ import com.team01.freelance.wallet.dto.CategoryRevenueDTO;
 import com.team01.freelance.wallet.dto.PayoutDetailsDTO;
 import com.team01.freelance.wallet.dto.PromoCodeUsageDTO;
 import com.team01.freelance.wallet.dto.FreelancerPayoutSummaryDTO;
+import com.team01.freelance.wallet.dto.MilestoneReversalRequest;
 import com.team01.freelance.wallet.dto.RefundRequest;
 import com.team01.freelance.wallet.dto.RevenueReportDTO;
 import com.team01.freelance.wallet.model.Payout;
@@ -115,6 +116,16 @@ public class PayoutController {
             @RequestBody RefundRequest request) {
         return ResponseEntity.ok(
                 payoutService.refundPayout(id, request.getReason()));
+    }
+
+    /**
+     * [S5-F12] Milestone-based payout reversal (DP-1 Strategy + Mongo audit trail).
+     */
+    @PostMapping("/{id}/reverse-milestone")
+    public ResponseEntity<Payout> reverseMilestone(
+            @PathVariable Long id,
+            @RequestBody MilestoneReversalRequest request) {
+        return ResponseEntity.ok(payoutService.reverseMilestone(id, request));
     }
 
     @PostMapping("/contract/{contractId}")

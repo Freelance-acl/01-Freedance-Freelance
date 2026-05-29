@@ -111,7 +111,7 @@ class UserRoleIntegrationTest extends AbstractIntegrationTest {
     void register_withoutRole_defaultsToClientInDatabase() throws Exception {
         String email = uniqueEmail("no-role");
 
-        register(email, registerBodyWithoutRole(email), status().isOk());
+        register(email, registerBodyWithoutRole(email), status().isCreated());
 
         assertEquals("CLIENT", roleForEmail(email));
     }
@@ -121,7 +121,7 @@ class UserRoleIntegrationTest extends AbstractIntegrationTest {
     void register_withoutRole_jwtRoleClaimIsClient() throws Exception {
         String email = uniqueEmail("jwt-client");
 
-        String response = register(email, registerBodyWithoutRole(email), status().isOk());
+        String response = register(email, registerBodyWithoutRole(email), status().isCreated());
         String token = JsonPath.read(response, "$.token");
 
         assertEquals("CLIENT", JwtTestSupport.extractRoleClaim(token, jwtConfig));
@@ -131,7 +131,7 @@ class UserRoleIntegrationTest extends AbstractIntegrationTest {
     void register_jwtContainsSubUidRoleClaims() throws Exception {
         String email = uniqueEmail("jwt-claims");
 
-        String response = register(email, registerBodyWithoutRole(email), status().isOk());
+        String response = register(email, registerBodyWithoutRole(email), status().isCreated());
         String token = JsonPath.read(response, "$.token");
 
         assertEquals(email, JwtTestSupport.extractSubjectClaim(token, jwtConfig));
@@ -147,7 +147,7 @@ class UserRoleIntegrationTest extends AbstractIntegrationTest {
     void register_withFreelancerRole_persistsFreelancer() throws Exception {
         String email = uniqueEmail("freelancer");
 
-        register(email, registerBodyWithRole(email, "FREELANCER"), status().isOk());
+        register(email, registerBodyWithRole(email, "FREELANCER"), status().isCreated());
 
         assertEquals("FREELANCER", roleForEmail(email));
     }
@@ -176,7 +176,7 @@ class UserRoleIntegrationTest extends AbstractIntegrationTest {
     void register_withAdminRole_ignoredAndCreatesClient() throws Exception {
         String email = uniqueEmail("bad-admin");
 
-        register(email, registerBodyWithRole(email, "ADMIN"), status().isOk());
+        register(email, registerBodyWithRole(email, "ADMIN"), status().isCreated());
 
         assertEquals("CLIENT", roleForEmail(email));
     }

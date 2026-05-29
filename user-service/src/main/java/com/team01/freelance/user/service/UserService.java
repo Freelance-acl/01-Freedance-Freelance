@@ -1,5 +1,6 @@
 package com.team01.freelance.user.service;
 
+import com.team01.freelance.common.observer.EventSubject;
 import com.team01.freelance.user.dto.TopFreelancerDTO;
 import com.team01.freelance.user.model.User;
 import com.team01.freelance.user.model.UserStatus;
@@ -37,6 +38,9 @@ public class UserService {
 
     @Autowired
     private DataSource dataSource;
+
+    @Autowired
+    private EventSubject authEventSubject;
 
     public List<User> getAllUsers() {
         return userRepository.findAll();
@@ -129,8 +133,18 @@ public class UserService {
         }
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("User not found with id: " + id));
+        UserRole oldRole = user.getRole();
         user.setRole(role);
-        return userRepository.save(user);
+        User saved = userRepository.save(user);
+
+        authEventSubject.notifyObservers("ROLE_CHANGED", Map.of(
+                "userId", saved.getId(),
+                "action", "ROLE_CHANGED",
+                "details", Map.of(
+                        "oldRole", oldRole.name(),
+                        "newRole", saved.getRole().name())));
+
+        return saved;
     }
 
     public boolean deleteUserById(Long id) {

@@ -54,8 +54,33 @@ class M2AuthIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(post("/api/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(registerBody(uniqueEmail())))
-                .andExpect(status().isOk())
+                .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.token").isNotEmpty());
+    }
+
+    @Test
+    void register_withInvalidBearerToken_stillSucceeds() throws Exception {
+        mockMvc.perform(post("/api/auth/register")
+                        .header("Authorization", "Bearer invalid-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(registerBody(uniqueEmail())))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.token").isNotEmpty());
+    }
+
+    @Test
+    void register_duplicateEmail_returns409() throws Exception {
+        String email = uniqueEmail();
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(registerBody(email)))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(registerBody(email)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("Email already exists"));
     }
 
     // (b) POST /api/auth/login — public
@@ -65,7 +90,7 @@ class M2AuthIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(post("/api/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(registerBody(email)))
-                .andExpect(status().isOk());
+                .andExpect(status().isCreated());
 
         mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
