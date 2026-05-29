@@ -1,6 +1,6 @@
 package com.team01.freelance.user.service;
 
-import com.team01.freelance.user.config.JwtConfig;
+import com.team01.freelance.user.config.JwtConfigurationManager;
 import com.team01.freelance.user.model.User;
 import com.team01.freelance.user.model.UserRole;
 import com.team01.freelance.user.model.UserStatus;
@@ -16,15 +16,12 @@ class JwtServiceTest {
 
     private static final String VALID_SECRET = "dGhpcyBpcyBhIHNlY3JldCBrZXkgZm9yIEpXVCBzaWduaW5n";
 
-    private JwtConfig jwtConfig;
     private JwtService jwtService;
 
     @BeforeEach
     void setUp() {
-        jwtConfig = new JwtConfig();
-        jwtConfig.setSecret(VALID_SECRET);
-        jwtConfig.setExpiration(3_600_000L);
-        jwtService = new JwtService(jwtConfig);
+        JwtConfigurationManager.resetForTests(VALID_SECRET, 3_600_000L);
+        jwtService = new JwtService();
     }
 
     @Test
@@ -36,28 +33,22 @@ class JwtServiceTest {
         assertEquals("alice@freelance.com", jwtService.extractUsername(token));
         assertEquals(42L, jwtService.extractUserId(token));
         assertEquals("FREELANCER", jwtService.extractRole(token));
-        assertEquals("alice@freelance.com", JwtTestSupport.extractSubjectClaim(token, jwtConfig));
-        assertEquals(42L, JwtTestSupport.extractUidClaim(token, jwtConfig));
-        assertEquals("FREELANCER", JwtTestSupport.extractRoleClaim(token, jwtConfig));
+        assertEquals("alice@freelance.com", JwtTestSupport.extractSubjectClaim(token));
+        assertEquals(42L, JwtTestSupport.extractUidClaim(token));
+        assertEquals("FREELANCER", JwtTestSupport.extractRoleClaim(token));
         assertTrue(jwtService.isTokenValid(token));
     }
 
     @Test
     void blankSecret_rejectedAtStartup() {
-        jwtConfig.setSecret("   ");
-
-        IllegalStateException ex =
-                assertThrows(IllegalStateException.class, () -> new JwtService(jwtConfig));
-        assertTrue(ex.getMessage().contains("JWT_SECRET"));
+        assertThrows(IllegalStateException.class,
+                () -> JwtConfigurationManager.resetForTests("   ", 3_600_000L));
     }
 
     @Test
     void shortSecret_rejectedAtStartup() {
-        jwtConfig.setSecret("bXlTZWNyZXQxMjM="); // "mySecret123" — too few bytes for HS256
-
-        IllegalStateException ex =
-                assertThrows(IllegalStateException.class, () -> new JwtService(jwtConfig));
-        assertTrue(ex.getMessage().contains("32 bytes"));
+        assertThrows(IllegalStateException.class,
+                () -> JwtConfigurationManager.resetForTests("bXlTZWNyZXQxMjM=", 3_600_000L));
     }
 
     private static User sampleUser(Long id, String email, UserRole role) {

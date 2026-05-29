@@ -1,5 +1,6 @@
 package com.team01.freelance.user.service;
 
+import com.team01.freelance.common.observer.EventSubject;
 import com.team01.freelance.user.dto.AuthResponse;
 import com.team01.freelance.user.dto.LoginRequest;
 import com.team01.freelance.user.dto.RegisterRequest;
@@ -14,6 +15,8 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.Map;
+
 @Service
 public class AuthService {
 
@@ -22,11 +25,17 @@ public class AuthService {
     private final UserRepository userRepository;
     private final BCryptPasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final EventSubject authEventSubject;
 
-    public AuthService(UserRepository userRepository, BCryptPasswordEncoder passwordEncoder, JwtService jwtService) {
+    public AuthService(
+            UserRepository userRepository,
+            BCryptPasswordEncoder passwordEncoder,
+            JwtService jwtService,
+            EventSubject authEventSubject) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
+        this.authEventSubject = authEventSubject;
     }
 
     public AuthResponse register(RegisterRequest request) {
@@ -46,23 +55,34 @@ public class AuthService {
         }
         user.setPhone(request.phone());
         user = userRepository.save(user);
+
+        authEventSubject.notifyObservers("REGISTERED", Map.of(
+                "userId", user.getId(),
+                "action", "REGISTERED",
+                "details", Map.of("email", user.getEmail())));
+
         String token = jwtService.generateToken(user);
-        return new AuthResponse(token, 3600000);
+        return new AuthResponse(token, jwtServiceExpirationMs());
     }
 
     public AuthResponse login(LoginRequest request) {
         User user = userRepository.findByEmail(request.email())
-                .orElseThrow(() -> {
-                    // log.warn("Login failed: user not found - {}", request.email());
-                    return new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials");
-                });
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials"));
 
         if (!passwordEncoder.matches(request.password(), user.getPassword())) {
-            // log.warn("Login failed: invalid password for user - {}", request.email());
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials");
         }
 
+        authEventSubject.notifyObservers("LOGGED_IN", Map.of(
+                "userId", user.getId(),
+                "action", "LOGGED_IN",
+                "details", Map.of()));
+
         String token = jwtService.generateToken(user);
-        return new AuthResponse(token, 3600000);
+        return new AuthResponse(token, jwtServiceExpirationMs());
+    }
+
+    private static long jwtServiceExpirationMs() {
+        return com.team01.freelance.user.config.JwtConfigurationManager.getInstance().getExpiration();
     }
 }
