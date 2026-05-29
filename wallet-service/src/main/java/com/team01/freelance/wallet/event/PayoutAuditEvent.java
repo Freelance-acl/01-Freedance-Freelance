@@ -85,3 +85,4 @@ public class PayoutAuditEvent implements MongoEvent {
         this.details = details != null ? new HashMap<>(details) : new HashMap<>();
     }
 }
+

@@ -14,3 +14,4 @@ public interface MongoEvent {
 
     Map<String, Object> getDetails();
 }
+

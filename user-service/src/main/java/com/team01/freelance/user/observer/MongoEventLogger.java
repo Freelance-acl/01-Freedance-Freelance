@@ -69,3 +69,4 @@ public class MongoEventLogger implements EntityObserver {
         throw new IllegalArgumentException("Auth event payload must be a Map");
     }
 }
+

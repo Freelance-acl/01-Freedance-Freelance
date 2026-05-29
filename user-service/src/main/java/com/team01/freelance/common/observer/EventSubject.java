@@ -30,3 +30,4 @@ public class EventSubject {
         return List.copyOf(observers);
     }
 }
+

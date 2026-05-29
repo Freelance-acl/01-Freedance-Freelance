@@ -8,3 +8,4 @@ public interface RefundStrategy {
 
     RefundResult calculateRefund(Payout payout, MilestoneReversalRequest request);
 }
+

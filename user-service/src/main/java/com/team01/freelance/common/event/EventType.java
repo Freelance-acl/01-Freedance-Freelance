@@ -7,3 +7,4 @@ public enum EventType {
     CONTRACT,
     PAYOUT_AUDIT
 }
+

@@ -74,3 +74,4 @@ public class MongoEventLogger implements EntityObserver {
         throw new IllegalArgumentException("Payout audit payload must be a Map");
     }
 }
+
