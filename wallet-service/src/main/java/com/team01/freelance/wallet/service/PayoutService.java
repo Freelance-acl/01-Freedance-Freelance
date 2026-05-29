@@ -328,6 +328,7 @@ public class PayoutService {
      */
     @Transactional
     public Payout reverseMilestone(Long id, MilestoneReversalRequest request) {
+        System.out.println("Reverse Milestone Payout");
         Payout payout = payoutRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "Payout not found with id: " + id));
