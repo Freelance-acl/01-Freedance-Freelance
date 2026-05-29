@@ -124,6 +124,7 @@ public class PayoutService {
             @CacheEvict(value = "S5-F6", allEntries = true),
             @CacheEvict(value = "S5-F8", allEntries = true)
     })
+    @CacheEvict(value = "payout", allEntries = true)
     public Payout updatePayout(Long id, Payout payoutDetails) {
         return payoutRepository.findById(id).map(existingPayout -> {
                 if (payoutDetails.getAmount() != null) existingPayout.setAmount(payoutDetails.getAmount());
