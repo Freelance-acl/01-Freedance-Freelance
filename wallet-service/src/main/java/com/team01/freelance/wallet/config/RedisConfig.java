@@ -62,6 +62,7 @@ public class RedisConfig {
         cacheConfigs.put("S5-F6", tenMin);
         cacheConfigs.put("S5-F8", fifteenMin);
         cacheConfigs.put("S5-F9", tenMin);
+        cacheConfigs.put("S5-F10", tenMin);
         cacheConfigs.put("payout", fifteenMin);
         cacheConfigs.put("promo-code", fifteenMin);
         cacheConfigs.put("payout-promo", fifteenMin);

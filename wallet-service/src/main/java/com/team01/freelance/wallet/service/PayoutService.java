@@ -127,7 +127,8 @@ public class PayoutService {
             @CacheEvict(value = "S5-F1", allEntries = true),
             @CacheEvict(value = "S5-F3", allEntries = true),
             @CacheEvict(value = "S5-F6", allEntries = true),
-            @CacheEvict(value = "S5-F8", allEntries = true)
+            @CacheEvict(value = "S5-F8", allEntries = true),
+            @CacheEvict(value = "S5-F10", allEntries = true)
     })
     public Payout updatePayout(Long id, Payout payoutDetails) {
         return payoutRepository.findById(id).map(existingPayout -> {
@@ -140,7 +141,10 @@ public class PayoutService {
         }).orElseThrow(() -> new EntityNotFoundException("Payout not found with id: " + id));
     }
 
-    @CacheEvict(value = "payout", allEntries = true)
+    @Caching(evict = {
+            @CacheEvict(value = "payout", allEntries = true),
+            @CacheEvict(value = "S5-F10", allEntries = true)
+    })
     public boolean deletePayoutById(Long id) {
         if (!payoutRepository.existsById(id)) {
             return false;
@@ -149,7 +153,10 @@ public class PayoutService {
         return true;
     }
 
-    @CacheEvict(value = "payout", allEntries = true)
+    @Caching(evict = {
+            @CacheEvict(value = "payout", allEntries = true),
+            @CacheEvict(value = "S5-F10", allEntries = true)
+    })
     public void deleteAllPayouts() {
         payoutRepository.deleteAll();
     }

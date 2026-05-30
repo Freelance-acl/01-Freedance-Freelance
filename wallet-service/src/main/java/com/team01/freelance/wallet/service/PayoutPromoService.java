@@ -29,7 +29,7 @@ public class PayoutPromoService {
         return payoutPromoRepository.findAll();
     }
 
-    @Cacheable(value = "payout-promo", key = "#id")
+    @Cacheable(value = "payout-promo", key = "#id", unless = "#result == null or !#result.isPresent()")
     public Optional<PayoutPromo> getPayoutPromoById(Long id) {
         return payoutPromoRepository.findById(id);
     }
