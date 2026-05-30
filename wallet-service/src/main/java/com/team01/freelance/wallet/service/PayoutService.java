@@ -3,6 +3,7 @@ package com.team01.freelance.wallet.service;
 import com.team01.freelance.contract.repository.ContractRepository;
 import com.team01.freelance.user.repository.UserRepository;
 import com.team01.freelance.wallet.dto.AppliedPromoCodeDTO;
+import com.team01.freelance.wallet.dto.CategoryRevenueDTO;
 import com.team01.freelance.wallet.dto.PayoutDetailsDTO;
 import com.team01.freelance.wallet.dto.PromoCodeUsageDTO;
 import com.team01.freelance.wallet.dto.FreelancerPayoutSummaryDTO;
@@ -22,6 +23,8 @@ import com.team01.freelance.wallet.repository.PayoutRepository;
 import com.team01.freelance.wallet.repository.PayoutPromoRepository;
 import com.team01.freelance.wallet.repository.PromoCodeRepository;
 import jakarta.persistence.EntityNotFoundException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
@@ -45,6 +48,8 @@ import java.util.HashMap;
 
 @Service
 public class PayoutService {
+
+    private static final Logger log = LoggerFactory.getLogger(PayoutService.class);
 
     @Autowired
     private PayoutRepository payoutRepository;
@@ -124,7 +129,6 @@ public class PayoutService {
             @CacheEvict(value = "S5-F6", allEntries = true),
             @CacheEvict(value = "S5-F8", allEntries = true)
     })
-    @CacheEvict(value = "payout", allEntries = true)
     public Payout updatePayout(Long id, Payout payoutDetails) {
         return payoutRepository.findById(id).map(existingPayout -> {
                 if (payoutDetails.getAmount() != null) existingPayout.setAmount(payoutDetails.getAmount());
@@ -581,6 +585,42 @@ public class PayoutService {
                 .refundedAmount(refundedAmount == null ? 0.0 : refundedAmount)
                 .refundCount(refundCount == null ? 0L : refundCount)
                 .build();
+    }
+
+    // [S5-F10] Category revenue analytics
+    @Cacheable(value = "S5-F10", key = "#startDate.toString() + #endDate.toString()")
+    public List<CategoryRevenueDTO> getCategoryRevenue(LocalDate startDate, LocalDate endDate) {
+        if (startDate.isAfter(endDate)) {
+            throw new IllegalStateException("startDate cannot be after endDate");
+        }
+
+        // TODO: publish ANALYTICS_VIEWED event to MongoDB payout_audit_trail collection
+        //       once Observer infrastructure is ready.
+        log.info("ANALYTICS_VIEWED: category revenue requested for {} to {}", startDate, endDate);
+
+        LocalDateTime start = startDate.atStartOfDay();
+        LocalDateTime end = endDate.atTime(23, 59, 59, 999_999_999);
+
+        List<Object[]> rows = payoutRepository.aggregateCompletedByCategory(start, end);
+        List<CategoryRevenueDTO> result = new ArrayList<>();
+
+        for (Object[] row : rows) {
+            String category = (String) row[0];
+            double platformFee = row[1] != null ? ((Number) row[1]).doubleValue() : 0.0;
+            double netPayout   = row[2] != null ? ((Number) row[2]).doubleValue() : 0.0;
+            double total       = row[3] != null ? ((Number) row[3]).doubleValue() : 0.0;
+            long   count       = row[4] != null ? ((Number) row[4]).longValue()   : 0L;
+
+            result.add(CategoryRevenueDTO.builder()
+                    .category(category)
+                    .platformFeeRevenue(platformFee)
+                    .netPayoutRevenue(netPayout)
+                    .totalRevenue(total)
+                    .payoutCount(count)
+                    .build());
+        }
+
+        return result;
     }
 
 }
