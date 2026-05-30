@@ -100,6 +100,9 @@ public interface PayoutRepository extends JpaRepository<Payout, Long> {
             @Param("contractId") Long contractId,
             @Param("status") String status);
 
+    @Query(value = "SELECT agreed_amount FROM contracts WHERE id = :contractId", nativeQuery = true)
+    Double findAgreedAmountByContractId(@Param("contractId") Long contractId);
+
     @Query(value = "SELECT COUNT(*) FROM contracts WHERE id = :id", nativeQuery = true)
     Long countContractById(@Param("id") Long id);
 

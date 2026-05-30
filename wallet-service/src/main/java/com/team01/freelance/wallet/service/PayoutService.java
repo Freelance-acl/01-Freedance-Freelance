@@ -484,8 +484,21 @@ public class PayoutService {
         if (request == null || request.getMethod() == null) {
             throw new IllegalArgumentException("Payout method is required");
         }
-        payout.setStatus(PayoutStatus.COMPLETED);
+
+        try {
+            Map<String, Object> createdAudit = buildAuditPayload(payout.getId(), payout, null, "CREATED", payout.getAmount());
+            payoutEventSubject.notifyObservers("PAYOUT_AUDIT", createdAudit);
+        } catch (Exception e) {
+            log.warn("Audit event failed for CREATED on contract {}: {}", contractId, e.getMessage());
+        }
+
+        Double agreedAmount = payoutRepository.findAgreedAmountByContractId(contractId);
+        double platformFee = agreedAmount != null ? agreedAmount * 0.10 : payout.getAmount() * 0.10;
+
         payout.setMethod(request.getMethod());
+
+        String action = request.isSimulateFailure() ? "FAILED" : "COMPLETED";
+        payout.setStatus(request.isSimulateFailure() ? PayoutStatus.FAILED : PayoutStatus.COMPLETED);
 
         Map<String, Object> txDetails = new LinkedHashMap<>();
         txDetails.put("transactionId", UUID.randomUUID().toString());
@@ -493,10 +506,20 @@ public class PayoutService {
         if (request.getAccountLastFour() != null) {
             txDetails.put("accountLastFour", request.getAccountLastFour());
         }
+        txDetails.put("platformFee", platformFee);
         txDetails.put("processedAt", LocalDateTime.now().toString());
         payout.setTransactionDetails(txDetails);
 
-        return payoutRepository.save(payout);
+        Payout saved = payoutRepository.save(payout);
+
+        try {
+            Map<String, Object> audit = buildAuditPayload(saved.getId(), saved, null, action, saved.getAmount());
+            payoutEventSubject.notifyObservers("PAYOUT_AUDIT", audit);
+        } catch (Exception e) {
+            log.warn("Audit event failed for {} on contract {}: {}", action, contractId, e.getMessage());
+        }
+
+        return saved;
     }
 
     // S5-F5
@@ -554,6 +577,21 @@ public class PayoutService {
 
         promoCode.setCurrentUses(promoCode.getCurrentUses() + 1);
         promoCodeRepository.save(promoCode);
+
+        try {
+            Map<String, Object> promoParams = new HashMap<>();
+            promoParams.put("payoutId", payoutId);
+            promoParams.put("action", "PROMO_APPLIED");
+            promoParams.put("method", payout.getMethod());
+            promoParams.put("amount", discount);
+            Map<String, Object> details = new HashMap<>();
+            details.put("promoCodeId", promoCodeId);
+            details.put("discountType", promoCode.getDiscountType().name());
+            promoParams.put("details", details);
+            payoutEventSubject.notifyObservers("PAYOUT_AUDIT", promoParams);
+        } catch (Exception e) {
+            log.warn("Audit event failed for PROMO_APPLIED on payout {}: {}", payoutId, e.getMessage());
+        }
 
         return payoutRepository.findById(payoutId).orElseThrow();
     }
