@@ -16,6 +16,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 @Configuration
+@org.springframework.context.annotation.Profile("!test")
 public class RedisConfig {
 
     @Bean

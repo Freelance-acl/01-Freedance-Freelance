@@ -5,13 +5,10 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.persistence.autoconfigure.EntityScan;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
-import org.springframework.data.mongodb.repository.config.EnableMongoRepositories;
-
 @SpringBootApplication(scanBasePackages = {
         "com.team01.freelance.wallet"
 })
 @EnableCaching
-@EnableMongoRepositories(basePackages = "com.team01.freelance.wallet")
 @EnableJpaRepositories(basePackages = {
         "com.team01.freelance.wallet",
         "com.team01.freelance.contract",
