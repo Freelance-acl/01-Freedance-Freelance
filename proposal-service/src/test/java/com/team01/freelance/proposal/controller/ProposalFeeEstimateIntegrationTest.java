@@ -10,7 +10,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 import com.team01.freelance.job.model.Job;
@@ -50,7 +49,7 @@ class ProposalFeeEstimateIntegrationTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext).build();
+        mockMvc = buildMockMvc(webApplicationContext);
 
         proposalRepository.deleteAll();
         jobRepository.deleteAll();

@@ -19,7 +19,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 import static org.hamcrest.Matchers.hasSize;
@@ -54,7 +53,7 @@ class ProposalDetailsIntegrationTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext).build();
+        mockMvc = buildMockMvc(webApplicationContext);
 
         proposalMilestoneRepository.deleteAll();
         proposalRepository.deleteAll();

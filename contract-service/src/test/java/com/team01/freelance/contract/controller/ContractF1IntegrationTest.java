@@ -3,11 +3,11 @@ package com.team01.freelance.contract.controller;
 import com.team01.freelance.contract.model.ContractStatus;
 import com.team01.freelance.contract.support.AbstractIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
 
@@ -18,6 +18,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @Transactional
+@WithMockUser(roles = "ADMIN")
 class ContractF1IntegrationTest extends AbstractIntegrationTest {
 
     private MockMvc mockMvc;
@@ -30,7 +31,7 @@ class ContractF1IntegrationTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext).build();
+        mockMvc = buildMockMvc(webApplicationContext);
     }
 
     @Test

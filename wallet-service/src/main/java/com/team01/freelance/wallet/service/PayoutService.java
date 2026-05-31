@@ -3,6 +3,7 @@ package com.team01.freelance.wallet.service;
 import com.team01.freelance.contract.repository.ContractRepository;
 import com.team01.freelance.user.repository.UserRepository;
 import com.team01.freelance.wallet.dto.AppliedPromoCodeDTO;
+import com.team01.freelance.wallet.dto.CategoryRevenueDTO;
 import com.team01.freelance.wallet.dto.PayoutDetailsDTO;
 import com.team01.freelance.wallet.dto.PromoCodeUsageDTO;
 import com.team01.freelance.wallet.dto.FreelancerPayoutSummaryDTO;
@@ -10,13 +11,24 @@ import com.team01.freelance.wallet.dto.RevenueReportDTO;
 import com.team01.freelance.wallet.model.Payout;
 import com.team01.freelance.wallet.model.PayoutPromo;
 import com.team01.freelance.wallet.model.PayoutStatus;
+import com.team01.freelance.wallet.dto.MilestoneReversalRequest;
 import com.team01.freelance.wallet.dto.ProcessPayoutRequest;
+import com.team01.freelance.common.observer.EventSubject;
+import com.team01.freelance.wallet.strategy.NoReversalStrategy;
+import com.team01.freelance.wallet.strategy.RefundResult;
+import com.team01.freelance.wallet.strategy.RefundStrategy;
+import com.team01.freelance.wallet.strategy.RefundStrategySelector;
 import com.team01.freelance.wallet.model.PromoCode;
 import com.team01.freelance.wallet.repository.PayoutRepository;
 import com.team01.freelance.wallet.repository.PayoutPromoRepository;
 import com.team01.freelance.wallet.repository.PromoCodeRepository;
 import jakarta.persistence.EntityNotFoundException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,6 +49,8 @@ import java.util.HashMap;
 @Service
 public class PayoutService {
 
+    private static final Logger log = LoggerFactory.getLogger(PayoutService.class);
+
     @Autowired
     private PayoutRepository payoutRepository;
 
@@ -52,14 +66,22 @@ public class PayoutService {
     @Autowired
     private PromoCodeRepository promoCodeRepository;
 
+    @Autowired
+    private RefundStrategySelector refundStrategySelector;
+
+    @Autowired
+    private EventSubject payoutEventSubject;
+
     public List<Payout> getAllPayouts() {
         return payoutRepository.findAll();
     }
 
+    @Cacheable(value = "payout", key = "#id")
     public Optional<Payout> getPayoutById(Long id) {
         return payoutRepository.findById(id);
     }
 
+    @Cacheable(value = "S5-F1", key = "#status + ':' + #startDate + ':' + #endDate")
     public List<Payout> searchPayouts(PayoutStatus status, LocalDate startDate, LocalDate endDate) {
         if (startDate != null && endDate != null && startDate.isAfter(endDate)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "startDate cannot be after endDate");
@@ -100,6 +122,13 @@ public class PayoutService {
      * @return The updated payout
      * @throws EntityNotFoundException if the payout is not found
      */
+    @Caching(evict = {
+            @CacheEvict(value = "payout", allEntries = true),
+            @CacheEvict(value = "S5-F1", allEntries = true),
+            @CacheEvict(value = "S5-F3", allEntries = true),
+            @CacheEvict(value = "S5-F6", allEntries = true),
+            @CacheEvict(value = "S5-F8", allEntries = true)
+    })
     public Payout updatePayout(Long id, Payout payoutDetails) {
         return payoutRepository.findById(id).map(existingPayout -> {
                 if (payoutDetails.getAmount() != null) existingPayout.setAmount(payoutDetails.getAmount());
@@ -111,6 +140,7 @@ public class PayoutService {
         }).orElseThrow(() -> new EntityNotFoundException("Payout not found with id: " + id));
     }
 
+    @CacheEvict(value = "payout", allEntries = true)
     public boolean deletePayoutById(Long id) {
         if (!payoutRepository.existsById(id)) {
             return false;
@@ -119,10 +149,16 @@ public class PayoutService {
         return true;
     }
 
+    @CacheEvict(value = "payout", allEntries = true)
     public void deleteAllPayouts() {
         payoutRepository.deleteAll();
     }
 
+    @Caching(evict = {
+            @CacheEvict(value = "payout", key = "#id"),
+            @CacheEvict(value = "S5-F10", allEntries = true),
+            @CacheEvict(value = "S5-F11", allEntries = true)
+    })
     @Transactional
     public Payout retryPayout(Long id) {
 
@@ -160,6 +196,7 @@ public class PayoutService {
         return payoutRepository.save(payout);
     }
 
+    @Cacheable(value = "S5-F8", key = "#payoutId")
     public PayoutDetailsDTO getPayoutDetails(Long payoutId) {
 
         Payout payout = payoutRepository.findByIdWithPromos(payoutId)
@@ -207,6 +244,7 @@ public class PayoutService {
         return dto;
     }
 
+    @Cacheable(value = "S5-F9", key = "#limit")
     public List<PromoCodeUsageDTO> getTopUsedPromoCodes(int limit) {
 
         List<Object[]> rows = payoutRepository.findTopUsedPromoCodes(limit);
@@ -245,6 +283,7 @@ public class PayoutService {
      * @return summary with totalPayouts, totalAmount and per-method breakdown
      * @throws ResponseStatusException 404 if the user does not exist
      */
+    @Cacheable(value = "S5-F3", key = "#freelancerId")
     public FreelancerPayoutSummaryDTO getFreelancerPayoutSummary(Long freelancerId) {
         if (!userRepository.existsById(freelancerId)) {
             throw new ResponseStatusException(
@@ -286,6 +325,11 @@ public class PayoutService {
      * @return the updated payout
      * @throws ResponseStatusException 404 if not found, 400 if not COMPLETED
      */
+    @Caching(evict = {
+            @CacheEvict(value = "payout", key = "#id"),
+            @CacheEvict(value = "S5-F10", allEntries = true),
+            @CacheEvict(value = "S5-F11", allEntries = true)
+    })
     @Transactional
     public Payout refundPayout(Long id, String reason) {
         Payout payout = payoutRepository.findById(id)
@@ -310,6 +354,94 @@ public class PayoutService {
 
         return payoutRepository.save(payout);
     }
+
+    /**
+     * [S5-F12] Reverse a milestone-based payout using DP-1 strategy selection.
+     */
+    @Transactional
+    public Payout reverseMilestone(Long id, MilestoneReversalRequest request) {
+        System.out.println("Reverse Milestone Payout");
+        Payout payout = payoutRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Payout not found with id: " + id));
+
+        if (payout.getStatus() != PayoutStatus.COMPLETED) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Only COMPLETED payouts can be reversed (current status: "
+                            + payout.getStatus() + ")");
+        }
+
+        RefundStrategy strategy = refundStrategySelector.select(payout, request);
+
+        if (strategy instanceof NoReversalStrategy) {
+            Map<String, Object> deniedAudit = buildAuditPayload(
+                    id, payout, request, "REFUND_DENIED", 0.0);
+            Map<String, Object> deniedDetails = castDetails(deniedAudit);
+            deniedDetails.put("strategy", "NoReversalStrategy");
+            deniedDetails.put("denialReason", "reversal window expired");
+            payoutEventSubject.notifyObservers("PAYOUT_AUDIT", deniedAudit);
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "reversal window expired");
+        }
+
+        RefundResult result = strategy.calculateRefund(payout, request);
+        double refundAmount = result.amount();
+        String reversalScope = request != null ? request.getReversalScope() : null;
+        String refundReason = request != null ? request.getReason() : null;
+        String refundedAt = LocalDateTime.now().toString();
+
+        payout.setStatus(PayoutStatus.REFUNDED);
+        Map<String, Object> txDetails = payout.getTransactionDetails() != null
+                ? new HashMap<>(payout.getTransactionDetails())
+                : new HashMap<>();
+        txDetails.put("refundAmount", refundAmount);
+        txDetails.put("reversalScope", reversalScope);
+        txDetails.put("refundReason", refundReason);
+        txDetails.put("refundedAt", refundedAt);
+        payout.setTransactionDetails(txDetails);
+
+        Payout saved = payoutRepository.save(payout);
+
+        Map<String, Object> refundedAudit = buildAuditPayload(
+                id, payout, request, "REFUNDED", refundAmount);
+        Map<String, Object> refundedDetails = castDetails(refundedAudit);
+        refundedDetails.put("strategy", result.strategyName());
+        refundedDetails.put("reason", refundReason);
+        refundedDetails.put("originalAmount", payout.getAmount());
+        refundedDetails.put("reversalAmount", refundAmount);
+        refundedDetails.put("reversalScope", reversalScope);
+        payoutEventSubject.notifyObservers("PAYOUT_AUDIT", refundedAudit);
+
+        return saved;
+    }
+
+    private static Map<String, Object> buildAuditPayload(
+            Long payoutId,
+            Payout payout,
+            MilestoneReversalRequest request,
+            String action,
+            double amount) {
+        Map<String, Object> auditParams = new HashMap<>();
+        auditParams.put("payoutId", payoutId);
+        auditParams.put("method", payout.getMethod());
+        auditParams.put("action", action);
+        auditParams.put("amount", amount);
+        Map<String, Object> details = new HashMap<>();
+        if (request != null && request.getReason() != null) {
+            details.put("reason", request.getReason());
+        }
+        if (request != null && request.getReversalScope() != null) {
+            details.put("reversalScope", request.getReversalScope());
+        }
+        auditParams.put("details", details);
+        return auditParams;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> castDetails(Map<String, Object> auditParams) {
+        return (Map<String, Object>) auditParams.get("details");
+    }
+
     // [S5-F4] Process a payout for a COMPLETED contract.
     /**
      * [S5-F4] Process a payout for a COMPLETED contract.
@@ -321,6 +453,11 @@ public class PayoutService {
      * @throws IllegalStateException if the contract is not COMPLETED
      * @throws IllegalArgumentException if the payout method is not provided
      */
+    @Caching(evict = {
+            @CacheEvict(value = "payout", allEntries = true),
+            @CacheEvict(value = "S5-F10", allEntries = true),
+            @CacheEvict(value = "S5-F11", allEntries = true)
+    })
     @Transactional
     public Payout processContractPayout(Long contractId, ProcessPayoutRequest request) {
         if (payoutRepository.countContractById(contractId) == 0) {
@@ -363,6 +500,15 @@ public class PayoutService {
     }
 
     // S5-F5
+    @Caching(evict = {
+            @CacheEvict(value = "payout", key = "#payoutId"),
+            @CacheEvict(value = "S5-F5", allEntries = true),
+            @CacheEvict(value = "S5-F8", key = "#payoutId"),
+            @CacheEvict(value = "S5-F9", allEntries = true),
+            @CacheEvict(value = "S5-F10", allEntries = true),
+            @CacheEvict(value = "S5-F11", allEntries = true),
+            @CacheEvict(value = "promo-code", key = "#promoCodeId")
+    })
     @Transactional
     public Payout applyPromoCode(Long payoutId, Long promoCodeId) {
         Payout payout = payoutRepository.findById(payoutId)
@@ -413,6 +559,7 @@ public class PayoutService {
     }
 
     // S5-F6
+    @Cacheable(value = "S5-F6", key = "#startDate + ':' + #endDate")
     public RevenueReportDTO getRevenueReport(LocalDate startDate, LocalDate endDate) {
         if (startDate.isAfter(endDate)) {
             throw new IllegalStateException("startDate cannot be after endDate");
@@ -431,13 +578,49 @@ public class PayoutService {
         Double refundedAmount = payoutRepository.sumRefundedAmountBetween(start, end);
         Long refundCount = payoutRepository.countRefundedBetween(start, end);
 
-        return new RevenueReportDTO(
-                totalRevenue == null ? 0.0 : totalRevenue,
-                totalTransactions == null ? 0L : totalTransactions,
-                averagePayout,
-                refundedAmount == null ? 0.0 : refundedAmount,
-                refundCount == null ? 0L : refundCount
-        );
+        return RevenueReportDTO.builder()
+                .totalRevenue(totalRevenue == null ? 0.0 : totalRevenue)
+                .totalTransactions(totalTransactions == null ? 0L : totalTransactions)
+                .averagePayout(averagePayout)
+                .refundedAmount(refundedAmount == null ? 0.0 : refundedAmount)
+                .refundCount(refundCount == null ? 0L : refundCount)
+                .build();
+    }
+
+    // [S5-F10] Category revenue analytics
+    @Cacheable(value = "S5-F10", key = "#startDate.toString() + #endDate.toString()")
+    public List<CategoryRevenueDTO> getCategoryRevenue(LocalDate startDate, LocalDate endDate) {
+        if (startDate.isAfter(endDate)) {
+            throw new IllegalStateException("startDate cannot be after endDate");
+        }
+
+        // TODO: publish ANALYTICS_VIEWED event to MongoDB payout_audit_trail collection
+        //       once Observer infrastructure is ready.
+        log.info("ANALYTICS_VIEWED: category revenue requested for {} to {}", startDate, endDate);
+
+        LocalDateTime start = startDate.atStartOfDay();
+        LocalDateTime end = endDate.atTime(23, 59, 59, 999_999_999);
+
+        List<Object[]> rows = payoutRepository.aggregateCompletedByCategory(start, end);
+        List<CategoryRevenueDTO> result = new ArrayList<>();
+
+        for (Object[] row : rows) {
+            String category = (String) row[0];
+            double platformFee = row[1] != null ? ((Number) row[1]).doubleValue() : 0.0;
+            double netPayout   = row[2] != null ? ((Number) row[2]).doubleValue() : 0.0;
+            double total       = row[3] != null ? ((Number) row[3]).doubleValue() : 0.0;
+            long   count       = row[4] != null ? ((Number) row[4]).longValue()   : 0L;
+
+            result.add(CategoryRevenueDTO.builder()
+                    .category(category)
+                    .platformFeeRevenue(platformFee)
+                    .netPayoutRevenue(netPayout)
+                    .totalRevenue(total)
+                    .payoutCount(count)
+                    .build());
+        }
+
+        return result;
     }
 
 }

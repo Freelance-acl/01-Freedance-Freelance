@@ -121,6 +121,38 @@ public interface PayoutRepository extends JpaRepository<Payout, Long> {
     @Query(value = "SELECT COUNT(*) FROM payouts WHERE status = 'REFUNDED' AND created_at BETWEEN :start AND :end", nativeQuery = true)
     Long countRefundedBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
+    /**
+     * [S5-F10] Aggregate COMPLETED payouts by job category, joining contracts and jobs tables.
+     * Each row: [category (String), platformFeeRevenue (Double), netPayoutRevenue (Double),
+     *            totalRevenue (Double), payoutCount (Long)]
+     * platformFeeRevenue uses transactionDetails->>'platformFee' cast to numeric,
+     * falling back to amount * 0.10 when the key is absent.
+     */
+    @Query(value = """
+            SELECT j.category                                                               AS category,
+                   SUM(COALESCE(
+                       NULLIF(p.transaction_details->>'platformFee', '')::numeric,
+                       p.amount * 0.10
+                   ))                                                                       AS platform_fee_revenue,
+                   SUM(p.amount) - SUM(COALESCE(
+                       NULLIF(p.transaction_details->>'platformFee', '')::numeric,
+                       p.amount * 0.10
+                   ))                                                                       AS net_payout_revenue,
+                   SUM(p.amount)                                                            AS total_revenue,
+                   COUNT(p.id)                                                              AS payout_count
+            FROM payouts p
+            JOIN contracts c ON c.id = p.contract_id
+            JOIN jobs j      ON j.id = c.job_id
+            WHERE p.status = 'COMPLETED'
+              AND p.created_at >= :start
+              AND p.created_at <= :end
+            GROUP BY j.category
+            ORDER BY j.category
+            """, nativeQuery = true)
+    List<Object[]> aggregateCompletedByCategory(
+            @Param("start") LocalDateTime start,
+            @Param("end") LocalDateTime end);
+
     @Modifying(clearAutomatically = true)
     @Query(value = """
             INSERT INTO payouts (
@@ -135,6 +167,15 @@ public interface PayoutRepository extends JpaRepository<Payout, Long> {
             @Param("freelancerId") Long freelancerId,
             @Param("amount") Double amount,
             @Param("createdAt") LocalDateTime createdAt);
+
+    @Query(value = """
+            SELECT COALESCE(SUM(pm.amount), 0)
+            FROM contracts c
+            JOIN proposal_milestones pm ON pm.proposal_id = c.proposal_id
+            WHERE c.id = :contractId
+              AND pm.status NOT IN ('COMPLETED', 'APPROVED')
+            """, nativeQuery = true)
+    Double sumIncompleteMilestoneAmounts(@Param("contractId") Long contractId);
 
 }
 

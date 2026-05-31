@@ -11,7 +11,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
 
@@ -53,7 +52,7 @@ class ProposalMetadataSearchIntegrationTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext).build();
+        mockMvc = buildMockMvc(webApplicationContext);
 
         long suffix = System.nanoTime();
         client = saveUser("Client", "client-" + suffix + "@test.dev", UserRole.CLIENT);

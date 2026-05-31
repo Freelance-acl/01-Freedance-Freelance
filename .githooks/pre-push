@@ -1,58 +1,73 @@
 #!/bin/sh
-# Branch naming (feat/* per Milestone 1 + team conventions) and mvn test for all modules.
+# Branch naming and mvn test checks for milestone feature work.
 
 set -e
 ROOT=$(git rev-parse --show-toplevel)
 cd "$ROOT" || exit 1
 
-validate_feat_branch() {
+ALLOWED_TYPES='feat|fix|hotfix|refactor|docs|test|chore|perf'
+ALLOWED_SCOPES='user|job|proposal|contract|wallet|m1|cc|infra'
+ALLOWED_SERVICE_SCOPES='user-service|job-service|proposal-service|contract-service|wallet-service'
+ALLOWED_DESCRIPTOR='(S[1-5]-F[1-9][0-9]*|MOD-[0-9]+|CC-[0-9]+|DP-[1-7]|[a-z0-9]+(-[a-z0-9]+)*)'
+
+validate_branch() {
   b=$1
+
   case "$b" in
+    main|master)
+      return 0
+    ;;
     feat/docker/*)
       rest=${b#feat/docker/}
       if [ -z "$rest" ]; then
-        echo "pre-push: feat/docker/<id> must include an id segment." >&2
+        echo "pre-push: feat/docker/<studentId> must include an id segment." >&2
         return 1
       fi
       case "$rest" in
         */*)
-          echo "pre-push: feat/docker must be exactly feat/docker/<id>, got: $b" >&2
+          echo "pre-push: feat/docker must be exactly feat/docker/<studentId>, got: $b" >&2
           return 1
         ;;
       esac
+      if ! printf '%s' "$rest" | grep -Eq '^[0-9]+$'; then
+        echo "pre-push: feat/docker/<studentId> must use digits only, got: $b" >&2
+        return 1
+      fi
       return 0
     ;;
   esac
 
-  case "$b" in
-    feat/*) ;;
-    *) return 0 ;;
-  esac
+  if ! printf '%s' "$b" | grep -Eq "^($ALLOWED_TYPES)/"; then
+    echo "pre-push: branch type must be one of: feat, fix, hotfix, refactor, docs, test, chore, perf; got: $b" >&2
+    return 1
+  fi
 
   nf=$(printf '%s' "$b" | awk -F/ '{print NF}')
-  svc=$(printf '%s' "$b" | cut -d/ -f2)
-
-  if [ "$nf" -eq 2 ]; then
-    case "$svc" in
-      user|job|proposal|contract|wallet|user-service|job-service|proposal-service|contract-service|wallet-service)
-        echo "pre-push: note — grader expects feat/<service>/S#-F#/<studentId> for feature credit; pushing service-only branch: $b" >&2
-        return 0
-      ;;
-    esac
-    echo "pre-push: invalid feat/<service> branch (second segment must be a known service name): $b" >&2
+  if [ "$nf" -ne 4 ]; then
+    echo "pre-push: branch must be <type>/<scope>/<descriptor>/<studentId>, got: $b" >&2
     return 1
   fi
 
-  if [ "$nf" -eq 4 ]; then
-    if printf '%s' "$b" | grep -Eq '^feat/(user|job|proposal|contract|wallet|user-service|job-service|proposal-service|contract-service|wallet-service)/S[1-5]-F[1-9]/[^/]+$'; then
-      return 0
-    fi
-    echo "pre-push: feat branch with 4 segments must match feat/<service>/S#-F#/<id> for a known service, got: $b" >&2
+  scope=$(printf '%s' "$b" | cut -d/ -f2)
+  descriptor=$(printf '%s' "$b" | cut -d/ -f3)
+  id=$(printf '%s' "$b" | cut -d/ -f4)
+
+  if ! printf '%s' "$scope" | grep -Eq "^($ALLOWED_SCOPES|$ALLOWED_SERVICE_SCOPES)$"; then
+    echo "pre-push: invalid branch scope; expected one of user, job, proposal, contract, wallet, m1, cc, infra (service-name aliases accepted); got: $scope" >&2
     return 1
   fi
 
-  echo "pre-push: unsupported feat/ branch (use feat/<service>, feat/<svc>/S#-F#/<id>, or feat/docker/<id>): $b" >&2
-  return 1
+  if ! printf '%s' "$descriptor" | grep -Eq "^$ALLOWED_DESCRIPTOR$"; then
+    echo "pre-push: invalid branch descriptor; use S#-F#, MOD-#, CC-#, DP-#, or kebab-case: $descriptor" >&2
+    return 1
+  fi
+
+  if ! printf '%s' "$id" | grep -Eq '^[0-9]+$'; then
+    echo "pre-push: branch student ID must be digits only: $id" >&2
+    return 1
+  fi
+
+  return 0
 }
 
 while read -r local_ref local_sha remote_ref remote_sha; do
@@ -69,13 +84,8 @@ while read -r local_ref local_sha remote_ref remote_sha; do
 
   branch=${local_ref#refs/heads/}
 
-  case "$branch" in
-    main|master) ;;
-    *)
-      validate_feat_branch "$branch" || exit 1
-    ;;
-  esac
-done
+  validate_branch "$branch" || exit 1
+ done
 
 if [ "$SKIP_TESTS" = "1" ] || [ "$NO_VERIFY" = "1" ]; then
   echo "pre-push: skipping mvn test (SKIP_TESTS=1 or NO_VERIFY=1)." >&2
@@ -115,11 +125,11 @@ prefer_java25_for_maven
 
 run_mvn_test() {
   if [ -x "$ROOT/mvnw" ]; then
-    "$ROOT/mvnw" -q test
+    "$ROOT/mvnw" -q test-compile test
   elif [ -f "$ROOT/mvnw" ]; then
-    sh "$ROOT/mvnw" -q test
+    sh "$ROOT/mvnw" -q test-compile test
   elif command -v mvn >/dev/null 2>&1; then
-    mvn -q test
+    mvn -q test-compile test
   else
     echo "pre-push: neither ./mvnw nor mvn found; cannot run tests." >&2
     return 1

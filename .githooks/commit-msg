@@ -1,5 +1,5 @@
 #!/bin/sh
-# Enforce Milestone 1 commit message format; allow merge, revert, and init setup.
+# Enforce project commit message convention with numeric student IDs.
 
 MSG_FILE=${1:-}
 if [ -z "$MSG_FILE" ] || [ ! -f "$MSG_FILE" ]; then
@@ -9,32 +9,6 @@ fi
 
 MSG=$(cat "$MSG_FILE")
 FIRST=$(printf '%s\n' "$MSG" | sed -n '1p' | tr -d '\015')
-SERVICES=$(python3 - <<'PY'
-import ast
-from pathlib import Path
-
-script = Path(".githooks/validate_team_json.py")
-tree = ast.parse(script.read_text(encoding="utf-8"))
-allowed = []
-for node in tree.body:
-    if isinstance(node, ast.Assign):
-        for target in node.targets:
-            if isinstance(target, ast.Name) and target.id == "ALLOWED_SERVICES":
-                call = node.value
-                if isinstance(call, ast.Call) and call.args:
-                    arg0 = call.args[0]
-                    if isinstance(arg0, (ast.Set, ast.Tuple, ast.List)):
-                        for elt in arg0.elts:
-                            if isinstance(elt, ast.Constant) and isinstance(elt.value, str):
-                                allowed.append(elt.value)
-                break
-print("|".join(sorted(allowed)))
-PY
-)
-if [ -z "$SERVICES" ]; then
-  SERVICES="user-service|job-service|proposal-service|contract-service|wallet-service"
-fi
-
 case "$FIRST" in
   Merge\ *) exit 0 ;;
   Revert\ *) exit 0 ;;
@@ -44,15 +18,16 @@ case "$FIRST" in
   init:\ project\ setup\ by\ *) exit 0 ;;
 esac
 
-if echo "$FIRST" | grep -Eq "^(feat|fix)\\(($SERVICES)\\): .+ \\([^)]+\\)$"; then
+if echo "$FIRST" | grep -Eq '^(feat|fix|hotfix|refactor|docs|test|chore|perf)\((user|job|proposal|contract|wallet|user-service|job-service|proposal-service|contract-service|wallet-service|m1|cc|infra)\): .+ \([0-9]+\)$'; then
   exit 0
 fi
 
-echo "commit-msg: message must match milestone format:" >&2
-echo "  feat(<service>): <description> (<studentId>)" >&2
-echo "  fix(<service>): <description> (<studentId>)" >&2
-SERVICES_DISPLAY=$(printf '%s' "$SERVICES" | tr '|' ',' | sed 's/,/, /g')
-echo "Services: $SERVICES_DISPLAY" >&2
+echo "commit-msg: message must match the project commit convention:" >&2
+echo "  <type>(<scope>): <subject> (<studentId>)" >&2
+echo "Types: feat, fix, hotfix, refactor, docs, test, chore, perf" >&2
+echo "Scopes: user, job, proposal, contract, wallet, m1, cc, infra" >&2
+echo "Service-name aliases user-service/job-service/... are also accepted." >&2
+echo "Student ID must be digits only, e.g. 13000892" >&2
 echo "Also allowed: Merge ... / Revert ... / init: project setup by (...)" >&2
 echo "First line was: $FIRST" >&2
 exit 1
