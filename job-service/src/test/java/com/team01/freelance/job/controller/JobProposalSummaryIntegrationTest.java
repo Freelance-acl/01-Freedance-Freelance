@@ -10,11 +10,11 @@ import com.team01.freelance.user.model.UserRole;
 import com.team01.freelance.user.model.UserStatus;
 import com.team01.freelance.user.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
 
@@ -29,6 +29,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * [S2-F3] Integration tests for {@code GET /api/jobs/{id}/proposal-summary}.
  */
 @Transactional
+@WithMockUser(roles = "ADMIN")
 class JobProposalSummaryIntegrationTest extends AbstractIntegrationTest {
 
     private MockMvc mockMvc;
@@ -50,7 +51,7 @@ class JobProposalSummaryIntegrationTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext).build();
+        mockMvc = buildMockMvc(webApplicationContext);
         User client = saveUser("Client", UserRole.CLIENT);
         freelancer = saveUser("Freelancer", UserRole.FREELANCER);
         job = saveJob(client.getId());

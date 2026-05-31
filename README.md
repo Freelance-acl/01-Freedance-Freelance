@@ -13,6 +13,31 @@ Microservices backend for a freelance marketplace, using Spring Boot + PostgreSQ
 | wallet-service | 8080 | 8085 | http://localhost:8085 |
 | PostgreSQL | 5432 | 5432 | postgresql://postgres:postgres@localhost:5432/freelancedb |
 
+### M2 database stack (§6)
+
+Six databases run in Docker Compose alongside the five Spring services. PostgreSQL is the **hard** dependency; MongoDB, Redis, Elasticsearch, Neo4j, and Cassandra are **soft** dependencies (features degrade gracefully when unavailable).
+
+| Database | Port | Image | Role |
+|----------|------|-------|------|
+| PostgreSQL | 5432 | `postgres:17` | Primary relational data (M1) |
+| MongoDB | 27017 | `mongo:latest` | Event logs / audit (`freelancemongo`) |
+| Redis | 6379 | `redis:latest` | Read-endpoint caching (256 MB, `allkeys-lru`) |
+| Elasticsearch | 9200 | `elasticsearch:8.19.12` | Job full-text search (job-service) |
+| Neo4j | 7687 | `neo4j:latest` | Proposal recommendation graph |
+| Cassandra | 9042 | `cassandra:latest` | Contract milestone time-series (`freelanceks`) |
+
+Optional GUIs (extra RAM, not in the §6.2 ~4.5 GB estimate): start with `docker compose --profile gui up -d` for Mongo Express (`http://localhost:8888`), Redis Insight (`http://localhost:5540`), and Kibana (`http://localhost:5601`). Neo4j Browser is at `http://localhost:7474`.
+
+**Memory budget (§6.2):** Compose enforces the ACL caps — Redis `--maxmemory 256mb`, Elasticsearch `ES_JAVA_OPTS=-Xms512m -Xmx512m`, Cassandra `MAX_HEAP_SIZE=512M`, Neo4j heap `512m`, Spring apps `-Xmx300m` — plus optional Docker `mem_limit` ceilings so the graded stack stays near **~4.5 GB** and under **5 GB** (CC-5). Check after `docker compose up -d`:
+
+```bash
+docker stats --no-stream
+```
+
+PostgreSQL and MongoDB use image defaults (~250 MB / ~400 MB); the five NoSQL-heavy DBs and apps are explicitly capped.
+
+Each service uses `src/main/resources/application.yml` with `spring.datasource`, `spring.data.mongodb`, `spring.data.redis`, `jwt.secret`, and service-specific NoSQL settings (see M2 ACL §6.5). Override via `.env` / Compose env vars (`SPRING_DATA_MONGODB_URI`, `SPRING_DATA_REDIS_HOST`, etc.).
+
 ---
 
 ## Prerequisites
@@ -32,6 +57,9 @@ Microservices backend for a freelance marketplace, using Spring Boot + PostgreSQ
 ```bash
 # Copy environment configuration (do this once)
 cp .env.example .env
+# Fill DB_URL, DB_USER, DB_PASS, and JWT_SECRET in .env (required for run / Compose)
+# JWT: openssl rand -base64 32
+# DB (local): DB_URL=jdbc:postgresql://localhost:5432/freelancedb
 
 # Then run setup
 ./setup.bash
@@ -48,25 +76,33 @@ This runs:
 ./run.bash
 ```
 
-`docker-compose.yaml` sets `SPRING_DATASOURCE_URL` (and credentials) on each service so JDBC uses the hostname `postgres` on the Compose network. `application.properties` uses `localhost` for running `./mvnw spring-boot:run` directly on your machine.
+`docker-compose.yaml` injects **`SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/...`** (Docker hostname `postgres`, not `localhost`). Your `.env` `DB_URL=localhost` is only for **`./mvnw spring-boot:run` on the host** — do not point containers at `localhost` for Postgres.
+
+Compose also sets `JWT_SECRET` and NoSQL env vars (`mongo`, `redis`, etc.). Host runs use `.env` defaults in `application.yml`.
+
+Compose fails to start if `JWT_SECRET` is unset. Spring fails at startup if any required placeholder (`DB_URL`, `DB_USER`, `DB_PASS`, `JWT_SECRET`) is missing when not using the `test` profile.
 
 Each service **Dockerfile** is **multi-stage**: builds in a JDK layer, ships a JRE-only runtime (smaller image). You do **not** need a local `target/*.jar` before `docker compose build`.
 
 ### 3. Stop all services
 
 ```bash
-docker-compose down
+./stop.bash
 ```
 
-### Dev with hot reload (Docker)
+### Troubleshooting: `freelance-db` unhealthy
+
+Usually caused by reusing an old `pgdata` volume after changing the Postgres image (e.g. `postgres:15` → `postgres:17`, or `postgres:latest` which is now PG 18+ with a new data layout). The stack pins **`postgres:17`** per M2 §6.1.
+
+Reset the database volume (destroys local DB data; re-seed or re-run migrations as needed):
 
 ```bash
-docker compose -f docker-compose.dev.yml up --build
+docker compose down
+docker volume rm 01-freedance-freelance_pgdata
+docker compose up -d --build
 ```
 
-Bind-mounts each service's source into the container and runs `spring-boot:run` with DevTools. After editing `.java` files, trigger a compile in your IDE (or `./mvnw compile -pl <service>`) so `target/classes` updates and DevTools restarts.
-
-**Do not** run both `docker-compose up` and `docker-compose -f docker-compose.dev.yml up` simultaneously if both publish Postgres on port 5432.
+Local hot reload: run `./mvnw spring-boot:run -pl <service>` on the host with `.env` loaded, or use your IDE with DevTools.
 
 ---
 

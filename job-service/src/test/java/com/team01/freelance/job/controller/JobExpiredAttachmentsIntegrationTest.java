@@ -12,10 +12,10 @@ import com.team01.freelance.user.model.UserRole;
 import com.team01.freelance.user.model.UserStatus;
 import com.team01.freelance.user.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
 
@@ -30,6 +30,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * [S2-F7] Integration tests for {@code GET /api/jobs/attachments/expired}.
  */
 @Transactional
+@WithMockUser(roles = "ADMIN")
 class JobExpiredAttachmentsIntegrationTest extends AbstractIntegrationTest {
 
     private MockMvc mockMvc;
@@ -45,7 +46,7 @@ class JobExpiredAttachmentsIntegrationTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext).build();
+        mockMvc = buildMockMvc(webApplicationContext);
         User client = saveUser("Client", UserRole.CLIENT);
         saveJobWithExpiredAttachment(client.getId(), "Expired brief job");
     }

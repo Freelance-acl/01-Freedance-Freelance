@@ -27,7 +27,7 @@
 INSERT INTO users
     (id, name, email, password, phone, role, status, preferences, created_at)
 VALUES
-    (200, 'Test Freelancer', 's5f3.freelancer@mail.com', 'pass123',
+    (200, 'Test Freelancer', 's5f3.freelancer@mail.com', '$2a$10$.F.hAy2H0GbGYDuhvLYeZeyQ5j8bgncylLVySmYHITqFld1Uedpvq',
      '+201099999200', 'FREELANCER', 'ACTIVE',
      '{
         "language": "en",

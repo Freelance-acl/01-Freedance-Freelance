@@ -1,8 +1,10 @@
 package com.team01.freelance.wallet.controller;
 
+import com.team01.freelance.wallet.dto.CategoryRevenueDTO;
 import com.team01.freelance.wallet.dto.PayoutDetailsDTO;
 import com.team01.freelance.wallet.dto.PromoCodeUsageDTO;
 import com.team01.freelance.wallet.dto.FreelancerPayoutSummaryDTO;
+import com.team01.freelance.wallet.dto.MilestoneReversalRequest;
 import com.team01.freelance.wallet.dto.RefundRequest;
 import com.team01.freelance.wallet.dto.RevenueReportDTO;
 import com.team01.freelance.wallet.model.Payout;
@@ -116,6 +118,16 @@ public class PayoutController {
                 payoutService.refundPayout(id, request.getReason()));
     }
 
+    /**
+     * [S5-F12] Milestone-based payout reversal (DP-1 Strategy + Mongo audit trail).
+     */
+    @PostMapping("/{id}/reverse-milestone")
+    public ResponseEntity<Payout> reverseMilestone(
+            @PathVariable Long id,
+            @RequestBody MilestoneReversalRequest request) {
+        return ResponseEntity.ok(payoutService.reverseMilestone(id, request));
+    }
+
     @PostMapping("/contract/{contractId}")
     public ResponseEntity<Payout> processContractPayout(
             @PathVariable Long contractId,
@@ -171,5 +183,12 @@ public class PayoutController {
     @PutMapping("/{id}/retry")
     public ResponseEntity<Payout> retryPayout(@PathVariable Long id) {
         return ResponseEntity.ok(payoutService.retryPayout(id));
+    }
+
+    @GetMapping("/analytics/category")
+    public ResponseEntity<List<CategoryRevenueDTO>> getCategoryRevenue(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        return ResponseEntity.ok(payoutService.getCategoryRevenue(startDate, endDate));
     }
 }
