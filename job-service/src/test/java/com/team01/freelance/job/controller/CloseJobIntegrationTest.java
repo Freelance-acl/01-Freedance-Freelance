@@ -10,12 +10,12 @@ import com.team01.freelance.user.model.UserRole;
 import com.team01.freelance.user.model.UserStatus;
 import com.team01.freelance.user.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 import java.sql.Timestamp;
@@ -29,6 +29,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * [S2-F4] Integration tests for {@code PUT /api/jobs/{id}/close}.
  */
+@WithMockUser(roles = "ADMIN")
 class CloseJobIntegrationTest extends AbstractIntegrationTest {
 
     private static final String CLOSE_URL = "/api/jobs/{id}/close";
@@ -53,7 +54,7 @@ class CloseJobIntegrationTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext).build();
+        mockMvc = buildMockMvc(webApplicationContext);
 
         long suffix = System.nanoTime();
         client = saveUser("Client", "client-" + suffix + "@test.dev", UserRole.CLIENT);

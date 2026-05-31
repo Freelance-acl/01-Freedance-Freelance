@@ -4,6 +4,8 @@ import com.team01.freelance.wallet.dto.PromoCodeUsageDTO;
 import com.team01.freelance.wallet.model.PromoCode;
 import com.team01.freelance.wallet.repository.PromoCodeRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -20,6 +22,7 @@ public class PromoCodeService {
         return promoCodeRepository.findAll();
     }
 
+    @Cacheable(value = "promo-code", key = "#id")
     public Optional<PromoCode> getPromoCodeById(Long id) {
         return promoCodeRepository.findById(id);
     }
@@ -36,6 +39,7 @@ public class PromoCodeService {
      * @return The updated promo code
      * @throws RuntimeException if the promo code is not found
      */
+    @CacheEvict(value = "promo-code", allEntries = true)
     public PromoCode updatePromoCode(Long id, PromoCode promoCode) {
         return promoCodeRepository.findById(id).map(existing -> {
                 if (promoCode.getCode() != null) existing.setCode(promoCode.getCode());
@@ -49,6 +53,7 @@ public class PromoCodeService {
         }).orElseThrow(() -> new RuntimeException("Promo code not found with id: " + id));
     }
 
+    @CacheEvict(value = "promo-code", allEntries = true)
     public boolean deletePromoCodeById(Long id) {
         if (!promoCodeRepository.existsById(id)) {
             return false;
@@ -57,6 +62,7 @@ public class PromoCodeService {
         return true;
     }
 
+    @CacheEvict(value = "promo-code", allEntries = true)
     public void deleteAllPromoCodes() {
         promoCodeRepository.deleteAll();
     }

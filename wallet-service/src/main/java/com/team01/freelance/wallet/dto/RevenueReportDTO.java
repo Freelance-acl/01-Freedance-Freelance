@@ -31,4 +31,24 @@ public class RevenueReportDTO {
 
     public Long getRefundCount() { return refundCount; }
     public void setRefundCount(Long refundCount) { this.refundCount = refundCount; }
+
+    public static Builder builder() { return new Builder(); }
+
+    public static class Builder {
+        private Double totalRevenue;
+        private Long totalTransactions;
+        private Double averagePayout;
+        private Double refundedAmount;
+        private Long refundCount;
+
+        public Builder totalRevenue(Double totalRevenue) { this.totalRevenue = totalRevenue; return this; }
+        public Builder totalTransactions(Long totalTransactions) { this.totalTransactions = totalTransactions; return this; }
+        public Builder averagePayout(Double averagePayout) { this.averagePayout = averagePayout; return this; }
+        public Builder refundedAmount(Double refundedAmount) { this.refundedAmount = refundedAmount; return this; }
+        public Builder refundCount(Long refundCount) { this.refundCount = refundCount; return this; }
+
+        public RevenueReportDTO build() {
+            return new RevenueReportDTO(totalRevenue, totalTransactions, averagePayout, refundedAmount, refundCount);
+        }
+    }
 }

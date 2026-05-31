@@ -78,6 +78,18 @@ prefer_java25
 # Use repo-managed hooks (each clone runs setup once)
 git config core.hooksPath .githooks
 
+# Copy .env.example to .env if .env doesn't exist
+if [ ! -f "$ROOT/.env" ]; then
+  if [ -f "$ROOT/.env.example" ]; then
+    cp "$ROOT/.env.example" "$ROOT/.env"
+    echo "[setup] Created .env from .env.example"
+  else
+    echo "[setup] Warning: .env.example not found, skipping .env creation." >&2
+  fi
+else
+  echo "[setup] .env already exists, skipping."
+fi
+
 if [ -f "$ROOT/mvnw" ]; then
   if [ -x "$ROOT/mvnw" ]; then
     MVNW=("./mvnw")

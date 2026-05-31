@@ -4,11 +4,59 @@
 -- Freelance Marketplace - Database Seed
 -- Source: Milestone 1 PDF, Section 15 "Appendix: Example Database Tables"
 -- ----------------------------------------------------------------------------
--- The 3 users (Ahmed, Sara, Admin User) are assumed to already exist:
---   id=1  Ahmed Hassan   ahmed@mail.com         FREELANCER
---   id=2  Sara Mohamed   sara@mail.com          CLIENT
---   id=3  Admin User     admin@freelance.com    ADMIN
+-- M2 auth: passwords are BCrypt hashes ($2a$ / $2b$ / $2y$, 60 chars).
+-- Plaintext login password for all users below: securePassword123
+--   POST /api/auth/login  { "email": "...", "password": "securePassword123" }
 -- ============================================================================
+
+-- ============================================================================
+-- 15.1.1  users
+-- ============================================================================
+INSERT INTO users
+    (id, name, email, password, phone, role, status, preferences, created_at)
+VALUES
+    (1, 'Ahmed Hassan', 'ahmed@mail.com',
+     '$2a$10$.F.hAy2H0GbGYDuhvLYeZeyQ5j8bgncylLVySmYHITqFld1Uedpvq',
+     '+201012345601', 'FREELANCER', 'ACTIVE',
+     '{
+        "language": "en",
+        "notifications": {"email": true, "sms": false},
+        "timezone": "Africa/Cairo",
+        "profileVisibility": "PUBLIC",
+        "hourlyRateRange": {"min": 300, "max": 600}
+     }'::jsonb,
+     '2026-03-01 10:00:00'),
+
+    (2, 'Sara Mohamed', 'sara@mail.com',
+     '$2a$10$.F.hAy2H0GbGYDuhvLYeZeyQ5j8bgncylLVySmYHITqFld1Uedpvq',
+     '+201012345602', 'CLIENT', 'ACTIVE',
+     '{
+        "language": "en",
+        "notifications": {"email": true, "sms": true},
+        "timezone": "Africa/Cairo",
+        "profileVisibility": "PUBLIC"
+     }'::jsonb,
+     '2026-03-01 10:01:00'),
+
+    (3, 'Admin User', 'admin@freelance.com',
+     '$2a$10$.F.hAy2H0GbGYDuhvLYeZeyQ5j8bgncylLVySmYHITqFld1Uedpvq',
+     '+201012345603', 'ADMIN', 'ACTIVE',
+     '{
+        "language": "en",
+        "notifications": {"email": true, "sms": false},
+        "timezone": "UTC",
+        "profileVisibility": "PRIVATE"
+     }'::jsonb,
+     '2026-03-01 10:02:00')
+ON CONFLICT (id) DO UPDATE SET
+    name        = EXCLUDED.name,
+    email       = EXCLUDED.email,
+    password    = EXCLUDED.password,
+    phone       = EXCLUDED.phone,
+    role        = EXCLUDED.role,
+    status      = EXCLUDED.status,
+    preferences = EXCLUDED.preferences,
+    created_at  = EXCLUDED.created_at;
 
 -- ============================================================================
 -- 15.1.2  user_skills  (Ahmed's skills)
