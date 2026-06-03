@@ -3,6 +3,8 @@ package com.team01.freelance.contract.controller;
 import com.team01.freelance.contract.dto.ContractSummaryDTO;
 import com.team01.freelance.contract.dto.BatchContractStatusUpdateRequest;
 import com.team01.freelance.contract.dto.BatchContractStatusUpdateResponse;
+import com.team01.freelance.contract.dto.ContractMilestoneDTO;
+import com.team01.freelance.contract.dto.ContractMilestoneTrackRequest;
 import com.team01.freelance.contract.model.Contract;
 import com.team01.freelance.contract.dto.FreelancerPerformanceDTO;
 import com.team01.freelance.contract.dto.StalledContractDTO;
@@ -22,6 +24,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -191,6 +194,33 @@ public class ContractController {
     ) {
         try {
             return ResponseEntity.ok(contractService.batchUpdateContractStatus(updates));
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @PostMapping("/{id}/milestones/track")
+    public ResponseEntity<Void> trackMilestone(@PathVariable Long id, @RequestBody ContractMilestoneTrackRequest request) {
+        try {
+            contractService.recordContractMilestone(id, request);
+            return ResponseEntity.status(201).build();
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @GetMapping("/{id}/milestones/timeline")
+    public ResponseEntity<List<ContractMilestoneDTO>> getMilestoneTimeline(
+            @PathVariable Long id,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startTime,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endTime
+    ) {
+        try {
+            return ResponseEntity.ok(contractService.getContractMilestoneTimeline(id, startTime, endTime));
         } catch (EntityNotFoundException e) {
             return ResponseEntity.notFound().build();
         } catch (IllegalArgumentException e) {
