@@ -186,25 +186,25 @@ public class UserService {
         List<UserSkill> userSkills = userSkillRepository.findByUserId(id);
 
         List<UserProfileSkillDTO> skills = userSkills.stream()
-                .map(skill -> new UserProfileSkillDTO(
-                        skill.getSkillName(),
-                        skill.getCategory(),
-                        skill.getYearsOfExperience(),
-                        skill.getProficiencyLevel(),
-                        skill.getIsPrimary() != null ? skill.getIsPrimary() : false,
-                        skill.getMetadata()
-                ))
+                .map(skill -> UserProfileSkillDTO.builder()
+                        .skillName(skill.getSkillName())
+                        .category(skill.getCategory())
+                        .yearsOfExperience(skill.getYearsOfExperience())
+                        .proficiencyLevel(skill.getProficiencyLevel())
+                        .isPrimary(skill.getIsPrimary() != null ? skill.getIsPrimary() : false)
+                        .metadata(skill.getMetadata())
+                        .build())
                 .toList();
 
-        return new UserProfileDTO(
-                user.getId(),
-                user.getName(),
-                user.getEmail(),
-                user.getPhone(),
-                user.getPreferences(),
-                skills,
-                skills.size()
-        );
+        return UserProfileDTO.builder()
+                .userId(user.getId())
+                .name(user.getName())
+                .email(user.getEmail())
+                .phone(user.getPhone())
+                .preferences(user.getPreferences())
+                .skills(skills)
+                .totalSkills(skills.size())
+                .build();
     }
 
     public List<User> findUsersByLanguageAndMinimumCompletedContracts(String lang, Long minContracts) {
@@ -259,27 +259,27 @@ public class UserService {
         Double totalEarnings = row[3] != null ? ((Number) row[3]).doubleValue() : 0.0;
         Double averageContractValue = row[4] != null ? ((Number) row[4]).doubleValue() : 0.0;
 
-        return new UserContractSummaryDTO(
-                user.getId(),
-                user.getName(),
-                totalContracts,
-                completedContracts,
-                terminatedContracts,
-                totalEarnings,
-                averageContractValue
-        );
+        return UserContractSummaryDTO.builder()
+                .userId(user.getId())
+                .name(user.getName())
+                .totalContracts(totalContracts)
+                .completedContracts(completedContracts)
+                .terminatedContracts(terminatedContracts)
+                .totalEarnings(totalEarnings)
+                .averageContractValue(averageContractValue)
+                .build();
     }
 
     private static UserContractSummaryDTO zeroContractSummary(User user) {
-        return new UserContractSummaryDTO(
-                user.getId(),
-                user.getName(),
-                0L,
-                0L,
-                0L,
-                0.0,
-                0.0
-        );
+        return UserContractSummaryDTO.builder()
+                .userId(user.getId())
+                .name(user.getName())
+                .totalContracts(0L)
+                .completedContracts(0L)
+                .terminatedContracts(0L)
+                .totalEarnings(0.0)
+                .averageContractValue(0.0)
+                .build();
     }
 
     private boolean isBlank(String value) {
@@ -287,11 +287,12 @@ public class UserService {
     }
 
     private TopFreelancerDTO toTopFreelancerDTO(Object[] row) {
-        return new TopFreelancerDTO(
-                toLong(row[0]),
-                (String) row[1],
-                toBigDecimal(row[2]),
-                toLong(row[3]));
+        return TopFreelancerDTO.builder()
+                .userId(toLong(row[0]))
+                .name((String) row[1])
+                .totalEarnings(toBigDecimal(row[2]))
+                .contractCount(toLong(row[3]))
+                .build();
     }
 
     private Long toLong(Object value) {
