@@ -391,6 +391,13 @@ public class JobService {
      * @return a list of TopBudgetJobDTO with job details and proposal counts
      */
     public List<TopBudgetJobDTO> getTopBudgetJobs(int limit) {
-        return jobRepository.findTopBudgetJobs(limit);
+        return jobRepository.findTopBudgetJobs(limit).stream()
+                .map(job -> TopBudgetJobDTO.builder()
+                        .jobId(job.getJobId())
+                        .title(job.getTitle())
+                        .budgetMax(job.getBudgetMax())
+                        .totalProposals(job.getTotalProposals())
+                        .build())
+                .toList();
     }
 }
