@@ -26,6 +26,7 @@ import com.team01.freelance.user.dto.UserProfileDTO;
 import com.team01.freelance.user.dto.UserProfileSkillDTO;
 import com.team01.freelance.user.model.UserSkill;
 import com.team01.freelance.user.repository.UserSkillRepository;
+import com.team01.freelance.user.adapter.ObjectArrayDtoAdapter;
 
 @Service
 public class UserService {
@@ -41,6 +42,9 @@ public class UserService {
 
     @Autowired
     private EventSubject authEventSubject;
+
+    @Autowired
+    private ObjectArrayDtoAdapter objectArrayDtoAdapter;
 
     public List<User> getAllUsers() {
         return userRepository.findAll();
@@ -248,39 +252,11 @@ public class UserService {
                 .orElseThrow(() -> new EntityNotFoundException("User not found with id: " + id));
 
         Object result = userRepository.getUserContractSummary(id);
-        if (result == null) {
-            return zeroContractSummary(user);
-        }
-        Object[] row = (Object[]) result;
-
-        Long totalContracts = row[0] != null ? ((Number) row[0]).longValue() : 0L;
-        Long completedContracts = row[1] != null ? ((Number) row[1]).longValue() : 0L;
-        Long terminatedContracts = row[2] != null ? ((Number) row[2]).longValue() : 0L;
-        Double totalEarnings = row[3] != null ? ((Number) row[3]).doubleValue() : 0.0;
-        Double averageContractValue = row[4] != null ? ((Number) row[4]).doubleValue() : 0.0;
-
-        return UserContractSummaryDTO.builder()
-                .userId(user.getId())
-                .name(user.getName())
-                .totalContracts(totalContracts)
-                .completedContracts(completedContracts)
-                .terminatedContracts(terminatedContracts)
-                .totalEarnings(totalEarnings)
-                .averageContractValue(averageContractValue)
-                .build();
+        Object[] row = (result != null) ? (Object[]) result : null;
+        return objectArrayDtoAdapter.adapt(row, user);
     }
 
-    private static UserContractSummaryDTO zeroContractSummary(User user) {
-        return UserContractSummaryDTO.builder()
-                .userId(user.getId())
-                .name(user.getName())
-                .totalContracts(0L)
-                .completedContracts(0L)
-                .terminatedContracts(0L)
-                .totalEarnings(0.0)
-                .averageContractValue(0.0)
-                .build();
-    }
+
 
     private boolean isBlank(String value) {
         return value == null || value.trim().isEmpty();
