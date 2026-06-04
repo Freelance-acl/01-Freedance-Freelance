@@ -151,4 +151,21 @@ List<TopBudgetJobDTO> findTopBudgetJobs(@Param("limit") int limit);
 	@Modifying
 	@Query(value = "UPDATE jobs SET status = 'OPEN' WHERE id = :jobId AND status = 'IN_PROGRESS'", nativeQuery = true)
 	int reopenIfInProgress(@Param("jobId") Long jobId);
+
+	/**
+	 * Aggregated dashboard query returning basic metrics per job.
+	 * Columns: jobId, title, totalProposals, averageBidAmount, activeAttachments, rating
+	 */
+	@Query(value = """
+			SELECT j.id as jobId, j.title,
+				   COALESCE(COUNT(p.id), 0) as totalProposals,
+				   COALESCE(AVG(p.bid_amount), 0) as averageBidAmount,
+				   COALESCE(SUM(CASE WHEN ja.expiry_date >= CURRENT_DATE THEN 1 ELSE 0 END), 0) as activeAttachments,
+				   COALESCE(j.rating, 0) as rating
+			FROM jobs j
+			LEFT JOIN proposals p ON p.job_id = j.id
+			LEFT JOIN job_attachments ja ON ja.job_id = j.id
+			GROUP BY j.id, j.title, j.rating
+			""", nativeQuery = true)
+	List<Object[]> findJobDashboard();
 }
