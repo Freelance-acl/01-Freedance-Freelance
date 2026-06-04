@@ -591,6 +591,7 @@ public class ProposalService {
 
     public void deleteAllProposals() {
         proposalRepository.deleteAll();
+        cacheInvalidationService.invalidateAllProposalCaches();
     }
 
     private FeeEstimateDTO computePlatformFee(double bidAmount, int estimatedDays) {
