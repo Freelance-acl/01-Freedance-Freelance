@@ -1,12 +1,16 @@
 package com.team01.freelance.user.service;
 
 import com.team01.freelance.common.observer.EventSubject;
+import com.team01.freelance.user.cache.UserCacheNames;
 import com.team01.freelance.user.dto.TopFreelancerDTO;
 import com.team01.freelance.user.model.User;
 import com.team01.freelance.user.model.UserStatus;
 import com.team01.freelance.user.repository.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 
 import javax.sql.DataSource;
@@ -46,15 +50,34 @@ public class UserService {
         return userRepository.findAll();
     }
 
+    @Cacheable(value = UserCacheNames.USER, key = "#id", unless = "#result == null")
     public Optional<User> getUserById(Long id) {
         return userRepository.findById(id);
     }
 
+    @Caching(evict = {
+            @CacheEvict(value = UserCacheNames.USER, allEntries = true),
+            @CacheEvict(value = UserCacheNames.S1_F1, allEntries = true),
+            @CacheEvict(value = UserCacheNames.S1_F3, allEntries = true),
+            @CacheEvict(value = UserCacheNames.S1_F5, allEntries = true),
+            @CacheEvict(value = UserCacheNames.S1_F6, allEntries = true),
+            @CacheEvict(value = UserCacheNames.S1_F8, allEntries = true),
+            @CacheEvict(value = UserCacheNames.S1_F9, allEntries = true)
+    })
     public User createUser(User user) {
         return userRepository.save(user);
     }
 
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(value = UserCacheNames.USER, key = "#id"),
+            @CacheEvict(value = UserCacheNames.S1_F1, allEntries = true),
+            @CacheEvict(value = UserCacheNames.S1_F3, allEntries = true),
+            @CacheEvict(value = UserCacheNames.S1_F5, allEntries = true),
+            @CacheEvict(value = UserCacheNames.S1_F6, allEntries = true),
+            @CacheEvict(value = UserCacheNames.S1_F8, allEntries = true),
+            @CacheEvict(value = UserCacheNames.S1_F9, allEntries = true)
+    })
     public User deactivateUser(Long id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("User not found with id: " + id));
@@ -68,6 +91,10 @@ public class UserService {
         return userRepository.save(user);
     }
 
+    @Cacheable(
+            value = UserCacheNames.S1_F5,
+            key = "T(com.team01.freelance.user.cache.UserCacheKey).hash(#key, #value)",
+            unless = "#result == null")
     public List<User> findUsersByPreference(String key, String value) {
         if (isBlank(key) || isBlank(value)) {
             throw new IllegalArgumentException("Preference key and value must not be blank");
@@ -83,6 +110,10 @@ public class UserService {
         return userRepository.findByPreference(trimmedKey, trimmedValue);
     }
 
+    @Cacheable(
+            value = UserCacheNames.S1_F6,
+            key = "T(com.team01.freelance.user.cache.UserCacheKey).hash(#startDate, #endDate, #limit)",
+            unless = "#result == null")
     public List<TopFreelancerDTO> getTopFreelancersByEarnings(LocalDate startDate, LocalDate endDate, Integer limit) {
         if (startDate == null || endDate == null || startDate.isAfter(endDate)) {
             throw new IllegalArgumentException("startDate must be on or before endDate");
@@ -110,6 +141,15 @@ public class UserService {
      * @return The updated user
      * @throws EntityNotFoundException if the user is not found
      */
+    @Caching(evict = {
+            @CacheEvict(value = UserCacheNames.USER, key = "#id"),
+            @CacheEvict(value = UserCacheNames.S1_F1, allEntries = true),
+            @CacheEvict(value = UserCacheNames.S1_F3, allEntries = true),
+            @CacheEvict(value = UserCacheNames.S1_F5, allEntries = true),
+            @CacheEvict(value = UserCacheNames.S1_F6, allEntries = true),
+            @CacheEvict(value = UserCacheNames.S1_F8, allEntries = true),
+            @CacheEvict(value = UserCacheNames.S1_F9, allEntries = true)
+    })
     public User updateUser(Long id, User userDetails) {
         return userRepository.findById(id).map(existingUser -> {
             if (userDetails.getId() != null && !id.equals(userDetails.getId())) {
@@ -127,6 +167,11 @@ public class UserService {
         }).orElseThrow(() -> new EntityNotFoundException("User not found with id: " + id));
     }
 
+    @Caching(evict = {
+            @CacheEvict(value = UserCacheNames.USER, key = "#id"),
+            @CacheEvict(value = UserCacheNames.S1_F1, allEntries = true),
+            @CacheEvict(value = UserCacheNames.S1_F8, allEntries = true)
+    })
     public User updateUserRole(Long id, UserRole role) {
         if (role == null) {
             throw new IllegalArgumentException("role must not be null");
@@ -147,6 +192,15 @@ public class UserService {
         return saved;
     }
 
+    @Caching(evict = {
+            @CacheEvict(value = UserCacheNames.USER, key = "#id"),
+            @CacheEvict(value = UserCacheNames.S1_F1, allEntries = true),
+            @CacheEvict(value = UserCacheNames.S1_F3, allEntries = true),
+            @CacheEvict(value = UserCacheNames.S1_F5, allEntries = true),
+            @CacheEvict(value = UserCacheNames.S1_F6, allEntries = true),
+            @CacheEvict(value = UserCacheNames.S1_F8, allEntries = true),
+            @CacheEvict(value = UserCacheNames.S1_F9, allEntries = true)
+    })
     public boolean deleteUserById(Long id) {
         if (!userRepository.existsById(id)) {
             return false;
@@ -155,15 +209,35 @@ public class UserService {
         return true;
     }
 
+    @Caching(evict = {
+            @CacheEvict(value = UserCacheNames.USER, allEntries = true),
+            @CacheEvict(value = UserCacheNames.S1_F1, allEntries = true),
+            @CacheEvict(value = UserCacheNames.S1_F3, allEntries = true),
+            @CacheEvict(value = UserCacheNames.S1_F5, allEntries = true),
+            @CacheEvict(value = UserCacheNames.S1_F6, allEntries = true),
+            @CacheEvict(value = UserCacheNames.S1_F8, allEntries = true),
+            @CacheEvict(value = UserCacheNames.S1_F9, allEntries = true)
+    })
     public void deleteAllUsers() {
         userRepository.deleteAll();
     }
 
+    @Cacheable(
+            value = UserCacheNames.S1_F1,
+            key = "T(com.team01.freelance.user.cache.UserCacheKey).hash(#name, #email, #role)",
+            unless = "#result == null")
     public List<User> searchUsers(String name, String email, UserRole role) {
         return userRepository.searchUsers(name, email, role);
     }
 
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(value = UserCacheNames.USER, key = "#id"),
+            @CacheEvict(value = UserCacheNames.S1_F1, allEntries = true),
+            @CacheEvict(value = UserCacheNames.S1_F5, allEntries = true),
+            @CacheEvict(value = UserCacheNames.S1_F8, allEntries = true),
+            @CacheEvict(value = UserCacheNames.S1_F9, allEntries = true)
+    })
     public User updatePreferences(Long id, Map<String, Object> incomingPreferences) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("User not found with id: " + id));
@@ -179,6 +253,11 @@ public class UserService {
         user.setPreferences(merged);
         return userRepository.save(user);
     }
+
+    @Cacheable(
+            value = UserCacheNames.S1_F8,
+            key = "T(com.team01.freelance.user.cache.UserCacheKey).hash(#id)",
+            unless = "#result == null")
     public UserProfileDTO getUserProfile(Long id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("User not found with id: " + id));
@@ -207,6 +286,10 @@ public class UserService {
         );
     }
 
+    @Cacheable(
+            value = UserCacheNames.S1_F9,
+            key = "T(com.team01.freelance.user.cache.UserCacheKey).hash(#lang, #minContracts)",
+            unless = "#result == null")
     public List<User> findUsersByLanguageAndMinimumCompletedContracts(String lang, Long minContracts) {
         if (lang == null || lang.trim().isEmpty()) {
             throw new IllegalArgumentException("Language cannot be blank");
@@ -243,6 +326,10 @@ public class UserService {
         }
     }
 
+    @Cacheable(
+            value = UserCacheNames.S1_F3,
+            key = "T(com.team01.freelance.user.cache.UserCacheKey).hash(#id)",
+            unless = "#result == null")
     public UserContractSummaryDTO getUserContractSummary(Long id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("User not found with id: " + id));

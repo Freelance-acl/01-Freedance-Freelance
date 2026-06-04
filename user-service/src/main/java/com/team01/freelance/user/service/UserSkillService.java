@@ -1,11 +1,15 @@
 package com.team01.freelance.user.service;
 
+import com.team01.freelance.user.cache.UserCacheNames;
 import com.team01.freelance.user.model.UserSkill;
 import com.team01.freelance.user.repository.UserRepository;
 import com.team01.freelance.user.repository.UserSkillRepository;
 import jakarta.persistence.EntityNotFoundException;
 import com.team01.freelance.user.model.User;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,10 +31,15 @@ public class UserSkillService {
         return userSkillRepository.findAll();
     }
 
+    @Cacheable(value = UserCacheNames.USER_SKILL, key = "#id", unless = "#result == null")
     public Optional<UserSkill> getUserSkillById(Long id) {
         return userSkillRepository.findById(id);
     }
 
+    @Caching(evict = {
+            @CacheEvict(value = UserCacheNames.USER_SKILL, allEntries = true),
+            @CacheEvict(value = UserCacheNames.S1_F8, allEntries = true)
+    })
     public UserSkill createUserSkill(UserSkill userSkill) {
         if (userSkill.getUser() == null || userSkill.getUser().getId() == null) {
             throw new IllegalArgumentException("User ID is required to create a UserSkill");
@@ -51,6 +60,10 @@ public class UserSkillService {
      * @return The updated user skill
      * @throws EntityNotFoundException if the user skill is not found
      */
+    @Caching(evict = {
+            @CacheEvict(value = UserCacheNames.USER_SKILL, key = "#id"),
+            @CacheEvict(value = UserCacheNames.S1_F8, allEntries = true)
+    })
     public UserSkill updateUserSkill(Long id, UserSkill userSkill) {
         return userSkillRepository.findById(id).map(existing -> {
                 if (userSkill.getSkillName() != null) existing.setSkillName(userSkill.getSkillName());
@@ -64,6 +77,10 @@ public class UserSkillService {
         }).orElseThrow(() -> new EntityNotFoundException("User Skill not found with id: " + id));
     }
 
+    @Caching(evict = {
+            @CacheEvict(value = UserCacheNames.USER_SKILL, key = "#id"),
+            @CacheEvict(value = UserCacheNames.S1_F8, allEntries = true)
+    })
      public boolean deleteUserSkillById(Long id) {
 
         return userSkillRepository.findById(id).map(existing -> {
@@ -72,6 +89,10 @@ public class UserSkillService {
         }).orElse(false);
     }
 
+    @Caching(evict = {
+            @CacheEvict(value = UserCacheNames.USER_SKILL, allEntries = true),
+            @CacheEvict(value = UserCacheNames.S1_F8, allEntries = true)
+    })
     public void deleteAllUserSkills() {
         userSkillRepository.deleteAll();
     }
@@ -86,6 +107,11 @@ public class UserSkillService {
      * @throws IllegalArgumentException if the skill does not belong to the user
      */
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(value = UserCacheNames.USER, key = "#userId"),
+            @CacheEvict(value = UserCacheNames.USER_SKILL, allEntries = true),
+            @CacheEvict(value = UserCacheNames.S1_F8, allEntries = true)
+    })
     public User setPrimarySkill(Long userId, Long skillId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new EntityNotFoundException("User not found with id: " + userId));
