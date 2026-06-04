@@ -33,6 +33,60 @@ public class JobProposalSummaryDTO {
         this.highestBid = highestBid;
     }
 
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    public static class Builder {
+        private Long jobId;
+        private String title;
+        private Long totalProposals;
+        private Double averageBidAmount;
+        private Double lowestBid;
+        private Double highestBid;
+
+        public Builder jobId(Long jobId) {
+            this.jobId = jobId;
+            return this;
+        }
+
+        public Builder title(String title) {
+            this.title = title;
+            return this;
+        }
+
+        public Builder totalProposals(Long totalProposals) {
+            this.totalProposals = totalProposals;
+            return this;
+        }
+
+        public Builder averageBidAmount(Double averageBidAmount) {
+            this.averageBidAmount = averageBidAmount;
+            return this;
+        }
+
+        public Builder lowestBid(Double lowestBid) {
+            this.lowestBid = lowestBid;
+            return this;
+        }
+
+        public Builder highestBid(Double highestBid) {
+            this.highestBid = highestBid;
+            return this;
+        }
+
+        public JobProposalSummaryDTO build() {
+            return new JobProposalSummaryDTO(
+                    jobId,
+                    title,
+                    totalProposals,
+                    averageBidAmount,
+                    lowestBid,
+                    highestBid
+            );
+        }
+    }
+
     // Getters and Setters
 
     public Long getJobId() {
