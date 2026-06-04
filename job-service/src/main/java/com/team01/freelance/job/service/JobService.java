@@ -59,7 +59,7 @@ public class JobService {
     @Autowired
     private DataSource dataSource;
 
-    @Autowired
+    @Autowired(required = false)
     private EventSubject jobEventSubject;
 
     public List<Job> getAllJobs() {
