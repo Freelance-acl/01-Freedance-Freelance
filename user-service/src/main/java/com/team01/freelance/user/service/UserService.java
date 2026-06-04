@@ -51,7 +51,12 @@ public class UserService {
     }
 
     public User createUser(User user) {
-        return userRepository.save(user);
+        User saved = userRepository.save(user);
+        authEventSubject.notifyObservers("USER_CREATED", Map.of(
+                "userId", saved.getId(),
+                "action", "USER_CREATED",
+                "details", Map.of()));
+        return saved;
     }
 
     @Transactional
@@ -65,7 +70,12 @@ public class UserService {
 
         user.setStatus(UserStatus.DEACTIVATED);
         userRepository.withdrawSubmittedProposalsForUser(id);
-        return userRepository.save(user);
+        User saved = userRepository.save(user);
+        authEventSubject.notifyObservers("USER_DEACTIVATED", Map.of(
+                "userId", saved.getId(),
+                "action", "USER_DEACTIVATED",
+                "details", Map.of()));
+        return saved;
     }
 
     public List<User> findUsersByPreference(String key, String value) {
@@ -123,7 +133,12 @@ public class UserService {
             if (userDetails.getStatus() != null) existingUser.setStatus(userDetails.getStatus());
             if (userDetails.getPreferences() != null) existingUser.setPreferences(userDetails.getPreferences());
             if (userDetails.getCreatedAt() != null) existingUser.setCreatedAt(userDetails.getCreatedAt());
-            return userRepository.save(existingUser);
+            User saved = userRepository.save(existingUser);
+            authEventSubject.notifyObservers("USER_UPDATED", Map.of(
+                    "userId", saved.getId(),
+                    "action", "USER_UPDATED",
+                    "details", Map.of()));
+            return saved;
         }).orElseThrow(() -> new EntityNotFoundException("User not found with id: " + id));
     }
 
@@ -152,6 +167,10 @@ public class UserService {
             return false;
         }
         userRepository.deleteById(id);
+        authEventSubject.notifyObservers("USER_DELETED", Map.of(
+                "userId", id,
+                "action", "USER_DELETED",
+                "details", Map.of()));
         return true;
     }
 
@@ -176,8 +195,14 @@ public class UserService {
             merged.putAll(incomingPreferences);
         }
 
+
         user.setPreferences(merged);
-        return userRepository.save(user);
+        User saved = userRepository.save(user);
+        authEventSubject.notifyObservers("USER_UPDATED", Map.of(
+                "userId", saved.getId(),
+                "action", "USER_UPDATED",
+                "details", Map.of()));
+        return saved;
     }
     public UserProfileDTO getUserProfile(Long id) {
         User user = userRepository.findById(id)
