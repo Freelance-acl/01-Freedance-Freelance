@@ -1,4 +1,4 @@
-package com.team01.freelance.job.service;
+﻿package com.team01.freelance.job.service;
 
 import com.team01.freelance.job.dto.JobProposalSummaryDTO;
 import com.team01.freelance.job.client.ContractLookupClient;
@@ -37,6 +37,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import java.util.Map;
 
+import com.team01.freelance.common.observer.EventSubject;
+
 @Service
 public class JobService {
 
@@ -54,6 +56,9 @@ public class JobService {
 
     @Autowired
     private DataSource dataSource;
+
+    @Autowired
+    private EventSubject jobEventSubject;
 
     public List<Job> getAllJobs() {
         return jobRepository.findAll();
@@ -93,7 +98,9 @@ public class JobService {
         userRepository.findById(job.getClientId())
                 .orElseThrow(() -> new EntityNotFoundException("Client not found with id: " + job.getClientId()));
 
-        return jobRepository.save(job);
+        Job savedJob = jobRepository.save(job);
+        publishJobEvent("JOB_CREATED", savedJob.getId(), jobEventDetails(savedJob));
+        return savedJob;
     }
 
     /**
@@ -121,7 +128,9 @@ public class JobService {
                 throw new IllegalArgumentException("Budget minimum cannot be greater than budget maximum");
             }
 
-            return jobRepository.save(existingJob);
+            Job savedJob = jobRepository.save(existingJob);
+                publishJobEvent("JOB_UPDATED", savedJob.getId(), jobEventDetails(savedJob));
+            return savedJob;
         }).orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + id));
     }
 
@@ -135,7 +144,9 @@ public class JobService {
                 mergedRequirements.putAll(requirements);
             }
             existingJob.setRequirements(mergedRequirements);
-            return jobRepository.save(existingJob);
+            Job savedJob = jobRepository.save(existingJob);
+            publishJobEvent("JOB_UPDATED", savedJob.getId(), jobEventDetails(savedJob));
+            return savedJob;
         }).orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + id));
     }
 
@@ -144,11 +155,13 @@ public class JobService {
             return false;
         }
         jobRepository.deleteById(id);
+        publishJobEvent("JOB_DELETED", id, Map.of());
         return true;
     }
 
     public void deleteAllJobs() {
         jobRepository.deleteAll();
+        publishJobEvent("JOB_BULK_DELETED", null, Map.of());
     }
 
     /**
@@ -257,7 +270,13 @@ public class JobService {
         job.setRating(newRating);
         job.setTotalRatings(currentTotalRatings + 1);
 
-        return jobRepository.save(job);
+        Job savedJob = jobRepository.save(job);
+        publishJobEvent("JOB_RATED", savedJob.getId(), Map.of(
+            "contractId", ratingRequest.getContractId(),
+            "rating", ratingRequest.getRating(),
+            "ratingCount", savedJob.getTotalRatings()
+        ));
+        return savedJob;
     }
 
     @Transactional
@@ -298,6 +317,12 @@ public class JobService {
         attachment.setMetadata(metadata);
 
         jobAttachmentRepository.save(attachment);
+
+        publishJobEvent("JOB_ATTACHMENT_VERIFIED", jobId, Map.of(
+            "attachmentId", attachmentId,
+            "verifiedBy", request.getVerifiedBy(),
+            "verified", true
+        ));
 
         Job refreshedJob = jobRepository.findById(jobId)
                 .orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + jobId));
@@ -392,5 +417,28 @@ public class JobService {
      */
     public List<TopBudgetJobDTO> getTopBudgetJobs(int limit) {
         return jobRepository.findTopBudgetJobs(limit);
+    }
+
+    private void publishJobEvent(String eventType, Long jobId, Map<String, Object> details) {
+        if (jobEventSubject == null) {
+            return;
+        }
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("jobId", jobId);
+        payload.put("details", details == null ? Map.of() : details);
+        payload.put("timestamp", LocalDateTime.now());
+        payload.put("action", eventType);
+        jobEventSubject.notifyObservers(eventType, payload);
+    }
+
+    private Map<String, Object> jobEventDetails(Job job) {
+        Map<String, Object> details = new HashMap<>();
+        if (job.getTitle() != null) {
+            details.put("title", job.getTitle());
+        }
+        if (job.getStatus() != null) {
+            details.put("status", job.getStatus().name());
+        }
+        return details;
     }
 }
