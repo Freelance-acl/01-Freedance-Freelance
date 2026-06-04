@@ -1,37 +1,54 @@
 package com.team01.freelance.proposal.service;
 
-import com.team01.freelance.proposal.dto.FeeEstimateDTO;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import javax.sql.DataSource;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.team01.freelance.common.observer.EventSubject;
 import com.team01.freelance.contract.model.Contract;
 import com.team01.freelance.contract.model.ContractStatus;
 import com.team01.freelance.contract.repository.ContractRepository;
 import com.team01.freelance.job.model.Job;
 import com.team01.freelance.job.repository.JobRepository;
-import com.team01.freelance.wallet.repository.PayoutRepository;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.team01.freelance.proposal.cache.CacheKeyUtil;
+import com.team01.freelance.proposal.cache.ProposalCacheInvalidationService;
+import com.team01.freelance.proposal.cache.ProposalCacheService;
+import com.team01.freelance.proposal.dto.FeeEstimateDTO;
 import com.team01.freelance.proposal.dto.ProposalAnalyticsDTO;
+import com.team01.freelance.proposal.dto.ProposalAnalyticsDashboardDTO;
 import com.team01.freelance.proposal.dto.ProposalDetailsDTO;
+import com.team01.freelance.proposal.dto.RecordInteractionResponse;
+import com.team01.freelance.proposal.graph.InteractionGraphService;
 import com.team01.freelance.proposal.model.MilestoneStatus;
 import com.team01.freelance.proposal.model.Proposal;
 import com.team01.freelance.proposal.model.ProposalMilestone;
 import com.team01.freelance.proposal.model.ProposalStatus;
 import com.team01.freelance.proposal.repository.ProposalAnalyticsProjection;
+import com.team01.freelance.proposal.repository.ProposalDashboardProjection;
 import com.team01.freelance.proposal.repository.ProposalRepository;
+import com.team01.freelance.proposal.repository.ProposalStatusCountProjection;
+import com.team01.freelance.user.model.User;
 import com.team01.freelance.user.repository.UserRepository;
+import com.team01.freelance.wallet.repository.PayoutRepository;
 
 import jakarta.persistence.EntityNotFoundException;
 
@@ -67,15 +84,44 @@ public class ProposalService {
     @Autowired
     private DataSource dataSource;
 
+    @Autowired
+    private ProposalCacheService proposalCacheService;
+
+    @Autowired
+    private ProposalCacheInvalidationService cacheInvalidationService;
+
+    @Autowired
+    @Qualifier("proposalEventSubject")
+    private EventSubject proposalEventSubject;
+
+    @Autowired
+    private InteractionGraphService interactionGraphService;
+
     public List<Proposal> getAllProposals() {
         return proposalRepository.findAll();
     }
 
     public Optional<Proposal> getProposalById(Long id) {
-        return proposalRepository.findById(id);
+        String key = CacheKeyUtil.entityKey("proposal", id);
+        Optional<Proposal> cached = proposalCacheService.get(key, Proposal.class);
+        if (cached.isPresent()) {
+            return cached;
+        }
+        Optional<Proposal> loaded = proposalRepository.findById(id);
+        loaded.ifPresent(proposal -> proposalCacheService.put(key, Duration.ofMinutes(15), proposal));
+        return loaded;
     }
 
     public ProposalDetailsDTO getProposalDetails(Long proposalId) {
+        String key = CacheKeyUtil.featureKey("S3-F9", String.valueOf(proposalId));
+        return proposalCacheService.getOrCompute(
+                key,
+                Duration.ofMinutes(10),
+                ProposalDetailsDTO.class,
+                () -> loadProposalDetails(proposalId));
+    }
+
+    private ProposalDetailsDTO loadProposalDetails(Long proposalId) {
         Proposal proposal = proposalRepository.findByIdWithMilestones(proposalId)
                 .orElseThrow(() -> new EntityNotFoundException("Proposal not found with id: " + proposalId));
         List<ProposalDetailsDTO.MilestoneDTO> milestones = Optional.ofNullable(proposal.getProposalMilestones())
@@ -114,13 +160,21 @@ public class ProposalService {
         if (startDate.isAfter(endDate)) {
             throw new IllegalArgumentException("startDate must be on or before endDate");
         }
-        ProposalStatus parsedStatus = null;
-        if (status != null && !status.isBlank()) {
-            parsedStatus = ProposalStatus.fromString(status.trim());
-        }
+        final ProposalStatus statusFilter =
+                (status != null && !status.isBlank()) ? ProposalStatus.fromString(status.trim()) : null;
         LocalDateTime start = startDate.atStartOfDay();
         LocalDateTime endExclusive = endDate.plusDays(1).atStartOfDay();
-        return proposalRepository.searchBySubmittedAtRangeAndOptionalStatus(start, endExclusive, parsedStatus);
+        Map<String, Object> params = Map.of(
+                "status", status == null ? "" : status,
+                "startDate", startDate.toString(),
+                "endDate", endDate.toString());
+        String key = CacheKeyUtil.featureKey("S3-F1", CacheKeyUtil.hashParams(params));
+        return proposalCacheService.getOrCompute(
+                key,
+                Duration.ofMinutes(5),
+                new TypeReference<List<Proposal>>() {
+                },
+                () -> proposalRepository.searchBySubmittedAtRangeAndOptionalStatus(start, endExclusive, statusFilter));
     }
 
     /**
@@ -138,7 +192,14 @@ public class ProposalService {
         }
         String normalizedKey = key.trim();
         String normalizedValue = value.trim();
-        List<Proposal> matches = findProposalsByMetadata(normalizedKey, normalizedValue);
+        Map<String, Object> params = Map.of("key", normalizedKey, "value", normalizedValue);
+        String cacheKey = CacheKeyUtil.featureKey("S3-F5", CacheKeyUtil.hashParams(params));
+        List<Proposal> matches = proposalCacheService.getOrCompute(
+                cacheKey,
+                Duration.ofMinutes(5),
+                new TypeReference<List<Proposal>>() {
+                },
+                () -> findProposalsByMetadata(normalizedKey, normalizedValue));
         matches.forEach(proposal -> proposal.setProposalMilestones(new ArrayList<>()));
         return matches;
     }
@@ -179,7 +240,16 @@ public class ProposalService {
         
     public ProposalAnalyticsDTO getProposalAnalytics(LocalDate startDate, LocalDate endDate) {
         validateDateRange(startDate, endDate);
+        Map<String, Object> params = Map.of("startDate", startDate.toString(), "endDate", endDate.toString());
+        String cacheKey = CacheKeyUtil.featureKey("S3-F6", CacheKeyUtil.hashParams(params));
+        return proposalCacheService.getOrCompute(
+                cacheKey,
+                Duration.ofMinutes(10),
+                ProposalAnalyticsDTO.class,
+                () -> loadProposalAnalytics(startDate, endDate));
+    }
 
+    private ProposalAnalyticsDTO loadProposalAnalytics(LocalDate startDate, LocalDate endDate) {
         LocalDateTime start = startDate.atStartOfDay();
         LocalDateTime endExclusive = endDate.plusDays(1).atStartOfDay();
         ProposalAnalyticsProjection analytics = proposalRepository.calculateAnalyticsBySubmittedAtRange(start, endExclusive);
@@ -193,6 +263,93 @@ public class ProposalService {
                 analytics.getAcceptanceRate().doubleValue());
     }
 
+    public ProposalAnalyticsDashboardDTO getProposalAnalyticsDashboard(LocalDate startDate, LocalDate endDate) {
+        validateDateRange(startDate, endDate);
+        logAnalyticsViewed();
+        Map<String, Object> params = Map.of("startDate", startDate.toString(), "endDate", endDate.toString());
+        String cacheKey = CacheKeyUtil.featureKey("S3-F10", CacheKeyUtil.hashParams(params));
+        return proposalCacheService.getOrCompute(
+                cacheKey,
+                Duration.ofMinutes(10),
+                ProposalAnalyticsDashboardDTO.class,
+                () -> loadProposalAnalyticsDashboard(startDate, endDate));
+    }
+
+    private ProposalAnalyticsDashboardDTO loadProposalAnalyticsDashboard(LocalDate startDate, LocalDate endDate) {
+        LocalDateTime start = startDate.atStartOfDay();
+        LocalDateTime endInclusive = endDate.atTime(23, 59, 59, 999_000_000);
+        ProposalDashboardProjection stats =
+                proposalRepository.calculateDashboardBySubmittedAtRange(start, endInclusive);
+        long total = stats.getTotalProposals() != null ? stats.getTotalProposals() : 0L;
+        long accepted = stats.getAcceptedProposals() != null ? stats.getAcceptedProposals() : 0L;
+        double acceptanceRate = total == 0 ? 0.0 : (double) accepted / total;
+        Map<String, Long> byStatus = proposalRepository.countProposalsByStatusInRange(start, endInclusive).stream()
+                .collect(Collectors.toMap(
+                        ProposalStatusCountProjection::getStatus,
+                        ProposalStatusCountProjection::getCount,
+                        Long::sum,
+                        LinkedHashMap::new));
+        return ProposalAnalyticsDashboardDTO.builder()
+                .totalProposals(total)
+                .acceptanceRate(acceptanceRate)
+                .averageBidAmount(stats.getAverageBidAmount() != null ? stats.getAverageBidAmount() : 0.0)
+                .averageEstimatedDays(stats.getAverageEstimatedDays() != null ? stats.getAverageEstimatedDays() : 0.0)
+                .proposalsByStatus(byStatus)
+                .build();
+    }
+
+    public FeeEstimateDTO estimatePlatformFee(Double bidAmount, Integer estimatedDays) {
+        return estimatePlatformFee(bidAmount, estimatedDays, null);
+    }
+
+    public FeeEstimateDTO estimatePlatformFee(Double bidAmount, Integer estimatedDays, String requestBodyHash) {
+        if (bidAmount == null || bidAmount <= 0) {
+            throw new IllegalArgumentException("bidAmount must be positive");
+        }
+        if (estimatedDays == null || estimatedDays <= 0) {
+            throw new IllegalArgumentException("estimatedDays must be positive");
+        }
+        String hash = requestBodyHash != null
+                ? requestBodyHash
+                : CacheKeyUtil.hashParams(Map.of("bidAmount", bidAmount, "estimatedDays", estimatedDays));
+        String cacheKey = CacheKeyUtil.featureKey("S3-F3", hash);
+        return proposalCacheService.getOrCompute(
+                cacheKey,
+                Duration.ofMinutes(5),
+                FeeEstimateDTO.class,
+                () -> computePlatformFee(bidAmount, estimatedDays));
+    }
+
+    public RecordInteractionResponse recordFreelancerJobInteraction(Long proposalId) {
+        Proposal proposal = proposalRepository.findById(proposalId)
+                .orElseThrow(() -> new EntityNotFoundException("Proposal not found with id: " + proposalId));
+        if (proposal.getStatus() != ProposalStatus.SUBMITTED) {
+            throw new IllegalArgumentException("Only SUBMITTED proposals can record interactions");
+        }
+        User freelancer = userRepository.findById(proposal.getFreelancerId())
+                .orElseThrow(() -> new EntityNotFoundException("Freelancer not found with id: " + proposal.getFreelancerId()));
+        Job job = jobRepository.findById(proposal.getJobId())
+                .orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + proposal.getJobId()));
+
+        boolean mutated = interactionGraphService.recordInteraction(
+                proposalId,
+                proposal.getFreelancerId(),
+                freelancer.getName(),
+                proposal.getJobId(),
+                job.getTitle(),
+                job.getCategory() != null ? job.getCategory().name() : null);
+
+        if (mutated) {
+            Map<String, Object> details = Map.of(
+                    "proposalId", proposalId,
+                    "freelancerId", proposal.getFreelancerId(),
+                    "jobId", proposal.getJobId());
+            notifyProposalEvent(proposalId, "INTERACTION_RECORDED", details);
+            cacheInvalidationService.invalidateRecommendations();
+        }
+        return new RecordInteractionResponse("Interaction recorded successfully");
+    }
+
     public Proposal createProposal(Proposal proposal) {
         if (proposal.getFreelancerId() == null || proposal.getJobId() == null) {
             throw new IllegalArgumentException("Freelancer and Job IDs are required to create a Proposal");
@@ -204,7 +361,9 @@ public class ProposalService {
         userRepository.findById(proposal.getFreelancerId())
                 .orElseThrow(() -> new EntityNotFoundException("Freelancer not found with id: " + proposal.getFreelancerId()));
 
-        return proposalRepository.save(proposal);
+        Proposal saved = proposalRepository.save(proposal);
+        cacheInvalidationService.invalidateAfterProposalWrite(saved.getId(), saved.getJobId());
+        return saved;
     }
 
     /**
@@ -223,7 +382,9 @@ public class ProposalService {
             if (proposalDetails.getStatus() != null) existingProposal.setStatus(proposalDetails.getStatus());
             if (proposalDetails.getMetadata() != null) existingProposal.setMetadata(proposalDetails.getMetadata());
             if (proposalDetails.getAcceptedAt() != null) existingProposal.setAcceptedAt(proposalDetails.getAcceptedAt());
-            return proposalRepository.save(existingProposal);
+            Proposal saved = proposalRepository.save(existingProposal);
+            cacheInvalidationService.invalidateAfterProposalWrite(saved.getId(), saved.getJobId());
+            return saved;
         }).orElseThrow(() -> new EntityNotFoundException("Proposal not found with id: " + id));
     }
 
@@ -272,6 +433,14 @@ public class ProposalService {
         );
 
         acceptedProposal.setProposalMilestones(new ArrayList<>());
+        notifyProposalEvent(
+                acceptedProposal.getId(),
+                "PROPOSAL_ACCEPTED",
+                Map.of(
+                        "proposalId", acceptedProposal.getId(),
+                        "freelancerId", acceptedProposal.getFreelancerId(),
+                        "jobId", acceptedProposal.getJobId()));
+        cacheInvalidationService.invalidateAfterProposalWrite(acceptedProposal.getId(), acceptedProposal.getJobId());
         return acceptedProposal;
     }
 
@@ -315,7 +484,9 @@ public class ProposalService {
             proposal.addProposalMilestone(milestone);
         }
 
-        return proposalRepository.save(proposal);
+        Proposal saved = proposalRepository.save(proposal);
+        cacheInvalidationService.invalidateAfterProposalWrite(saved.getId(), saved.getJobId());
+        return saved;
     }
 
     private void validateMilestone(ProposalMilestone milestone) {
@@ -354,6 +525,7 @@ public class ProposalService {
         }
 
         withdrawnProposal.setProposalMilestones(new ArrayList<>());
+        cacheInvalidationService.invalidateAfterProposalWrite(withdrawnProposal.getId(), withdrawnProposal.getJobId());
         return withdrawnProposal;
     }
 
@@ -396,6 +568,14 @@ public class ProposalService {
         );
 
         proposal.setProposalMilestones(new ArrayList<>());
+        notifyProposalEvent(
+                proposal.getId(),
+                "PROPOSAL_COMPLETED",
+                Map.of(
+                        "proposalId", proposal.getId(),
+                        "freelancerId", proposal.getFreelancerId(),
+                        "jobId", contract.getJobId()));
+        cacheInvalidationService.invalidateAfterProposalWrite(proposal.getId(), contract.getJobId());
         return proposal;
     }
 
@@ -403,6 +583,8 @@ public class ProposalService {
         if (!proposalRepository.existsById(id)) {
             return false;
         }
+        proposalRepository.findById(id).ifPresent(proposal ->
+                cacheInvalidationService.invalidateAfterProposalWrite(id, proposal.getJobId()));
         proposalRepository.deleteById(id);
         return true;
     }
@@ -411,22 +593,7 @@ public class ProposalService {
         proposalRepository.deleteAll();
     }
 
-    /**
-     * Computes a read-only platform fee estimate from bid amount and duration.
-     *
-     * @param bidAmount the proposed bid (must be positive)
-     * @param estimatedDays expected delivery days (must be positive)
-     * @return fee breakdown for the freelancer
-     * @throws IllegalArgumentException if inputs are null or not positive
-     */
-    public FeeEstimateDTO estimatePlatformFee(Double bidAmount, Integer estimatedDays) {
-        if (bidAmount == null || bidAmount <= 0) {
-            throw new IllegalArgumentException("bidAmount must be positive");
-        }
-        if (estimatedDays == null || estimatedDays <= 0) {
-            throw new IllegalArgumentException("estimatedDays must be positive");
-        }
-
+    private FeeEstimateDTO computePlatformFee(double bidAmount, int estimatedDays) {
         double minBid = bidAmount * 0.8;
         double maxBid = bidAmount * 1.2;
         long similarProposalCount = proposalRepository.countActiveProposalsInSimilarBidRange(minBid, maxBid);
@@ -436,12 +603,29 @@ public class ProposalService {
         double freelancerPayout = bidAmount - platformFee;
         double estimatedDailyRate = freelancerPayout / estimatedDays;
 
-        return new FeeEstimateDTO(
-                bidAmount,
-                platformFee,
-                freelancerPayout,
-                feePercentage,
-                estimatedDailyRate);
+        return FeeEstimateDTO.builder()
+                .bidAmount(bidAmount)
+                .platformFee(platformFee)
+                .freelancerPayout(freelancerPayout)
+                .feePercentage(feePercentage)
+                .estimatedDailyRate(estimatedDailyRate)
+                .build();
+    }
+
+    private void logAnalyticsViewed() {
+        notifyProposalEvent(null, "ANALYTICS_VIEWED", Map.of());
+    }
+
+    private void notifyProposalEvent(Long proposalId, String action, Map<String, Object> details) {
+        Map<String, Object> payload = new HashMap<>();
+        if (proposalId != null) {
+            payload.put("proposalId", proposalId);
+        } else {
+            payload.put("proposalId", 0L);
+        }
+        payload.put("action", action);
+        payload.put("details", details);
+        proposalEventSubject.notifyObservers(action, payload);
     }
 
     private static int resolveFeePercentage(long similarProposalCount) {

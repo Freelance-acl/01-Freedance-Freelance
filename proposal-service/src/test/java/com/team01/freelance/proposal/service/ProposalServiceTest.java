@@ -15,6 +15,11 @@ import com.team01.freelance.wallet.repository.PayoutRepository;
 import com.team01.freelance.contract.repository.ContractRepository;
 import com.team01.freelance.proposal.model.MilestoneStatus;
 import com.team01.freelance.proposal.repository.ProposalAnalyticsProjection;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.team01.freelance.common.observer.EventSubject;
+import com.team01.freelance.proposal.cache.ProposalCacheInvalidationService;
+import com.team01.freelance.proposal.cache.ProposalCacheService;
+import com.team01.freelance.proposal.graph.InMemoryInteractionGraphService;
 import com.team01.freelance.proposal.repository.ProposalRepository;
 import com.team01.freelance.job.repository.JobRepository;
 import com.team01.freelance.user.repository.UserRepository;
@@ -25,6 +30,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
@@ -69,7 +75,18 @@ class ProposalServiceTest {
 
     @BeforeEach
     void setUp() {
-        // MockitoExtension injects mocks into proposalService
+        ObjectMapper objectMapper = new ObjectMapper();
+        ReflectionTestUtils.setField(
+                proposalService,
+                "proposalCacheService",
+                new ProposalCacheService(null, objectMapper));
+        ReflectionTestUtils.setField(
+                proposalService,
+                "cacheInvalidationService",
+                new ProposalCacheInvalidationService(null));
+        ReflectionTestUtils.setField(proposalService, "proposalEventSubject", new EventSubject());
+        ReflectionTestUtils.setField(
+                proposalService, "interactionGraphService", new InMemoryInteractionGraphService());
     }
 
     @Test
@@ -685,6 +702,7 @@ class ProposalServiceTest {
         Proposal proposal = new Proposal();
         proposal.setId(5L);
         proposal.setStatus(ProposalStatus.ACCEPTED);
+        proposal.setFreelancerId(30L);
 
         Contract contract = new Contract();
         contract.setId(20L);

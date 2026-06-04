@@ -1,11 +1,18 @@
 package com.team01.freelance.proposal.service;
 
+import java.time.Duration;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import com.team01.freelance.proposal.cache.CacheKeyUtil;
+import com.team01.freelance.proposal.cache.ProposalCacheInvalidationService;
+import com.team01.freelance.proposal.cache.ProposalCacheService;
 import com.team01.freelance.proposal.model.ProposalMilestone;
 import com.team01.freelance.proposal.repository.ProposalMilestoneRepository;
 import com.team01.freelance.proposal.repository.ProposalRepository;
+
 import jakarta.persistence.EntityNotFoundException;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Optional;
@@ -19,12 +26,25 @@ public class ProposalMilestoneService {
     @Autowired
     private ProposalRepository proposalRepository;
 
+    @Autowired
+    private ProposalCacheService proposalCacheService;
+
+    @Autowired
+    private ProposalCacheInvalidationService cacheInvalidationService;
+
     public List<ProposalMilestone> getAllProposalMilestones() {
         return proposalMilestoneRepository.findAll();
     }
 
     public Optional<ProposalMilestone> getProposalMilestoneById(Long id) {
-        return proposalMilestoneRepository.findById(id);
+        String key = CacheKeyUtil.entityKey("proposal-milestone", id);
+        Optional<ProposalMilestone> cached = proposalCacheService.get(key, ProposalMilestone.class);
+        if (cached.isPresent()) {
+            return cached;
+        }
+        Optional<ProposalMilestone> loaded = proposalMilestoneRepository.findById(id);
+        loaded.ifPresent(milestone -> proposalCacheService.put(key, Duration.ofMinutes(15), milestone));
+        return loaded;
     }
 
     public ProposalMilestone createProposalMilestone(ProposalMilestone proposalMilestone) {
@@ -55,7 +75,9 @@ public class ProposalMilestoneService {
                 if (proposalMilestone.getAmount() != null) existing.setAmount(proposalMilestone.getAmount());
                 if (proposalMilestone.getStatus() != null) existing.setStatus(proposalMilestone.getStatus());
                 if (proposalMilestone.getMetadata() != null) existing.setMetadata(proposalMilestone.getMetadata());
-            return proposalMilestoneRepository.save(existing);
+            ProposalMilestone saved = proposalMilestoneRepository.save(existing);
+            cacheInvalidationService.invalidateAfterProposalMilestoneWrite(id);
+            return saved;
         }).orElseThrow(() -> new EntityNotFoundException("Proposal Milestone not found with id: " + id));
     }
 
@@ -63,6 +85,7 @@ public class ProposalMilestoneService {
         if (!proposalMilestoneRepository.existsById(id)) {
             return false;
         }
+        cacheInvalidationService.invalidateAfterProposalMilestoneWrite(id);
         proposalMilestoneRepository.deleteById(id);
         return true;
     }
