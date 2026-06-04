@@ -22,7 +22,17 @@ public class InMemoryInteractionGraphService implements InteractionGraphService 
             Long jobId,
             String jobTitle,
             String jobCategory) {
-        String key = freelancerId + ":" + jobId + ":" + proposalId;
+        String key = edgeKey(freelancerId, jobId, proposalId);
         return recorded.add(key);
+    }
+
+    /** Test helper: distinct proposal ids recorded for a freelancer–job pair. */
+    public int recordedProposalCount(Long freelancerId, Long jobId) {
+        String prefix = freelancerId + ":" + jobId + ":";
+        return (int) recorded.stream().filter(key -> key.startsWith(prefix)).count();
+    }
+
+    private static String edgeKey(Long freelancerId, Long jobId, Long proposalId) {
+        return freelancerId + ":" + jobId + ":" + proposalId;
     }
 }
