@@ -56,6 +56,14 @@ public class ProposalCacheInvalidationService {
         deleteByPattern("proposal-service::S3-F12::*");
     }
 
+    public void invalidateAllProposalCaches() {
+        deleteByPattern("proposal-service::proposal::*");
+        deleteByPattern("proposal-service::proposal-milestone::*");
+        invalidateReadFeatureCaches();
+        invalidateAnalyticsDashboard();
+        invalidateRecommendations();
+    }
+
     public void invalidateAnalyticsDashboard() {
         deleteByPattern("proposal-service::S3-F10::*");
     }
