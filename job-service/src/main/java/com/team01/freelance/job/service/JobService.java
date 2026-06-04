@@ -18,6 +18,7 @@ import com.team01.freelance.user.model.UserRole;
 import com.team01.freelance.user.repository.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -59,10 +60,15 @@ public class JobService {
         return jobRepository.findAll();
     }
 
+    @Cacheable(value = "job-by-id", key = "#id", unless = "#result.isEmpty()")
     public Optional<Job> getJobById(Long id) {
         return jobRepository.findById(id);
     }
 
+    @Cacheable(
+            value = "S2-F1",
+            key = "(#status == null ? 'ALL' : #status.trim()) + ':' + #minBudget + ':' + #maxBudget + ':' + #pageable.pageNumber + ':' + #pageable.pageSize + ':' + #pageable.sort.toString()"
+    )
     public Page<Job> searchJobsByStatusAndBudgetRange(String status, Double minBudget, Double maxBudget, Pageable pageable) {
         if (minBudget == null || maxBudget == null) {
             throw new IllegalArgumentException("minBudget and maxBudget are required");
@@ -162,6 +168,10 @@ public class JobService {
      * @throws IllegalArgumentException if startDate is after endDate
      * @throws EntityNotFoundException if job is not found
      */
+    @Cacheable(
+            value = "S2-F3",
+            key = "#jobId + ':' + (#startDate == null ? 'null' : #startDate.toString()) + ':' + (#endDate == null ? 'null' : #endDate.toString())"
+    )
     public JobProposalSummaryDTO getJobProposalSummary(Long jobId, LocalDate startDate, LocalDate endDate) {
         if (startDate == null || endDate == null) {
             throw new IllegalArgumentException("startDate and endDate are required");
@@ -318,6 +328,10 @@ public class JobService {
      * @param status the optional job status filter
      * @return a list of jobs matching the criteria
      */
+    @Cacheable(
+            value = "S2-F5",
+            key = "#key + ':' + #value + ':' + (#status == null ? 'ALL' : #status)"
+    )
     public List<Job> searchByRequirements(String key, String value, String status) {
         if (!usesPostgresDatabase()) {
             return filterJobsByRequirements(key, value, status);
@@ -390,6 +404,7 @@ public class JobService {
      * @param limit the maximum number of jobs to return
      * @return a list of TopBudgetJobDTO with job details and proposal counts
      */
+    @Cacheable(value = "S2-F6", key = "#limit")
     public List<TopBudgetJobDTO> getTopBudgetJobs(int limit) {
         return jobRepository.findTopBudgetJobs(limit);
     }
