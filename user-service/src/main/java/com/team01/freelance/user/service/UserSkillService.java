@@ -8,7 +8,8 @@ import com.team01.freelance.user.model.User;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
+import com.team01.freelance.common.observer.EventSubject;
+import java.util.Map;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -22,6 +23,9 @@ public class UserSkillService {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private EventSubject authEventSubject;
 
     public List<UserSkill> getAllUserSkills() {
         return userSkillRepository.findAll();
@@ -39,7 +43,12 @@ public class UserSkillService {
         userSkill.setUser(userRepository.findById(userSkill.getUser().getId())
                 .orElseThrow(() -> new EntityNotFoundException("User not found with id: " + userSkill.getUser().getId())));
 
-        return userSkillRepository.save(userSkill);
+        UserSkill saved = userSkillRepository.save(userSkill);
+        authEventSubject.notifyObservers("USER_SKILL_CREATED", Map.of(
+                "userId", saved.getUser().getId(),
+                "action", "USER_SKILL_CREATED",
+                "details", Map.of()));
+        return saved;
     }
 
     /**
@@ -60,14 +69,26 @@ public class UserSkillService {
                 if (userSkill.getIsPrimary() != null) existing.setIsPrimary(userSkill.getIsPrimary());
                 if (userSkill.getMetadata() != null) existing.setMetadata(userSkill.getMetadata());
                 if (userSkill.getCreatedAt() != null) existing.setCreatedAt(userSkill.getCreatedAt());
-            return userSkillRepository.save(existing);
+            UserSkill saved = userSkillRepository.save(existing);
+            Long userId = saved.getUser() != null ? saved.getUser().getId() : -1L;
+            authEventSubject.notifyObservers("USER_SKILL_UPDATED", Map.of(
+                    "userId", userId,
+                    "action", "USER_SKILL_UPDATED",
+                    "details", Map.of()));
+            return saved;
         }).orElseThrow(() -> new EntityNotFoundException("User Skill not found with id: " + id));
     }
 
-     public boolean deleteUserSkillById(Long id) {
-
+    public boolean deleteUserSkillById(Long id) {
         return userSkillRepository.findById(id).map(existing -> {
+            Long userId = existing.getUser() != null ? existing.getUser().getId() : null;
             userSkillRepository.delete(existing);
+            if (userId != null) {
+                authEventSubject.notifyObservers("USER_SKILL_DELETED", Map.of(
+                        "userId", userId,
+                        "action", "USER_SKILL_DELETED",
+                        "details", Map.of()));
+            }
             return true;
         }).orElse(false);
     }
@@ -115,6 +136,11 @@ public class UserSkillService {
             throw new EntityNotFoundException("User Skill not found with id: " + skillId);
         }
 
-        return userRepository.save(user);
+        User saved = userRepository.save(user);
+        authEventSubject.notifyObservers("PRIMARY_SKILL_SET", Map.of(
+                "userId", saved.getId(),
+                "action", "PRIMARY_SKILL_SET",
+                "details", Map.of("skillId", skillId)));
+        return saved;
     }
 }
