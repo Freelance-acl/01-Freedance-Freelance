@@ -30,5 +30,5 @@ server:
   port: ${SERVER_PORT:8080}
 
 jwt:
-  secret: ${JWT_SECRET}
-  expiration: 86400000
+  secret: ${JWT_SECRET:dGhpcy1pcy1hLXRlc3Qtc2VjcmV0LWtleS1mb3ItbTJhdC1sZWFzdC0zMmJ5dGVz}
+  expiration: ${JWT_EXPIRATION:86400000}
