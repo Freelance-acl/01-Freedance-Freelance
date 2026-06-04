@@ -3,6 +3,8 @@ package com.team01.freelance.job.service;
 import com.team01.freelance.job.dto.JobProposalSummaryDTO;
 import com.team01.freelance.job.client.ContractLookupClient;
 import com.team01.freelance.job.client.ContractSummary;
+import com.team01.freelance.common.observer.EventSubject;
+import com.team01.freelance.job.event.JobEventTypes;
 import com.team01.freelance.job.exception.ForbiddenOperationException;
 import com.team01.freelance.job.model.JobAttachmentAlertDTO;
 import com.team01.freelance.job.model.JobAttachment;
@@ -54,6 +56,9 @@ public class JobService {
 
     @Autowired
     private DataSource dataSource;
+
+    @Autowired
+    private EventSubject jobEventSubject;
 
     public List<Job> getAllJobs() {
         return jobRepository.findAll();
@@ -127,15 +132,23 @@ public class JobService {
 
     public Job updateJobRequirements(Long id, Map<String, Object> requirements) {
         return jobRepository.findById(id).map(existingJob -> {
+            Map<String, Object> changedRequirements = requirements == null
+                    ? Map.of()
+                    : new LinkedHashMap<>(requirements);
             Map<String, Object> mergedRequirements = new HashMap<>();
             if (existingJob.getRequirements() != null) {
                 mergedRequirements.putAll(existingJob.getRequirements());
             }
-            if (requirements != null) {
-                mergedRequirements.putAll(requirements);
-            }
+            mergedRequirements.putAll(changedRequirements);
             existingJob.setRequirements(mergedRequirements);
-            return jobRepository.save(existingJob);
+            Job savedJob = jobRepository.save(existingJob);
+            jobEventSubject.notifyObservers(JobEventTypes.REQUIREMENTS_UPDATED_JOB, Map.of(
+                    "jobId", savedJob.getId(),
+                    "timestamp", LocalDateTime.now(),
+                    "changedRequirements", changedRequirements,
+                    "requirements", new LinkedHashMap<>(mergedRequirements)
+            ));
+            return savedJob;
         }).orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + id));
     }
 
