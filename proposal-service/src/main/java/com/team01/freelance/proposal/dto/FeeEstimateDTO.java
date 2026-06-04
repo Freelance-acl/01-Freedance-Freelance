@@ -19,17 +19,16 @@ public class FeeEstimateDTO {
     @JsonAlias({"estimatedDailyRate", "estimated_daily_rate"})
     private final double estimatedDailyRate;
 
-    public FeeEstimateDTO(
-            double bidAmount,
-            double platformFee,
-            double freelancerPayout,
-            int feePercentage,
-            double estimatedDailyRate) {
-        this.bidAmount = bidAmount;
-        this.platformFee = platformFee;
-        this.freelancerPayout = freelancerPayout;
-        this.feePercentage = feePercentage;
-        this.estimatedDailyRate = estimatedDailyRate;
+    private FeeEstimateDTO(Builder builder) {
+        this.bidAmount = builder.bidAmount;
+        this.platformFee = builder.platformFee;
+        this.freelancerPayout = builder.freelancerPayout;
+        this.feePercentage = builder.feePercentage;
+        this.estimatedDailyRate = builder.estimatedDailyRate;
+    }
+
+    public static Builder builder() {
+        return new Builder();
     }
 
     public double getBidAmount() {
@@ -50,5 +49,42 @@ public class FeeEstimateDTO {
 
     public double getEstimatedDailyRate() {
         return estimatedDailyRate;
+    }
+
+    public static final class Builder {
+        private double bidAmount;
+        private double platformFee;
+        private double freelancerPayout;
+        private int feePercentage;
+        private double estimatedDailyRate;
+
+        public Builder bidAmount(double bidAmount) {
+            this.bidAmount = bidAmount;
+            return this;
+        }
+
+        public Builder platformFee(double platformFee) {
+            this.platformFee = platformFee;
+            return this;
+        }
+
+        public Builder freelancerPayout(double freelancerPayout) {
+            this.freelancerPayout = freelancerPayout;
+            return this;
+        }
+
+        public Builder feePercentage(int feePercentage) {
+            this.feePercentage = feePercentage;
+            return this;
+        }
+
+        public Builder estimatedDailyRate(double estimatedDailyRate) {
+            this.estimatedDailyRate = estimatedDailyRate;
+            return this;
+        }
+
+        public FeeEstimateDTO build() {
+            return new FeeEstimateDTO(this);
+        }
     }
 }
