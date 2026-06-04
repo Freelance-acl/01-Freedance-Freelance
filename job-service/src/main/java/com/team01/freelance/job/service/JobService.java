@@ -1,5 +1,6 @@
 package com.team01.freelance.job.service;
 
+import com.team01.freelance.common.observer.EventSubject;
 import com.team01.freelance.job.dto.JobProposalSummaryDTO;
 import com.team01.freelance.job.client.ContractLookupClient;
 import com.team01.freelance.job.client.ContractSummary;
@@ -18,6 +19,7 @@ import com.team01.freelance.user.model.UserRole;
 import com.team01.freelance.user.repository.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -54,6 +56,10 @@ public class JobService {
 
     @Autowired
     private DataSource dataSource;
+
+    @Autowired
+    @Qualifier("jobEventSubject")
+    private EventSubject jobEventSubject;
 
     public List<Job> getAllJobs() {
         return jobRepository.findAll();
@@ -379,8 +385,18 @@ public class JobService {
 
         jobRepository.rejectSubmittedProposalsByJobId(jobId);
 
-        return jobRepository.findById(jobId)
+        Job closedJob = jobRepository.findById(jobId)
                 .orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + jobId));
+        publishJobClosedEvent(closedJob);
+        return closedJob;
+    }
+
+    private void publishJobClosedEvent(Job job) {
+        jobEventSubject.notifyObservers("JOB_CLOSED", Map.of(
+                "jobId", job.getId(),
+                "status", job.getStatus().name(),
+                "source", "S2-F4"
+        ));
     }
 
     /**

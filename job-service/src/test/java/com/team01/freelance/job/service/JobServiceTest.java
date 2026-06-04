@@ -1,5 +1,6 @@
 package com.team01.freelance.job.service;
 
+import com.team01.freelance.common.observer.EventSubject;
 import com.team01.freelance.job.dto.JobProposalSummaryDTO;
 import com.team01.freelance.job.client.ContractLookupClient;
 import com.team01.freelance.job.client.ContractSummary;
@@ -58,6 +59,9 @@ class JobServiceTest {
 
     @Mock
     private DataSource dataSource;
+
+    @Mock
+    private EventSubject jobEventSubject;
 
     @InjectMocks
     private JobService jobService;
@@ -688,6 +692,7 @@ class JobServiceTest {
         assertEquals(JobStatus.CLOSED, result.getStatus());
         verify(jobRepository).closeJobIfEligible(jobId);
         verify(jobRepository).rejectSubmittedProposalsByJobId(jobId);
+        verify(jobEventSubject).notifyObservers(eq("JOB_CLOSED"), any(Map.class));
         verify(jobRepository, never()).save(any(Job.class));
     }
 
@@ -703,6 +708,7 @@ class JobServiceTest {
 
         assertThrows(IllegalArgumentException.class, () -> jobService.closeJob(jobId));
         verify(jobRepository, never()).rejectSubmittedProposalsByJobId(anyLong());
+        verify(jobEventSubject, never()).notifyObservers(anyString(), any());
     }
 
     @Test
@@ -773,6 +779,7 @@ class JobServiceTest {
 
         assertEquals(JobStatus.CLOSED, result.getStatus());
         verify(jobRepository, never()).closeJobIfEligible(anyLong());
+        verify(jobEventSubject, never()).notifyObservers(anyString(), any());
     }
 
     private Job createJobWithAttachments(Long id, String title, JobStatus status, JobAttachment... attachments) {
