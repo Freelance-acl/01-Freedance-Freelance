@@ -267,28 +267,32 @@ public class PayoutService {
     public List<PromoCodeUsageDTO> getTopUsedPromoCodes(int limit) {
 
         List<Object[]> rows = payoutRepository.findTopUsedPromoCodes(limit);
-
         List<PromoCodeUsageDTO> result = new ArrayList<>();
 
+        if (rows == null) {
+            return result;
+        }
+
         for (Object[] r : rows) {
+            boolean isExpired = false;
+            if (r.length > 7 && r[7] != null) {
+                if (r[7] instanceof java.time.LocalDateTime ldt) {
+                    isExpired = ldt.isBefore(java.time.LocalDateTime.now());
+                } else if (r[7] instanceof java.sql.Timestamp ts) {
+                    isExpired = ts.toLocalDateTime().isBefore(java.time.LocalDateTime.now());
+                }
+            }
 
-            PromoCodeUsageDTO dto = new PromoCodeUsageDTO();
-
-            dto.promoCodeId = ((Number) r[0]).longValue();
-            dto.code = (String) r[1];
-            dto.discountType = String.valueOf(r[2]);
-            dto.discountValue = r[3] != null ? ((Number) r[3]).doubleValue() : 0;
-
-            dto.timesUsed = r[4] != null ? ((Number) r[4]).intValue() : 0;
-            dto.totalDiscountGiven = r[5] != null ? ((Number) r[5]).doubleValue() : 0;
-
-            dto.active = (Boolean) r[6];
-
-            LocalDateTime expiry = (LocalDateTime) r[7];
-
-            dto.expired = expiry != null && expiry.isBefore(LocalDateTime.now());
-
-            result.add(dto);
+            result.add(PromoCodeUsageDTO.builder()
+                    .promoCodeId(r[0] != null ? ((Number) r[0]).longValue() : null)
+                    .code(r[1] != null ? String.valueOf(r[1]) : null)
+                    .discountType(r[2] != null ? String.valueOf(r[2]) : null)
+                    .discountValue(r[3] != null ? ((Number) r[3]).doubleValue() : 0.0)
+                    .timesUsed(r[4] != null ? ((Number) r[4]).longValue() : 0L)
+                    .totalDiscountGiven(r[5] != null ? ((Number) r[5]).doubleValue() : 0.0)
+                    .active(r[6] != null ? (Boolean) r[6] : false)
+                    .expired(isExpired)
+                    .build());
         }
 
         return result;
