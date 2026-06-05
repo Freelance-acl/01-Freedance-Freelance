@@ -24,7 +24,6 @@ import java.util.Map;
 public class RedisConfig {
 
     public static final String JOB_FULL_TEXT_SEARCH_CACHE = "S2-F10";
-
     @Bean
     public ObjectMapper redisObjectMapper() {
         ObjectMapper mapper = new ObjectMapper();
@@ -52,13 +51,21 @@ public class RedisConfig {
         GenericJackson2JsonRedisSerializer serializer = new GenericJackson2JsonRedisSerializer(redisObjectMapper);
         RedisCacheConfiguration defaultConfig = RedisCacheConfiguration.defaultCacheConfig()
                 .entryTtl(Duration.ofMinutes(5))
-                .serializeKeysWith(RedisSerializationContext.SerializationPair
-                        .fromSerializer(new StringRedisSerializer()))
-                .serializeValuesWith(RedisSerializationContext.SerializationPair
-                        .fromSerializer(serializer));
+                .serializeKeysWith(RedisSerializationContext.SerializationPair.fromSerializer(new StringRedisSerializer()))
+                .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(serializer));
+
+        RedisCacheConfiguration fiveMin = defaultConfig.entryTtl(Duration.ofMinutes(5));
+        RedisCacheConfiguration tenMin = defaultConfig.entryTtl(Duration.ofMinutes(10));
+        RedisCacheConfiguration fifteenMin = defaultConfig.entryTtl(Duration.ofMinutes(15));
 
         Map<String, RedisCacheConfiguration> cacheConfigs = new HashMap<>();
-        cacheConfigs.put(JOB_FULL_TEXT_SEARCH_CACHE, defaultConfig.entryTtl(Duration.ofMinutes(5)));
+        cacheConfigs.put("S2-F1", fiveMin);
+        cacheConfigs.put("S2-F3", tenMin);
+        cacheConfigs.put("S2-F5", fiveMin);
+        cacheConfigs.put("S2-F6", tenMin);
+        cacheConfigs.put("job-by-id", fifteenMin);
+        cacheConfigs.put("job-attachment-by-id", fifteenMin);
+        cacheConfigs.put(JOB_FULL_TEXT_SEARCH_CACHE, fiveMin);
 
         return RedisCacheManager.builder(connectionFactory)
                 .cacheDefaults(defaultConfig)

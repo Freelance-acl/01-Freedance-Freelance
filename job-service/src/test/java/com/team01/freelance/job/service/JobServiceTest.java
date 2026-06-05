@@ -1,8 +1,11 @@
 package com.team01.freelance.job.service;
 
+import com.team01.freelance.common.observer.EventSubject;
 import com.team01.freelance.job.dto.JobProposalSummaryDTO;
 import com.team01.freelance.job.client.ContractLookupClient;
 import com.team01.freelance.job.client.ContractSummary;
+import com.team01.freelance.common.observer.EventSubject;
+import com.team01.freelance.job.event.JobEventTypes;
 import com.team01.freelance.job.exception.ForbiddenOperationException;
 import com.team01.freelance.job.dto.TopBudgetJobDTO;
 import com.team01.freelance.job.model.JobAttachmentAlertDTO;
@@ -22,6 +25,7 @@ import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
@@ -62,6 +66,8 @@ class JobServiceTest {
 
     @Mock
     private JobSearchIndexOperations jobSearchIndexOperations;
+
+    private EventSubject jobEventSubject;
 
     @InjectMocks
     private JobService jobService;
@@ -354,6 +360,13 @@ class JobServiceTest {
         assertEquals("8 weeks", result.getRequirements().get("duration"));
         verify(jobRepository).save(existingJob);
         verify(jobSearchIndexOperations).index(existingJob);
+        ArgumentCaptor<Map<String, Object>> payloadCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(jobEventSubject).notifyObservers(eq(JobEventTypes.REQUIREMENTS_UPDATED_JOB), payloadCaptor.capture());
+        Map<String, Object> payload = payloadCaptor.getValue();
+        assertEquals(jobId, payload.get("jobId"));
+        assertEquals(updatedFields, payload.get("changedRequirements"));
+        assertEquals(result.getRequirements(), payload.get("requirements"));
+        assertNotNull(payload.get("timestamp"));
     }
 
     @Test
@@ -362,6 +375,7 @@ class JobServiceTest {
 
         assertThrows(EntityNotFoundException.class, () -> jobService.updateJobRequirements(1L, Map.of("foo", "bar")));
         verify(jobRepository, never()).save(any(Job.class));
+        verify(jobEventSubject, never()).notifyObservers(anyString(), any());
     }
 
     @Test
@@ -696,6 +710,7 @@ class JobServiceTest {
         assertEquals(JobStatus.CLOSED, result.getStatus());
         verify(jobRepository).closeJobIfEligible(jobId);
         verify(jobRepository).rejectSubmittedProposalsByJobId(jobId);
+        verify(jobEventSubject).notifyObservers(eq("JOB_CLOSED"), any(Map.class));
         verify(jobRepository, never()).save(any(Job.class));
         verify(jobSearchIndexOperations).index(closedJob);
     }
@@ -712,6 +727,7 @@ class JobServiceTest {
 
         assertThrows(IllegalArgumentException.class, () -> jobService.closeJob(jobId));
         verify(jobRepository, never()).rejectSubmittedProposalsByJobId(anyLong());
+        verify(jobEventSubject, never()).notifyObservers(anyString(), any());
     }
 
     @Test
@@ -765,7 +781,11 @@ class JobServiceTest {
         List<TopBudgetJobDTO> result = jobService.getTopBudgetJobs(2);
 
         assertEquals(1, result.size());
+        assertNotSame(dto, result.getFirst());
+        assertEquals(1L, result.getFirst().getJobId());
+        assertEquals("Job A", result.getFirst().getTitle());
         assertEquals(5000.0, result.getFirst().getBudgetMax());
+        assertEquals(2L, result.getFirst().getTotalProposals());
         verify(jobRepository).findTopBudgetJobs(2);
     }
 
@@ -783,6 +803,7 @@ class JobServiceTest {
         assertEquals(JobStatus.CLOSED, result.getStatus());
         verify(jobRepository, never()).closeJobIfEligible(anyLong());
         verify(jobSearchIndexOperations, never()).index(any(Job.class));
+        verify(jobEventSubject, never()).notifyObservers(anyString(), any());
     }
 
     private Job createJobWithAttachments(Long id, String title, JobStatus status, JobAttachment... attachments) {

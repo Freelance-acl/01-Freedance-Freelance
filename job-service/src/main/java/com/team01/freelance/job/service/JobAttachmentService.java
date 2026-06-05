@@ -5,6 +5,9 @@ import com.team01.freelance.job.repository.JobAttachmentRepository;
 import com.team01.freelance.job.repository.JobRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Caching;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -23,10 +26,15 @@ public class JobAttachmentService {
         return jobAttachmentRepository.findAll();
     }
 
+    @Cacheable(value = "job-attachment-by-id", key = "#id", unless = "#result.isEmpty()")
     public Optional<JobAttachment> getJobAttachmentById(Long id) {
         return jobAttachmentRepository.findById(id);
     }
 
+    @Caching(evict = {
+            @CacheEvict(value = "job-attachment-by-id", allEntries = true),
+            @CacheEvict(value = "job-by-id", allEntries = true)
+    })
     public JobAttachment createJobAttachment(JobAttachment jobAttachment) {
         if (jobAttachment.getJob() == null || jobAttachment.getJob().getId() == null) {
             throw new IllegalArgumentException("Job ID is required to create a JobAttachment");
@@ -47,6 +55,10 @@ public class JobAttachmentService {
      * @return The updated job attachment
      * @throws EntityNotFoundException if the job attachment is not found
      */
+    @Caching(evict = {
+            @CacheEvict(value = "job-attachment-by-id", key = "#id"),
+            @CacheEvict(value = "job-by-id", allEntries = true)
+    })
     public JobAttachment updateJobAttachment(Long id, JobAttachment jobAttachment) {
         return jobAttachmentRepository.findById(id).map(existing -> {
                 if (jobAttachment.getType() != null) existing.setType(jobAttachment.getType());
@@ -59,6 +71,10 @@ public class JobAttachmentService {
         }).orElseThrow(() -> new EntityNotFoundException("Job Attachment not found with id: " + id));
     }
 
+    @Caching(evict = {
+            @CacheEvict(value = "job-attachment-by-id", key = "#id", condition = "#result == true"),
+            @CacheEvict(value = "job-by-id", allEntries = true, condition = "#result == true")
+    })
     public boolean deleteJobAttachmentById(Long id) {
         if (!jobAttachmentRepository.existsById(id)) {
             return false;
@@ -67,6 +83,10 @@ public class JobAttachmentService {
         return true;
     }
 
+    @Caching(evict = {
+            @CacheEvict(value = "job-attachment-by-id", allEntries = true),
+            @CacheEvict(value = "job-by-id", allEntries = true)
+    })
     public void deleteAllJobAttachments() {
         jobAttachmentRepository.deleteAll();
     }
