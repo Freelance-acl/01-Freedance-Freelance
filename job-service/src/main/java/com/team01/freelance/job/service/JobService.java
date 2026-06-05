@@ -73,7 +73,7 @@ public class JobService {
         return jobRepository.findAll();
     }
 
-    @Cacheable(value = "job-by-id", key = "#id", unless = "#result.isEmpty()")
+    @Cacheable(value = "job-by-id", key = "#id", unless = "#result == null")
     public Optional<Job> getJobById(Long id) {
         return jobRepository.findById(id);
     }
@@ -258,13 +258,13 @@ public class JobService {
 
     private JobProposalSummaryDTO toJobProposalSummaryDTO(Object[] row) {
         return JobProposalSummaryDTO.builder()
-            .jobId(row[0] != null ? ((Number) row[0]).longValue() : null)
-            .title(row[1] != null ? row[1].toString() : null)
-            .totalProposals(row[2] != null ? ((Number) row[2]).longValue() : 0L)
-            .averageBidAmount(row[3] != null ? ((Number) row[3]).doubleValue() : 0.0)
-            .lowestBid(row[4] != null ? ((Number) row[4]).doubleValue() : 0.0)
-            .highestBid(row[5] != null ? ((Number) row[5]).doubleValue() : 0.0)
-            .build();
+                .jobId(row[0] != null ? ((Number) row[0]).longValue() : null)
+                .title(row[1] != null ? row[1].toString() : null)
+                .totalProposals(row[2] != null ? ((Number) row[2]).longValue() : 0L)
+                .averageBidAmount(row[3] != null ? ((Number) row[3]).doubleValue() : 0.0)
+                .lowestBid(row[4] != null ? ((Number) row[4]).doubleValue() : 0.0)
+                .highestBid(row[5] != null ? ((Number) row[5]).doubleValue() : 0.0)
+                .build();
     }
     @Transactional(readOnly = true)
     public List<JobAttachmentAlertDTO> getJobsWithExpiredAttachments() {
