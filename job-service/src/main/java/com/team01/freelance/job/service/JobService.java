@@ -21,6 +21,8 @@ import com.team01.freelance.user.model.UserRole;
 import com.team01.freelance.user.repository.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.dao.DataAccessException;
@@ -94,6 +96,11 @@ public class JobService {
         return jobRepository.searchJobsByStatusAndBudgetRange(normalizedStatus, minBudget, maxBudget, pageable);
     }
 
+    @Caching(evict = {
+            @CacheEvict(value = "S2-F1", allEntries = true),
+            @CacheEvict(value = "S2-F5", allEntries = true),
+            @CacheEvict(value = "S2-F6", allEntries = true)
+    })
     public Job createJob(Job job) {
         if (job.getClientId() == null) {
             throw new IllegalArgumentException("Client ID is required to create a Job");
@@ -120,6 +127,13 @@ public class JobService {
      * @throws IllegalArgumentException if the budget range is invalid
      * @throws EntityNotFoundException if the job is not found
      */
+    @Caching(evict = {
+            @CacheEvict(value = "job-by-id", key = "#id"),
+            @CacheEvict(value = "S2-F1", allEntries = true),
+            @CacheEvict(value = "S2-F3", allEntries = true),
+            @CacheEvict(value = "S2-F5", allEntries = true),
+            @CacheEvict(value = "S2-F6", allEntries = true)
+    })
     public Job updateJob(Long id, Job jobDetails) {
         return jobRepository.findById(id).map(existingJob -> {
                 if (jobDetails.getTitle() != null) existingJob.setTitle(jobDetails.getTitle());
@@ -139,6 +153,10 @@ public class JobService {
         }).orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + id));
     }
 
+    @Caching(evict = {
+            @CacheEvict(value = "job-by-id", key = "#id"),
+            @CacheEvict(value = "S2-F5", allEntries = true)
+    })
     public Job updateJobRequirements(Long id, Map<String, Object> requirements) {
         return jobRepository.findById(id).map(existingJob -> {
             Map<String, Object> changedRequirements = requirements == null
@@ -161,6 +179,13 @@ public class JobService {
         }).orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + id));
     }
 
+    @Caching(evict = {
+            @CacheEvict(value = "job-by-id", key = "#id", condition = "#result == true"),
+            @CacheEvict(value = "S2-F1", allEntries = true, condition = "#result == true"),
+            @CacheEvict(value = "S2-F3", allEntries = true, condition = "#result == true"),
+            @CacheEvict(value = "S2-F5", allEntries = true, condition = "#result == true"),
+            @CacheEvict(value = "S2-F6", allEntries = true, condition = "#result == true")
+    })
     public boolean deleteJobById(Long id) {
         if (!jobRepository.existsById(id)) {
             return false;
@@ -169,6 +194,13 @@ public class JobService {
         return true;
     }
 
+    @Caching(evict = {
+            @CacheEvict(value = "job-by-id", allEntries = true),
+            @CacheEvict(value = "S2-F1", allEntries = true),
+            @CacheEvict(value = "S2-F3", allEntries = true),
+            @CacheEvict(value = "S2-F5", allEntries = true),
+            @CacheEvict(value = "S2-F6", allEntries = true)
+    })
     public void deleteAllJobs() {
         jobRepository.deleteAll();
     }
@@ -254,6 +286,11 @@ public class JobService {
     }
 
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(value = "job-by-id", key = "#jobId"),
+            @CacheEvict(value = "S2-F1", allEntries = true),
+            @CacheEvict(value = "S2-F6", allEntries = true)
+    })
     public Job rateJob(Long jobId, JobRatingRequest ratingRequest) {
         Job job = jobRepository.findById(jobId)
                 .orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + jobId));
@@ -287,6 +324,10 @@ public class JobService {
     }
 
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(value = "job-by-id", key = "#jobId"),
+            @CacheEvict(value = "job-attachment-by-id", key = "#attachmentId")
+    })
     public Job verifyJobAttachment(Long jobId, Long attachmentId, JobAttachmentVerificationRequest request) {
         if (request == null || request.getVerifiedBy() == null) {
             throw new IllegalArgumentException("verifiedBy is required to verify a JobAttachment");
@@ -390,6 +431,12 @@ public class JobService {
      * @throws IllegalArgumentException if an ACTIVE contract exists for the job
      */
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(value = "job-by-id", key = "#jobId"),
+            @CacheEvict(value = "S2-F1", allEntries = true),
+            @CacheEvict(value = "S2-F5", allEntries = true),
+            @CacheEvict(value = "S2-F6", allEntries = true)
+    })
     public Job closeJob(Long jobId) {
         Job job = jobRepository.findById(jobId)
                 .orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + jobId));
