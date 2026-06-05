@@ -76,8 +76,6 @@ public class PayoutService {
     @Autowired
     private PayoutAuditEventRepository payoutAuditEventRepository;
 
-
-
     public List<Payout> getAllPayouts() {
         return payoutRepository.findAll();
     }
@@ -385,21 +383,7 @@ public class PayoutService {
         details.put("refundedAt", LocalDateTime.now().toString());
         payout.setTransactionDetails(details);
 
-        Payout updatedPayout = payoutRepository.save(payout);
-
-        // Observer Pattern: Trigger notification after successful update
-        notifyObservers("REFUNDED", updatedPayout);
-
-        return updatedPayout;
-    }
-
-    // Helper method to notify all registered Observers
-    private void notifyObservers(String action, Payout payout) {
-        if (observers != null) {
-            for (Observer observer : observers) {
-                observer.update(action, payout);
-            }
-        }
+        return payoutRepository.save(payout);
     }
 
     /**
