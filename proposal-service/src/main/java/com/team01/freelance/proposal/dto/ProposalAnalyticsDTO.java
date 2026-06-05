@@ -8,6 +8,9 @@ public class ProposalAnalyticsDTO {
     private double averageBid;
     private double acceptanceRate;
 
+    public ProposalAnalyticsDTO() {
+    }
+
     public ProposalAnalyticsDTO(
             long totalProposals,
             long acceptedProposals,
@@ -21,6 +24,10 @@ public class ProposalAnalyticsDTO {
         this.totalBidValue = totalBidValue;
         this.averageBid = averageBid;
         this.acceptanceRate = acceptanceRate;
+    }
+
+    public static Builder builder() {
+        return new Builder();
     }
 
     public long getTotalProposals() {
@@ -69,5 +76,43 @@ public class ProposalAnalyticsDTO {
 
     public void setAcceptanceRate(double acceptanceRate) {
         this.acceptanceRate = acceptanceRate;
+    }
+
+    public static class Builder {
+        private final ProposalAnalyticsDTO dto = new ProposalAnalyticsDTO();
+
+        public Builder totalProposals(long totalProposals) {
+            dto.totalProposals = totalProposals;
+            return this;
+        }
+
+        public Builder acceptedProposals(long acceptedProposals) {
+            dto.acceptedProposals = acceptedProposals;
+            return this;
+        }
+
+        public Builder rejectedProposals(long rejectedProposals) {
+            dto.rejectedProposals = rejectedProposals;
+            return this;
+        }
+
+        public Builder totalBidValue(double totalBidValue) {
+            dto.totalBidValue = totalBidValue;
+            return this;
+        }
+
+        public Builder averageBid(double averageBid) {
+            dto.averageBid = averageBid;
+            return this;
+        }
+
+        public Builder acceptanceRate(double acceptanceRate) {
+            dto.acceptanceRate = acceptanceRate;
+            return this;
+        }
+
+        public ProposalAnalyticsDTO build() {
+            return dto;
+        }
     }
 }
