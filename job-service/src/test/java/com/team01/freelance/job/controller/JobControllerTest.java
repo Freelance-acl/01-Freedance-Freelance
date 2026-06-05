@@ -11,12 +11,12 @@ import com.team01.freelance.job.model.JobRatingRequest;
 import com.team01.freelance.job.model.JobAttachmentType;
 import com.team01.freelance.job.model.Job;
 import com.team01.freelance.job.model.JobStatus;
+import com.team01.freelance.job.service.JobIndexService;
 import com.team01.freelance.job.service.JobService;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
-import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.data.web.PageableHandlerMethodArgumentResolver;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -47,12 +47,13 @@ class JobControllerTest {
 
     private MockMvc mockMvc;
     private JobService jobService;
+    private JobIndexService jobIndexService;
 
     @BeforeEach
     void setUp() {
-        JobController controller = new JobController();
         jobService = mock(JobService.class);
-        ReflectionTestUtils.setField(controller, "jobService", jobService);
+        jobIndexService = mock(JobIndexService.class);
+        JobController controller = new JobController(jobService, jobIndexService);
         mockMvc = MockMvcBuilders
                 .standaloneSetup(controller)
                 .setCustomArgumentResolvers(new PageableHandlerMethodArgumentResolver())
