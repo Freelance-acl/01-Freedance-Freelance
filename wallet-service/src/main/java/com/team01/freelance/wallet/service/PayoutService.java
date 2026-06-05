@@ -14,6 +14,7 @@ import com.team01.freelance.wallet.model.PayoutStatus;
 import com.team01.freelance.wallet.dto.MilestoneReversalRequest;
 import com.team01.freelance.wallet.dto.ProcessPayoutRequest;
 import com.team01.freelance.common.observer.EventSubject;
+import com.team01.freelance.wallet.repository.PayoutAuditEventRepository;
 import com.team01.freelance.wallet.strategy.NoReversalStrategy;
 import com.team01.freelance.wallet.strategy.RefundResult;
 import com.team01.freelance.wallet.strategy.RefundStrategy;
@@ -71,6 +72,9 @@ public class PayoutService {
 
     @Autowired
     private EventSubject payoutEventSubject;
+
+    @Autowired
+    private PayoutAuditEventRepository payoutAuditEventRepository;
 
     public List<Payout> getAllPayouts() {
         return payoutRepository.findAll();
@@ -693,6 +697,71 @@ public class PayoutService {
         }
 
         return result;
+    }
+
+    // Feature [S5-F11]
+    @Cacheable(value = "S5-F11", key = "T(java.util.Objects).hash(#startDate, #endDate)")
+    public List<com.team01.freelance.wallet.dto.PayoutMethodDTO> getPayoutMethodBreakdown(LocalDate startDate, LocalDate endDate) {
+        if (startDate.isAfter(endDate)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "startDate cannot be after endDate");
+        }
+
+        LocalDateTime startInclusive = startDate.atStartOfDay();
+        LocalDateTime endInclusive = endDate.atTime(23, 59, 59, 999_999_999);
+
+        List<com.team01.freelance.wallet.event.PayoutAuditEvent> events =
+                payoutAuditEventRepository.findByTimestampBetweenAndActionIn(
+                        startInclusive,
+                        endInclusive,
+                        List.of("COMPLETED", "FAILED")
+                );
+
+        Map<com.team01.freelance.wallet.model.PayoutMethod, long[]> analyticsMap = new HashMap<>();
+
+        for (com.team01.freelance.wallet.model.PayoutMethod m : com.team01.freelance.wallet.model.PayoutMethod.values()) {
+            analyticsMap.put(m, new long[]{0L, 0L});
+        }
+
+        Map<com.team01.freelance.wallet.model.PayoutMethod, Double> totalAmountMap = new HashMap<>();
+
+        for (com.team01.freelance.wallet.event.PayoutAuditEvent event : events) {
+            com.team01.freelance.wallet.model.PayoutMethod method = event.getMethod();
+            if (method == null) continue;
+
+            long[] stats = analyticsMap.get(method);
+            if ("COMPLETED".equals(event.getAction())) {
+                stats[0]++;
+                double currentAmt = totalAmountMap.getOrDefault(method, 0.0);
+                totalAmountMap.put(method, currentAmt + (event.getAmount() != null ? event.getAmount() : 0.0));
+            } else if ("FAILED".equals(event.getAction())) {
+                stats[1]++;
+            }
+        }
+
+        List<com.team01.freelance.wallet.dto.PayoutMethodDTO> resultList = new ArrayList<>();
+
+        for (com.team01.freelance.wallet.model.PayoutMethod m : com.team01.freelance.wallet.model.PayoutMethod.values()) {
+            long[] stats = analyticsMap.get(m);
+            long successCount = stats[0];
+            long failureCount = stats[1];
+            long totalCount = successCount + failureCount;
+
+            if (totalCount == 0) continue;
+
+            double successRate = totalCount > 0 ? (double) successCount / totalCount : 0.0;
+            double totalAmount = totalAmountMap.getOrDefault(m, 0.0);
+
+            com.team01.freelance.wallet.dto.PayoutMethodDTO dto = new com.team01.freelance.wallet.dto.PayoutMethodDTO();
+            dto.setMethod(m);
+            dto.setSuccessCount(successCount);
+            dto.setFailureCount(failureCount);
+            dto.setSuccessRate(successRate);
+            dto.setTotalAmount(totalAmount);
+
+            resultList.add(dto);
+        }
+
+        return resultList;
     }
 
 }
