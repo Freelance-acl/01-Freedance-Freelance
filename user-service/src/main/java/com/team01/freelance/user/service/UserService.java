@@ -1,34 +1,51 @@
 package com.team01.freelance.user.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team01.freelance.common.observer.EventSubject;
+import com.team01.freelance.user.adapter.MongoDocumentAdapter;
 import com.team01.freelance.user.dto.TopFreelancerDTO;
-import com.team01.freelance.user.model.User;
-import com.team01.freelance.user.model.UserStatus;
-import com.team01.freelance.user.repository.UserRepository;
-import jakarta.persistence.EntityNotFoundException;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-
-import javax.sql.DataSource;
-import com.team01.freelance.user.model.UserRole;
-
-import java.math.BigDecimal;
-import java.math.BigInteger;
-import java.time.LocalDate;
-import java.time.LocalTime;
-import java.util.List;
-import java.util.Optional;
-import java.util.Map;
-import java.util.HashMap;
-import org.springframework.transaction.annotation.Transactional;
+import com.team01.freelance.user.dto.UserActivityEventDTO;
+import com.team01.freelance.user.dto.UserActivityFeedDTO;
 import com.team01.freelance.user.dto.UserContractSummaryDTO;
 import com.team01.freelance.user.dto.UserProfileDTO;
 import com.team01.freelance.user.dto.UserProfileSkillDTO;
+import com.team01.freelance.user.event.AuthEvent;
+import com.team01.freelance.user.model.User;
+import com.team01.freelance.user.model.UserRole;
 import com.team01.freelance.user.model.UserSkill;
+import com.team01.freelance.user.model.UserStatus;
+import com.team01.freelance.user.repository.AuthEventRepository;
+import com.team01.freelance.user.repository.UserRepository;
 import com.team01.freelance.user.repository.UserSkillRepository;
+import jakarta.persistence.EntityNotFoundException;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+
+import javax.sql.DataSource;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.time.Duration;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 @Service
 public class UserService {
+
+    private static final int DEFAULT_ACTIVITY_PAGE = 0;
+    private static final int DEFAULT_ACTIVITY_SIZE = 10;
+    private static final int MAX_ACTIVITY_SIZE = 100;
+    private static final Duration ACTIVITY_CACHE_TTL = Duration.ofMinutes(5);
 
     @Autowired
     private UserRepository userRepository;
@@ -37,10 +54,25 @@ public class UserService {
     private UserSkillRepository userSkillRepository;
 
     @Autowired
+    private AuthEventRepository authEventRepository;
+
+    @Autowired
     private DataSource dataSource;
 
     @Autowired
     private EventSubject authEventSubject;
+
+    @Autowired
+    private JwtService jwtService;
+
+    @Autowired
+    private StringRedisTemplate redisTemplate;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @Autowired
+    private MongoDocumentAdapter mongoDocumentAdapter;
 
     public List<User> getAllUsers() {
         return userRepository.findAll();
@@ -72,14 +104,17 @@ public class UserService {
         if (isBlank(key) || isBlank(value)) {
             throw new IllegalArgumentException("Preference key and value must not be blank");
         }
+
         String trimmedKey = key.trim();
         String trimmedValue = value.trim();
+
         if (!usesPostgresDatabase()) {
             return userRepository.findAll().stream()
                     .filter(user -> user.getPreferences() != null
                             && trimmedValue.equals(String.valueOf(user.getPreferences().get(trimmedKey))))
                     .toList();
         }
+
         return userRepository.findByPreference(trimmedKey, trimmedValue);
     }
 
@@ -102,19 +137,12 @@ public class UserService {
                 .toList();
     }
 
-    /**
-     * Updates an existing user and throws if it does not exist.
-     *
-     * @param id The ID of the user to update
-     * @param userDetails The object containing updated fields
-     * @return The updated user
-     * @throws EntityNotFoundException if the user is not found
-     */
     public User updateUser(Long id, User userDetails) {
         return userRepository.findById(id).map(existingUser -> {
             if (userDetails.getId() != null && !id.equals(userDetails.getId())) {
                 throw new IllegalArgumentException("User ID cannot be changed. Use the path ID only.");
             }
+
             if (userDetails.getName() != null) existingUser.setName(userDetails.getName());
             if (userDetails.getEmail() != null) existingUser.setEmail(userDetails.getEmail());
             if (userDetails.getPassword() != null) existingUser.setPassword(userDetails.getPassword());
@@ -123,6 +151,7 @@ public class UserService {
             if (userDetails.getStatus() != null) existingUser.setStatus(userDetails.getStatus());
             if (userDetails.getPreferences() != null) existingUser.setPreferences(userDetails.getPreferences());
             if (userDetails.getCreatedAt() != null) existingUser.setCreatedAt(userDetails.getCreatedAt());
+
             return userRepository.save(existingUser);
         }).orElseThrow(() -> new EntityNotFoundException("User not found with id: " + id));
     }
@@ -131,8 +160,10 @@ public class UserService {
         if (role == null) {
             throw new IllegalArgumentException("role must not be null");
         }
+
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("User not found with id: " + id));
+
         UserRole oldRole = user.getRole();
         user.setRole(role);
         User saved = userRepository.save(user);
@@ -151,6 +182,7 @@ public class UserService {
         if (!userRepository.existsById(id)) {
             return false;
         }
+
         userRepository.deleteById(id);
         return true;
     }
@@ -179,6 +211,7 @@ public class UserService {
         user.setPreferences(merged);
         return userRepository.save(user);
     }
+
     public UserProfileDTO getUserProfile(Long id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("User not found with id: " + id));
@@ -207,6 +240,47 @@ public class UserService {
                 .build();
     }
 
+    public UserActivityFeedDTO getUserActivityFeed(
+            Long id,
+            Integer page,
+            Integer size,
+            String authorizationHeader) {
+
+        int safePage = normalizeActivityPage(page);
+        int safeSize = normalizeActivitySize(size);
+
+        String token = extractBearerToken(authorizationHeader);
+        validateActivityFeedAccess(id, token);
+
+        if (!userRepository.existsById(id)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found with id: " + id);
+        }
+
+        String cacheKey = activityFeedCacheKey(id, safePage, safeSize);
+        UserActivityFeedDTO cached = readActivityFeedFromCache(cacheKey);
+        if (cached != null) {
+            return cached;
+        }
+
+        Pageable pageable = PageRequest.of(safePage, safeSize);
+        Page<AuthEvent> eventPage = authEventRepository.findByUserIdOrderByTimestampDesc(id, pageable);
+
+        List<UserActivityEventDTO> events = eventPage.getContent().stream()
+                .map(mongoDocumentAdapter::adapt)
+                .toList();
+
+        UserActivityFeedDTO response = UserActivityFeedDTO.builder()
+                .content(events)
+                .page(safePage)
+                .size(safeSize)
+                .totalElements(eventPage.getTotalElements())
+                .totalPages(eventPage.getTotalPages())
+                .build();
+
+        writeActivityFeedToCache(cacheKey, response);
+        return response;
+    }
+
     public List<User> findUsersByLanguageAndMinimumCompletedContracts(String lang, Long minContracts) {
         if (lang == null || lang.trim().isEmpty()) {
             throw new IllegalArgumentException("Language cannot be blank");
@@ -226,23 +300,6 @@ public class UserService {
         return userRepository.findUsersByLanguageAndMinimumCompletedContracts(language, minimumContracts);
     }
 
-    private long completedContractCount(Long userId) {
-        Object result = userRepository.getUserContractSummary(userId);
-        if (result == null) {
-            return 0L;
-        }
-        Object[] row = (Object[]) result;
-        return row[1] != null ? ((Number) row[1]).longValue() : 0L;
-    }
-
-    private boolean usesPostgresDatabase() {
-        try (var connection = dataSource.getConnection()) {
-            return "PostgreSQL".equalsIgnoreCase(connection.getMetaData().getDatabaseProductName());
-        } catch (Exception ex) {
-            return false;
-        }
-    }
-
     public UserContractSummaryDTO getUserContractSummary(Long id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("User not found with id: " + id));
@@ -251,6 +308,7 @@ public class UserService {
         if (result == null) {
             return zeroContractSummary(user);
         }
+
         Object[] row = (Object[]) result;
 
         Long totalContracts = row[0] != null ? ((Number) row[0]).longValue() : 0L;
@@ -270,6 +328,24 @@ public class UserService {
                 .build();
     }
 
+    private long completedContractCount(Long userId) {
+        Object result = userRepository.getUserContractSummary(userId);
+        if (result == null) {
+            return 0L;
+        }
+
+        Object[] row = (Object[]) result;
+        return row[1] != null ? ((Number) row[1]).longValue() : 0L;
+    }
+
+    private boolean usesPostgresDatabase() {
+        try (var connection = dataSource.getConnection()) {
+            return "PostgreSQL".equalsIgnoreCase(connection.getMetaData().getDatabaseProductName());
+        } catch (Exception ex) {
+            return false;
+        }
+    }
+
     private static UserContractSummaryDTO zeroContractSummary(User user) {
         return UserContractSummaryDTO.builder()
                 .userId(user.getId())
@@ -280,6 +356,76 @@ public class UserService {
                 .totalEarnings(0.0)
                 .averageContractValue(0.0)
                 .build();
+    }
+
+    private static int normalizeActivityPage(Integer page) {
+        if (page == null || page < 0) {
+            return DEFAULT_ACTIVITY_PAGE;
+        }
+        return page;
+    }
+
+    private static int normalizeActivitySize(Integer size) {
+        if (size == null || size <= 0) {
+            return DEFAULT_ACTIVITY_SIZE;
+        }
+        return Math.min(size, MAX_ACTIVITY_SIZE);
+    }
+
+    private String extractBearerToken(String authorizationHeader) {
+        if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Missing Bearer token");
+        }
+
+        String token = authorizationHeader.substring(7).trim();
+        if (token.isEmpty() || !jwtService.isTokenValid(token)) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid or expired token");
+        }
+
+        return token;
+    }
+
+    private void validateActivityFeedAccess(Long requestedUserId, String token) {
+        try {
+            Long callerUserId = jwtService.extractUserId(token);
+            String role = jwtService.extractRole(token);
+
+            boolean isOwner = requestedUserId != null && requestedUserId.equals(callerUserId);
+            boolean isAdmin = "ADMIN".equals(role) || "ROLE_ADMIN".equals(role);
+
+            if (!isOwner && !isAdmin) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Cannot access another user's activity feed");
+            }
+        } catch (ResponseStatusException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid token claims");
+        }
+    }
+
+    private static String activityFeedCacheKey(Long userId, int page, int size) {
+        return "user-service::S1-F12::" + userId + "::page=" + page + "::size=" + size;
+    }
+
+    private UserActivityFeedDTO readActivityFeedFromCache(String cacheKey) {
+        try {
+            String cachedJson = redisTemplate.opsForValue().get(cacheKey);
+            if (cachedJson == null || cachedJson.isBlank()) {
+                return null;
+            }
+            return objectMapper.readValue(cachedJson, UserActivityFeedDTO.class);
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
+    private void writeActivityFeedToCache(String cacheKey, UserActivityFeedDTO response) {
+        try {
+            String json = objectMapper.writeValueAsString(response);
+            redisTemplate.opsForValue().set(cacheKey, json, ACTIVITY_CACHE_TTL);
+        } catch (Exception ignored) {
+            // Cache failures must not break the activity feed endpoint.
+        }
     }
 
     private boolean isBlank(String value) {

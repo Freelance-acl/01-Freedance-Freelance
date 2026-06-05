@@ -1,5 +1,6 @@
 package com.team01.freelance.job.service;
 
+import com.team01.freelance.common.observer.EventSubject;
 import com.team01.freelance.job.dto.JobProposalSummaryDTO;
 import com.team01.freelance.job.client.ContractLookupClient;
 import com.team01.freelance.job.client.ContractSummary;
@@ -20,6 +21,7 @@ import com.team01.freelance.user.model.UserRole;
 import com.team01.freelance.user.repository.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -58,6 +60,7 @@ public class JobService {
     private DataSource dataSource;
 
     @Autowired
+    @Qualifier("jobEventSubject")
     private EventSubject jobEventSubject;
 
     public List<Job> getAllJobs() {
@@ -202,14 +205,14 @@ public class JobService {
     }
 
     private JobProposalSummaryDTO toJobProposalSummaryDTO(Object[] row) {
-        return new JobProposalSummaryDTO(
-                row[0] != null ? ((Number) row[0]).longValue() : null,
-                row[1] != null ? row[1].toString() : null,
-                row[2] != null ? ((Number) row[2]).longValue() : 0L,
-                row[3] != null ? ((Number) row[3]).doubleValue() : 0.0,
-                row[4] != null ? ((Number) row[4]).doubleValue() : 0.0,
-                row[5] != null ? ((Number) row[5]).doubleValue() : 0.0
-        );
+        return JobProposalSummaryDTO.builder()
+            .jobId(row[0] != null ? ((Number) row[0]).longValue() : null)
+            .title(row[1] != null ? row[1].toString() : null)
+            .totalProposals(row[2] != null ? ((Number) row[2]).longValue() : 0L)
+            .averageBidAmount(row[3] != null ? ((Number) row[3]).doubleValue() : 0.0)
+            .lowestBid(row[4] != null ? ((Number) row[4]).doubleValue() : 0.0)
+            .highestBid(row[5] != null ? ((Number) row[5]).doubleValue() : 0.0)
+            .build();
     }
     @Transactional(readOnly = true)
     public List<JobAttachmentAlertDTO> getJobsWithExpiredAttachments() {
@@ -228,13 +231,13 @@ public class JobService {
                         return null;
                     }
 
-                    JobAttachmentAlertDTO dto = new JobAttachmentAlertDTO();
-                    dto.setJobId(job.getId());
-                    dto.setJobTitle(job.getTitle());
-                    dto.setJobStatus(job.getStatus());
-                    dto.setExpiredAttachments(expiredAttachments);
-                    dto.setExpiredCount(expiredAttachments.size());
-                    return dto;
+                        return JobAttachmentAlertDTO.builder()
+                            .jobId(job.getId())
+                            .jobTitle(job.getTitle())
+                            .jobStatus(job.getStatus())
+                            .expiredAttachments(expiredAttachments)
+                            .expiredCount(expiredAttachments.size())
+                            .build();
                 })
                 .filter(Objects::nonNull)
                 .toList();
@@ -392,8 +395,18 @@ public class JobService {
 
         jobRepository.rejectSubmittedProposalsByJobId(jobId);
 
-        return jobRepository.findById(jobId)
+        Job closedJob = jobRepository.findById(jobId)
                 .orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + jobId));
+        publishJobClosedEvent(closedJob);
+        return closedJob;
+    }
+
+    private void publishJobClosedEvent(Job job) {
+        jobEventSubject.notifyObservers("JOB_CLOSED", Map.of(
+                "jobId", job.getId(),
+                "status", job.getStatus().name(),
+                "source", "S2-F4"
+        ));
     }
 
     /**
@@ -404,6 +417,13 @@ public class JobService {
      * @return a list of TopBudgetJobDTO with job details and proposal counts
      */
     public List<TopBudgetJobDTO> getTopBudgetJobs(int limit) {
-        return jobRepository.findTopBudgetJobs(limit);
+        return jobRepository.findTopBudgetJobs(limit).stream()
+                .map(job -> TopBudgetJobDTO.builder()
+                        .jobId(job.getJobId())
+                        .title(job.getTitle())
+                        .budgetMax(job.getBudgetMax())
+                        .totalProposals(job.getTotalProposals())
+                        .build())
+                .toList();
     }
 }
