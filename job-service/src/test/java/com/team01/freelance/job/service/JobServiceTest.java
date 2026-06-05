@@ -158,14 +158,14 @@ class JobServiceTest {
         LocalDateTime queryStart = startDate.atStartOfDay();
         LocalDateTime queryEndExclusive = endDate.plusDays(1).atStartOfDay();
 
-        JobProposalSummaryDTO expectedDTO = new JobProposalSummaryDTO(
-                jobId,
-                "Web Development",
-                5L,
-                800.0,
-                500.0,
-                1200.0
-        );
+        JobProposalSummaryDTO expectedDTO = JobProposalSummaryDTO.builder()
+            .jobId(jobId)
+            .title("Web Development")
+            .totalProposals(5L)
+            .averageBidAmount(800.0)
+            .lowestBid(500.0)
+            .highestBid(1200.0)
+            .build();
 
         when(jobRepository.existsById(jobId)).thenReturn(true);
         when(jobRepository.getProposalSummary(jobId, queryStart, queryEndExclusive))
@@ -199,14 +199,14 @@ class JobServiceTest {
         LocalDateTime queryStart = startDate.atStartOfDay();
         LocalDateTime queryEndExclusive = endDate.plusDays(1).atStartOfDay();
 
-        JobProposalSummaryDTO expectedDTO = new JobProposalSummaryDTO(
-                jobId,
-                "Web Development",
-                0L,
-                0.0,
-                0.0,
-                0.0
-        );
+        JobProposalSummaryDTO expectedDTO = JobProposalSummaryDTO.builder()
+            .jobId(jobId)
+            .title("Web Development")
+            .totalProposals(0L)
+            .averageBidAmount(0.0)
+            .lowestBid(0.0)
+            .highestBid(0.0)
+            .build();
 
         when(jobRepository.existsById(jobId)).thenReturn(true);
         when(jobRepository.getProposalSummary(jobId, queryStart, queryEndExclusive))
@@ -292,14 +292,14 @@ class JobServiceTest {
         LocalDateTime queryStart = sameDate.atStartOfDay();
         LocalDateTime queryEndExclusive = sameDate.plusDays(1).atStartOfDay();
 
-        JobProposalSummaryDTO expectedDTO = new JobProposalSummaryDTO(
-                jobId,
-                "Web Development",
-                2L,
-                750.0,
-                700.0,
-                800.0
-        );
+        JobProposalSummaryDTO expectedDTO = JobProposalSummaryDTO.builder()
+            .jobId(jobId)
+            .title("Web Development")
+            .totalProposals(2L)
+            .averageBidAmount(750.0)
+            .lowestBid(700.0)
+            .highestBid(800.0)
+            .build();
 
         when(jobRepository.existsById(jobId)).thenReturn(true);
         when(jobRepository.getProposalSummary(jobId, queryStart, queryEndExclusive))

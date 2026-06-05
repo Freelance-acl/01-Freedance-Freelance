@@ -143,14 +143,14 @@ class JobControllerTest {
         LocalDate startDate = LocalDate.of(2026, 3, 1);
         LocalDate endDate = LocalDate.of(2026, 3, 31);
 
-        JobProposalSummaryDTO dto = new JobProposalSummaryDTO(
-                1L,
-                "Web Development",
-                5L,
-                800.0,
-                500.0,
-                1200.0
-        );
+        JobProposalSummaryDTO dto = JobProposalSummaryDTO.builder()
+                .jobId(1L)
+                .title("Web Development")
+                .totalProposals(5L)
+                .averageBidAmount(800.0)
+                .lowestBid(500.0)
+                .highestBid(1200.0)
+                .build();
 
         when(jobService.getJobProposalSummary(1L, startDate, endDate)).thenReturn(dto);
 
@@ -408,6 +408,31 @@ class JobControllerTest {
                 .andExpect(jsonPath("$[0].jobId").value(3))
                 .andExpect(jsonPath("$[0].budgetMax").value(8000.0))
                 .andExpect(jsonPath("$[0].totalProposals").value(4));
+    }
+
+    @Test
+    void getJobDashboard_returnsOkWithAggregatedResults() throws Exception {
+        com.team01.freelance.job.dto.JobDashboardDTO dashboard = com.team01.freelance.job.dto.JobDashboardDTO.builder()
+                .jobId(7L)
+                .title("Analytics Platform")
+                .totalProposals(12L)
+                .acceptedProposals(3L)
+                .averageBidAmount(950.0)
+                .activeAttachments(2L)
+                .rating(4.7)
+                .build();
+        when(jobService.getJobDashboard()).thenReturn(List.of(dashboard));
+
+        mockMvc.perform(get("/api/jobs/reports/dashboard"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].jobId").value(7))
+                .andExpect(jsonPath("$[0].title").value("Analytics Platform"))
+                .andExpect(jsonPath("$[0].totalProposals").value(12))
+                .andExpect(jsonPath("$[0].acceptedProposals").value(3))
+                .andExpect(jsonPath("$[0].averageBidAmount").value(950.0))
+                .andExpect(jsonPath("$[0].activeAttachments").value(2))
+                .andExpect(jsonPath("$[0].rating").value(4.7));
     }
 
     private JobAttachmentAlertDTO buildAlertDto(Long jobId, String jobTitle, JobStatus jobStatus, int expiredCount) {

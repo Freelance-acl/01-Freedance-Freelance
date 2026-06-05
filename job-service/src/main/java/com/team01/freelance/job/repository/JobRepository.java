@@ -15,6 +15,9 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Repository for job persistence and dashboard projections.
+ */
 @Repository
 public interface JobRepository extends JpaRepository<Job, Long> {
 
@@ -49,7 +52,10 @@ public interface JobRepository extends JpaRepository<Job, Long> {
             @Param("endDateExclusive") LocalDateTime endDateExclusive
     );
 
-    @Query(value = "SELECT * FROM jobs "
+	    /**
+	     * Searches jobs that overlap the requested budget range and optional status.
+	     */
+	    @Query(value = "SELECT * FROM jobs "
             + "WHERE (:status IS NULL OR status = :status) "
             + "AND (budget_max >= :minBudget AND budget_min <= :maxBudget) "
             + "ORDER BY budget_max DESC",
@@ -64,7 +70,10 @@ public interface JobRepository extends JpaRepository<Job, Long> {
             Pageable pageable);
 
 
-	@Query(value = "SELECT DISTINCT j.* FROM jobs j JOIN job_attachments ja ON ja.job_id = j.id WHERE ja.expiry_date < CURRENT_DATE ORDER BY j.id", nativeQuery = true)
+		/**
+		 * Returns jobs that currently have expired attachments.
+		 */
+		@Query(value = "SELECT DISTINCT j.* FROM jobs j JOIN job_attachments ja ON ja.job_id = j.id WHERE ja.expiry_date < CURRENT_DATE ORDER BY j.id", nativeQuery = true)
 	List<Job> findJobsWithExpiredAttachments();
 
 	/**
@@ -113,6 +122,9 @@ public interface JobRepository extends JpaRepository<Job, Long> {
 			""", nativeQuery = true)
 	int closeJobIfEligible(@Param("jobId") Long jobId);
 
+	/**
+	 * Rejects all submitted proposals for a job.
+	 */
 	@Modifying(clearAutomatically = true)
 	@Query(value = """
 			UPDATE proposals
@@ -121,10 +133,16 @@ public interface JobRepository extends JpaRepository<Job, Long> {
 			""", nativeQuery = true)
 	int rejectSubmittedProposalsByJobId(@Param("jobId") Long jobId);
 
+	/**
+	 * Marks a job as in progress.
+	 */
 	@Modifying(clearAutomatically = true)
 	@Query(value = "UPDATE jobs SET status = 'IN_PROGRESS' WHERE id = :jobId", nativeQuery = true)
 	int markJobInProgress(@Param("jobId") Long jobId);
 
+	/**
+	 * Marks a job as closed.
+	 */
 	@Modifying(clearAutomatically = true)
 	@Query(value = "UPDATE jobs SET status = 'CLOSED' WHERE id = :jobId", nativeQuery = true)
 	int markJobClosed(@Param("jobId") Long jobId);
@@ -148,6 +166,9 @@ public interface JobRepository extends JpaRepository<Job, Long> {
 List<TopBudgetJobDTO> findTopBudgetJobs(@Param("limit") int limit);
 
 
+	/**
+	 * Reopens a job when it is currently in progress.
+	 */
 	@Modifying
 	@Query(value = "UPDATE jobs SET status = 'OPEN' WHERE id = :jobId AND status = 'IN_PROGRESS'", nativeQuery = true)
 	int reopenIfInProgress(@Param("jobId") Long jobId);

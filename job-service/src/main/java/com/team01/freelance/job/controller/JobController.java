@@ -1,16 +1,15 @@
 package com.team01.freelance.job.controller;
 
+import com.team01.freelance.job.dto.JobDashboardDTO;
 import com.team01.freelance.job.dto.JobProposalSummaryDTO;
+import com.team01.freelance.job.dto.TopBudgetJobDTO;
 import com.team01.freelance.job.exception.ForbiddenOperationException;
+import com.team01.freelance.job.model.Job;
 import com.team01.freelance.job.model.JobAttachmentAlertDTO;
 import com.team01.freelance.job.model.JobAttachmentVerificationRequest;
 import com.team01.freelance.job.model.JobCloseRequest;
 import com.team01.freelance.job.model.JobRatingRequest;
-import com.team01.freelance.job.model.JobCloseRequest;
-import com.team01.freelance.job.model.Job;
 import com.team01.freelance.job.model.JobStatus;
-import com.team01.freelance.job.model.JobStatus;
-import com.team01.freelance.job.dto.TopBudgetJobDTO;
 import com.team01.freelance.job.service.JobService;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -181,15 +180,6 @@ public class JobController {
 
    
     /**
-     * Searches jobs by a key-value pair in the requirements JSONB column.
-     * Optionally filters by job status.
-     *
-     * @param key the JSON key to search for in requirements
-     * @param value the value to match
-     * @param status the optional job status filter
-     * @return 200 with list of matching jobs
-     */
-    /**
      * Closes a job and rejects all related SUBMITTED proposals.
      *
      * @param id the job ID
@@ -211,6 +201,15 @@ public class JobController {
         }
     }
 
+    /**
+     * Searches jobs by a key-value pair in the requirements JSONB column.
+     * Optionally filters by job status.
+     *
+     * @param key the JSON key to search for in requirements
+     * @param value the value to match
+     * @param status the optional job status filter
+     * @return 200 with list of matching jobs
+     */
     @GetMapping("/requirements/search")
     public ResponseEntity<List<Job>> searchByRequirements(
             @RequestParam String key,
@@ -244,16 +243,14 @@ public class JobController {
      * @param limit the maximum number of jobs to return (default: 10)
      * @return 200 with list of top budget jobs
      */
-    /**
-     * Retrieves the top jobs ordered by budgetMax in descending order.
-     * Includes the count of proposals for each job.
-     *
-     * @param limit the maximum number of jobs to return (default: 10)
-     * @return 200 with list of top budget jobs
-     */
     @GetMapping("/reports/top-budget")
     public ResponseEntity<List<TopBudgetJobDTO>> getTopBudgetJobs(
             @RequestParam(name = "limit", defaultValue = "10") int limit) {
         return ResponseEntity.ok(jobService.getTopBudgetJobs(limit));
+    }
+
+    @GetMapping({"/dashboard", "/reports/dashboard"})
+    public ResponseEntity<List<JobDashboardDTO>> getJobDashboard() {
+        return ResponseEntity.ok(jobService.getJobDashboard());
     }
 }

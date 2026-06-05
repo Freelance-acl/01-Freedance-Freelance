@@ -18,6 +18,7 @@ import com.team01.freelance.user.model.UserRole;
 import com.team01.freelance.user.repository.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,6 +42,9 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import java.util.Map;
 
+/**
+ * Coordinates job use cases, projections, and event publishing.
+ */
 @Service
 public class JobService {
 
@@ -62,14 +66,27 @@ public class JobService {
     @Autowired(required = false)
     private EventSubject jobEventSubject;
 
+    @Autowired(required = false)
+    @Lazy
+    private JobService self;
+
+    /**
+     * Returns all jobs.
+     */
     public List<Job> getAllJobs() {
         return jobRepository.findAll();
     }
 
+    /**
+     * Returns a job by ID if it exists.
+     */
     public Optional<Job> getJobById(Long id) {
         return jobRepository.findById(id);
     }
 
+    /**
+     * Searches jobs by status and budget overlap.
+     */
     public Page<Job> searchJobsByStatusAndBudgetRange(String status, Double minBudget, Double maxBudget, Pageable pageable) {
         if (minBudget == null || maxBudget == null) {
             throw new IllegalArgumentException("minBudget and maxBudget are required");
@@ -87,6 +104,10 @@ public class JobService {
         return jobRepository.searchJobsByStatusAndBudgetRange(normalizedStatus, minBudget, maxBudget, pageable);
     }
 
+    /**
+     * Creates a new job and publishes a creation event.
+     */
+    @CacheEvict(value = "jobDashboard", allEntries = true)
     public Job createJob(Job job) {
         if (job.getClientId() == null) {
             throw new IllegalArgumentException("Client ID is required to create a Job");
@@ -115,6 +136,7 @@ public class JobService {
      * @throws IllegalArgumentException if the budget range is invalid
      * @throws EntityNotFoundException if the job is not found
      */
+    @CacheEvict(value = "jobDashboard", allEntries = true)
     public Job updateJob(Long id, Job jobDetails) {
         return jobRepository.findById(id).map(existingJob -> {
                 if (jobDetails.getTitle() != null) existingJob.setTitle(jobDetails.getTitle());
@@ -136,6 +158,10 @@ public class JobService {
         }).orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + id));
     }
 
+    /**
+     * Replaces the requirements map for an existing job.
+     */
+    @CacheEvict(value = "jobDashboard", allEntries = true)
     public Job updateJobRequirements(Long id, Map<String, Object> requirements) {
         return jobRepository.findById(id).map(existingJob -> {
             Map<String, Object> mergedRequirements = new HashMap<>();
@@ -152,6 +178,10 @@ public class JobService {
         }).orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + id));
     }
 
+    /**
+     * Deletes a job when it exists.
+     */
+    @CacheEvict(value = "jobDashboard", allEntries = true)
     public boolean deleteJobById(Long id) {
         if (!jobRepository.existsById(id)) {
             return false;
@@ -161,6 +191,10 @@ public class JobService {
         return true;
     }
 
+    /**
+     * Deletes every job.
+     */
+    @CacheEvict(value = "jobDashboard", allEntries = true)
     public void deleteAllJobs() {
         jobRepository.deleteAll();
         publishJobEvent("JOB_BULK_DELETED", null, Map.of());
@@ -203,16 +237,22 @@ public class JobService {
         return toJobProposalSummaryDTO(rows.get(0));
     }
 
+    /**
+     * Maps a proposal summary row to its DTO.
+     */
     private JobProposalSummaryDTO toJobProposalSummaryDTO(Object[] row) {
-        return new JobProposalSummaryDTO(
-                row[0] != null ? ((Number) row[0]).longValue() : null,
-                row[1] != null ? row[1].toString() : null,
-                row[2] != null ? ((Number) row[2]).longValue() : 0L,
-                row[3] != null ? ((Number) row[3]).doubleValue() : 0.0,
-                row[4] != null ? ((Number) row[4]).doubleValue() : 0.0,
-                row[5] != null ? ((Number) row[5]).doubleValue() : 0.0
-        );
+        return JobProposalSummaryDTO.builder()
+            .jobId(row[0] != null ? ((Number) row[0]).longValue() : null)
+            .title(row[1] != null ? row[1].toString() : null)
+            .totalProposals(row[2] != null ? ((Number) row[2]).longValue() : 0L)
+            .averageBidAmount(row[3] != null ? ((Number) row[3]).doubleValue() : 0.0)
+            .lowestBid(row[4] != null ? ((Number) row[4]).doubleValue() : 0.0)
+            .highestBid(row[5] != null ? ((Number) row[5]).doubleValue() : 0.0)
+            .build();
     }
+    /**
+     * Returns jobs that still have expired attachments.
+     */
     @Transactional(readOnly = true)
     public List<JobAttachmentAlertDTO> getJobsWithExpiredAttachments() {
         LocalDate today = LocalDate.now();
@@ -242,7 +282,11 @@ public class JobService {
                 .toList();
     }
 
+    /**
+     * Rates a job using a completed contract.
+     */
     @Transactional
+    @CacheEvict(value = "jobDashboard", allEntries = true)
     public Job rateJob(Long jobId, JobRatingRequest ratingRequest) {
         Job job = jobRepository.findById(jobId)
                 .orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + jobId));
@@ -281,7 +325,11 @@ public class JobService {
         return savedJob;
     }
 
+    /**
+     * Verifies a job attachment and records the verifier metadata.
+     */
     @Transactional
+    @CacheEvict(value = "jobDashboard", allEntries = true)
     public Job verifyJobAttachment(Long jobId, Long attachmentId, JobAttachmentVerificationRequest request) {
         if (request == null || request.getVerifiedBy() == null) {
             throw new IllegalArgumentException("verifiedBy is required to verify a JobAttachment");
@@ -359,6 +407,9 @@ public class JobService {
         }
     }
 
+    /**
+     * Filters jobs by requirements in memory.
+     */
     private List<Job> filterJobsByRequirements(String key, String value, String status) {
         return jobRepository.findAll().stream()
                 .filter(job -> job.getRequirements() != null
@@ -368,6 +419,9 @@ public class JobService {
                 .toList();
     }
 
+    /**
+     * Detects whether the current datasource is PostgreSQL.
+     */
     private boolean usesPostgresDatabase() {
         try (var connection = dataSource.getConnection()) {
             return "PostgreSQL".equalsIgnoreCase(connection.getMetaData().getDatabaseProductName());
@@ -387,6 +441,7 @@ public class JobService {
      * @throws IllegalArgumentException if an ACTIVE contract exists for the job
      */
     @Transactional
+    @CacheEvict(value = "jobDashboard", allEntries = true)
     public Job closeJob(Long jobId) {
         Job job = jobRepository.findById(jobId)
                 .orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + jobId));
@@ -411,18 +466,26 @@ public class JobService {
     }
 
     /**
-     * Retrieves the top jobs ordered by budgetMax in descending order.
-     * Includes the count of proposals for each job.
-     *
-     * @param limit the maximum number of jobs to return
-     * @return a list of TopBudgetJobDTO with job details and proposal counts
+     * Returns the jobs with the highest budgets.
      */
     public List<TopBudgetJobDTO> getTopBudgetJobs(int limit) {
         return jobRepository.findTopBudgetJobs(limit);
     }
 
-    @Cacheable(value = "jobDashboard", key = "'all'")
+    /**
+     * Returns the dashboard view and records the access event.
+     */
     public List<JobDashboardDTO> getJobDashboard() {
+        publishJobEvent("DASHBOARD_VIEWED", null, Map.of("view", "dashboard"));
+        return self == null ? loadJobDashboard() : self.loadJobDashboard();
+    }
+
+    /**
+     * Loads the job dashboard projection from the repository.
+     */
+    @Transactional(readOnly = true)
+    @Cacheable(value = "jobDashboard", key = "'all'")
+    public List<JobDashboardDTO> loadJobDashboard() {
         List<Object[]> rows = jobRepository.findJobDashboard();
         return rows.stream().map(r -> JobDashboardDTO.builder()
                 .jobId(r[0] != null ? ((Number) r[0]).longValue() : null)
@@ -435,6 +498,9 @@ public class JobService {
                 .toList();
     }
 
+    /**
+     * Publishes a job event when event logging is enabled.
+     */
     private void publishJobEvent(String eventType, Long jobId, Map<String, Object> details) {
         if (jobEventSubject == null) {
             return;
@@ -447,6 +513,9 @@ public class JobService {
         jobEventSubject.notifyObservers(eventType, payload);
     }
 
+    /**
+     * Builds a compact event payload from the job state.
+     */
     private Map<String, Object> jobEventDetails(Job job) {
         Map<String, Object> details = new HashMap<>();
         if (job.getTitle() != null) {
