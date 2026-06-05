@@ -756,7 +756,11 @@ class JobServiceTest {
         List<TopBudgetJobDTO> result = jobService.getTopBudgetJobs(2);
 
         assertEquals(1, result.size());
+        assertNotSame(dto, result.getFirst());
+        assertEquals(1L, result.getFirst().getJobId());
+        assertEquals("Job A", result.getFirst().getTitle());
         assertEquals(5000.0, result.getFirst().getBudgetMax());
+        assertEquals(2L, result.getFirst().getTotalProposals());
         verify(jobRepository).findTopBudgetJobs(2);
     }
 
