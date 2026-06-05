@@ -32,6 +32,10 @@ public class FeeEstimateDTO {
         this.estimatedDailyRate = estimatedDailyRate;
     }
 
+    public static Builder builder() {
+        return new Builder();
+    }
+
     public double getBidAmount() {
         return bidAmount;
     }
@@ -50,5 +54,47 @@ public class FeeEstimateDTO {
 
     public double getEstimatedDailyRate() {
         return estimatedDailyRate;
+    }
+
+    public static class Builder {
+        private double bidAmount;
+        private double platformFee;
+        private double freelancerPayout;
+        private int feePercentage;
+        private double estimatedDailyRate;
+
+        public Builder bidAmount(double bidAmount) {
+            this.bidAmount = bidAmount;
+            return this;
+        }
+
+        public Builder platformFee(double platformFee) {
+            this.platformFee = platformFee;
+            return this;
+        }
+
+        public Builder freelancerPayout(double freelancerPayout) {
+            this.freelancerPayout = freelancerPayout;
+            return this;
+        }
+
+        public Builder feePercentage(int feePercentage) {
+            this.feePercentage = feePercentage;
+            return this;
+        }
+
+        public Builder estimatedDailyRate(double estimatedDailyRate) {
+            this.estimatedDailyRate = estimatedDailyRate;
+            return this;
+        }
+
+        public FeeEstimateDTO build() {
+            return new FeeEstimateDTO(
+                    bidAmount,
+                    platformFee,
+                    freelancerPayout,
+                    feePercentage,
+                    estimatedDailyRate);
+        }
     }
 }
