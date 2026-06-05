@@ -13,6 +13,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
@@ -39,12 +40,24 @@ class JobSearchIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
     private User client;
 
     @BeforeEach
     void setUp() {
         mockMvc = buildMockMvc(webApplicationContext);
+        clearJobTestData();
         client = saveUser("Client", "client-" + System.nanoTime() + "@test.dev", UserRole.CLIENT);
+    }
+
+    /** Non-transactional ITs (e.g. CloseJobIntegrationTest) can leave rows visible to this search test. */
+    private void clearJobTestData() {
+        jdbcTemplate.update("DELETE FROM proposals");
+        jdbcTemplate.update("DELETE FROM contracts");
+        jdbcTemplate.update("DELETE FROM job_attachments");
+        jobRepository.deleteAll();
     }
 
     @Test
