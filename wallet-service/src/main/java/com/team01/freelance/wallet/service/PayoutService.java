@@ -203,16 +203,38 @@ public class PayoutService {
             retryAttempt = ((Number) retryValue).intValue();
         }
 
-        // Hardcoded to COMPLETED as there does not exist payments.
-
-        transactionDetails.put("retryAttempt", retryAttempt + 1);
+        int nextAttempt = retryAttempt + 1;
+        transactionDetails.put("retryAttempt", nextAttempt);
         transactionDetails.put("gatewayResponse", "approved");
 
         payout.setStatus(PayoutStatus.COMPLETED);
-
         payout.setTransactionDetails(transactionDetails);
 
-        return payoutRepository.save(payout);
+        Payout saved = payoutRepository.save(payout);
+
+        // Dispatches event to GoF Observers exactly matching PayoutAuditEvent properties
+        try {
+            Map<String, Object> retryAuditParams = new HashMap<>();
+            retryAuditParams.put("payoutId", saved.getId());
+            retryAuditParams.put("action", "COMPLETED");
+            retryAuditParams.put("method", saved.getMethod()); // Passes PayoutMethod enum directly
+            retryAuditParams.put("amount", saved.getAmount()); // Match Double object assignment
+
+            // Populate the document's internal Map<String, Object> details block
+            Map<String, Object> innerDetails = new HashMap<>();
+            innerDetails.put("retryAttempt", nextAttempt);
+            innerDetails.put("gatewayResponse", "approved");
+            innerDetails.put("note", "Payout retried successfully after initial failure");
+
+            retryAuditParams.put("details", innerDetails);
+
+            // Notify GoF Observer Chain
+            payoutEventSubject.notifyObservers("COMPLETED", retryAuditParams);
+        } catch (Exception e) {
+            log.warn("Mongo logging failed during retry processing for payout ID {}: {}", saved.getId(), e.getMessage());
+        }
+
+        return saved;
     }
 
     @Cacheable(value = "S5-F8", key = "#payoutId")
