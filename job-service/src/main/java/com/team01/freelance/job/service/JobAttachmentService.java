@@ -7,6 +7,7 @@ import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Caching;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -25,6 +26,7 @@ public class JobAttachmentService {
         return jobAttachmentRepository.findAll();
     }
 
+    @Cacheable(value = "job-attachment-by-id", key = "#id", unless = "#result.isEmpty()")
     public Optional<JobAttachment> getJobAttachmentById(Long id) {
         return jobAttachmentRepository.findById(id);
     }
