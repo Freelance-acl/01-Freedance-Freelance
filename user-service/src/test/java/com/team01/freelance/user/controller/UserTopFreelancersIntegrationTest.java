@@ -61,10 +61,14 @@ class UserTopFreelancersIntegrationTest extends AbstractIntegrationTest {
                         .param("limit", "2"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].userId").value(freelancerB.getId()))
                 .andExpect(jsonPath("$[0].name").value("User B"))
                 .andExpect(jsonPath("$[0].totalEarnings").value(8000.0))
+                .andExpect(jsonPath("$[0].contractCount").value(1))
+                .andExpect(jsonPath("$[1].userId").value(freelancerA.getId()))
                 .andExpect(jsonPath("$[1].name").value("User A"))
-                .andExpect(jsonPath("$[1].totalEarnings").value(4000.0));
+                .andExpect(jsonPath("$[1].totalEarnings").value(4000.0))
+                .andExpect(jsonPath("$[1].contractCount").value(2));
     }
 
     private User saveFreelancer(String name) {
