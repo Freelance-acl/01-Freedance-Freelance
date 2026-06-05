@@ -18,7 +18,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
-
+import org.springframework.cache.CacheManager;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -35,6 +35,13 @@ class M1JwtProtectionIntegrationTest extends AbstractIntegrationTest {
 
     private static final String CLOSE_BODY = "{\"status\":\"CLOSED\"}";
 
+    @Autowired
+    private CacheManager cacheManager;
+
+    @BeforeEach
+    void clearCaches() {
+        cacheManager.getCacheNames().forEach(name -> cacheManager.getCache(name).clear());
+    }
     @Autowired
     private WebApplicationContext webApplicationContext;
 
@@ -108,6 +115,7 @@ class M1JwtProtectionIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void requirementsSearch_withValidToken_returns200() throws Exception {
+        jobRepository.deleteAll();
         saveJob("JWT senior job", JobStatus.OPEN, 2000.0, Map.of("experienceLevel", "SENIOR"));
 
         mockMvc.perform(get("/api/jobs/requirements/search")
