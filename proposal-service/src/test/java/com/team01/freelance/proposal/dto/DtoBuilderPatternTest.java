@@ -16,6 +16,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class DtoBuilderPatternTest {
 
     @Test
+    void feeEstimateDtoExposesDp4BuilderContract() throws Exception {
+        assertBuilderContract(FeeEstimateDTO.class,
+                new MethodSpec("bidAmount", double.class),
+                new MethodSpec("platformFee", double.class),
+                new MethodSpec("freelancerPayout", double.class),
+                new MethodSpec("feePercentage", int.class),
+                new MethodSpec("estimatedDailyRate", double.class));
+    }
+
+    @Test
     void proposalAnalyticsDtoExposesDp4BuilderContract() throws Exception {
         assertBuilderContract(ProposalAnalyticsDTO.class,
                 new MethodSpec("totalProposals", long.class),
@@ -69,6 +79,23 @@ class DtoBuilderPatternTest {
         assertEquals(5000.0, dto.getTotalBidValue());
         assertEquals(500.0, dto.getAverageBid());
         assertEquals(0.4, dto.getAcceptanceRate());
+    }
+
+    @Test
+    void feeEstimateBuilderPopulatesFields() {
+        FeeEstimateDTO dto = FeeEstimateDTO.builder()
+                .bidAmount(1000.0)
+                .platformFee(150.0)
+                .freelancerPayout(850.0)
+                .feePercentage(15)
+                .estimatedDailyRate(85.0)
+                .build();
+
+        assertEquals(1000.0, dto.getBidAmount());
+        assertEquals(150.0, dto.getPlatformFee());
+        assertEquals(850.0, dto.getFreelancerPayout());
+        assertEquals(15, dto.getFeePercentage());
+        assertEquals(85.0, dto.getEstimatedDailyRate());
     }
 
     @Test

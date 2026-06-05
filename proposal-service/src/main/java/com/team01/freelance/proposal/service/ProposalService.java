@@ -286,6 +286,7 @@ public class ProposalService {
                 now
         );
 
+        notifyProposalEvent("PROPOSAL_ACCEPTED", acceptedProposal);
         acceptedProposal.setProposalMilestones(new ArrayList<>());
         return acceptedProposal;
     }
@@ -330,7 +331,9 @@ public class ProposalService {
             proposal.addProposalMilestone(milestone);
         }
 
-        return proposalRepository.save(proposal);
+        Proposal savedProposal = proposalRepository.save(proposal);
+        notifyProposalEvent("PROPOSAL_MILESTONES_ADDED", savedProposal);
+        return savedProposal;
     }
 
     private void validateMilestone(ProposalMilestone milestone) {
@@ -412,6 +415,7 @@ public class ProposalService {
         );
 
         proposal.setProposalMilestones(new ArrayList<>());
+        notifyProposalEvent("PROPOSAL_COMPLETED", proposal);
         return proposal;
     }
 

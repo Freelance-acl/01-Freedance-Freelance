@@ -1,6 +1,7 @@
 package com.team01.freelance.proposal.service;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -12,6 +13,7 @@ import org.springframework.stereotype.Service;
 
 import com.team01.freelance.job.model.Job;
 import com.team01.freelance.job.repository.JobRepository;
+import com.team01.freelance.proposal.adapter.Neo4jRecordAdapter;
 import com.team01.freelance.proposal.dto.JobRecommendationDTO;
 import com.team01.freelance.proposal.exception.ForbiddenOperationException;
 import com.team01.freelance.proposal.graph.InteractionGraphService;
@@ -39,6 +41,9 @@ public class ProposalRecommendationService {
     @Autowired
     private ProposalAuthSupport proposalAuthSupport;
 
+    @Autowired
+    private Neo4jRecordAdapter neo4jRecordAdapter;
+
     @Cacheable(cacheNames = "S3-F12", key = "#freelancerId + ':' + #limit + ':' + #request.getHeader('Authorization')")
     public List<JobRecommendationDTO> getRecommendations(
             Long freelancerId,
@@ -65,12 +70,12 @@ public class ProposalRecommendationService {
             if (job == null) {
                 continue;
             }
-            JobRecommendationDTO dto = new JobRecommendationDTO();
-            dto.setJobId(job.getId());
-            dto.setTitle(job.getTitle());
-            dto.setCategory(job.getCategory() != null ? job.getCategory().name() : null);
-            dto.setScore(score.score());
-            results.add(dto);
+            Map<String, Object> record = new HashMap<>();
+            record.put("jobId", job.getId());
+            record.put("title", job.getTitle());
+            record.put("category", job.getCategory() != null ? job.getCategory().name() : null);
+            record.put("score", score.score());
+            results.add(neo4jRecordAdapter.adapt(record));
         }
         return results;
     }
