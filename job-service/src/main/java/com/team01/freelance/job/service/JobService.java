@@ -70,7 +70,7 @@ public class JobService {
         return jobRepository.findAll();
     }
 
-    @Cacheable(value = "job-by-id", key = "#id", unless = "#result.isEmpty()")
+    @Cacheable(value = "job-by-id", key = "#id", unless = "#result == null")
     public Optional<Job> getJobById(Long id) {
         return jobRepository.findById(id);
     }
