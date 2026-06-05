@@ -1,4 +1,4 @@
-﻿package com.team01.freelance.job.service;
+package com.team01.freelance.job.service;
 
 import com.team01.freelance.job.dto.JobProposalSummaryDTO;
 import com.team01.freelance.job.client.ContractLookupClient;
@@ -18,6 +18,10 @@ import com.team01.freelance.user.model.UserRole;
 import com.team01.freelance.user.repository.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -58,16 +62,22 @@ public class JobService {
     private DataSource dataSource;
 
     @Autowired
+    @Qualifier("jobEventSubject")
     private EventSubject jobEventSubject;
 
     public List<Job> getAllJobs() {
         return jobRepository.findAll();
     }
 
+    @Cacheable(value = "job-by-id", key = "#id", unless = "#result == null")
     public Optional<Job> getJobById(Long id) {
         return jobRepository.findById(id);
     }
 
+    @Cacheable(
+            value = "S2-F1",
+            key = "(#status == null ? 'ALL' : #status.trim()) + ':' + #minBudget + ':' + #maxBudget + ':' + #pageable.pageNumber + ':' + #pageable.pageSize + ':' + #pageable.sort.toString()"
+    )
     public Page<Job> searchJobsByStatusAndBudgetRange(String status, Double minBudget, Double maxBudget, Pageable pageable) {
         if (minBudget == null || maxBudget == null) {
             throw new IllegalArgumentException("minBudget and maxBudget are required");
@@ -85,6 +95,11 @@ public class JobService {
         return jobRepository.searchJobsByStatusAndBudgetRange(normalizedStatus, minBudget, maxBudget, pageable);
     }
 
+    @Caching(evict = {
+            @CacheEvict(value = "S2-F1", allEntries = true),
+            @CacheEvict(value = "S2-F5", allEntries = true),
+            @CacheEvict(value = "S2-F6", allEntries = true)
+    })
     public Job createJob(Job job) {
         if (job.getClientId() == null) {
             throw new IllegalArgumentException("Client ID is required to create a Job");
@@ -113,6 +128,13 @@ public class JobService {
      * @throws IllegalArgumentException if the budget range is invalid
      * @throws EntityNotFoundException if the job is not found
      */
+    @Caching(evict = {
+            @CacheEvict(value = "job-by-id", key = "#id"),
+            @CacheEvict(value = "S2-F1", allEntries = true),
+            @CacheEvict(value = "S2-F3", allEntries = true),
+            @CacheEvict(value = "S2-F5", allEntries = true),
+            @CacheEvict(value = "S2-F6", allEntries = true)
+    })
     public Job updateJob(Long id, Job jobDetails) {
         return jobRepository.findById(id).map(existingJob -> {
                 if (jobDetails.getTitle() != null) existingJob.setTitle(jobDetails.getTitle());
@@ -134,6 +156,10 @@ public class JobService {
         }).orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + id));
     }
 
+    @Caching(evict = {
+            @CacheEvict(value = "job-by-id", key = "#id"),
+            @CacheEvict(value = "S2-F5", allEntries = true)
+    })
     public Job updateJobRequirements(Long id, Map<String, Object> requirements) {
         return jobRepository.findById(id).map(existingJob -> {
             Map<String, Object> mergedRequirements = new HashMap<>();
@@ -175,6 +201,11 @@ public class JobService {
      * @throws IllegalArgumentException if startDate is after endDate
      * @throws EntityNotFoundException if job is not found
      */
+    @Cacheable(
+            value = "S2-F3",
+            key = "#jobId + ':' + (#startDate == null ? 'NONE' : #startDate.toString()) + ':' + (#endDate == null ? 'NONE' : #endDate.toString())",
+            unless = "#result == null"
+    )
     public JobProposalSummaryDTO getJobProposalSummary(Long jobId, LocalDate startDate, LocalDate endDate) {
         if (startDate == null || endDate == null) {
             throw new IllegalArgumentException("startDate and endDate are required");
@@ -343,6 +374,11 @@ public class JobService {
      * @param status the optional job status filter
      * @return a list of jobs matching the criteria
      */
+    @Cacheable(
+            value = "S2-F5",
+            key = "#key + ':' + #value + ':' + #status",
+            unless = "#result == null or #result.isEmpty()"
+    )
     public List<Job> searchByRequirements(String key, String value, String status) {
         if (!usesPostgresDatabase()) {
             return filterJobsByRequirements(key, value, status);
@@ -415,6 +451,7 @@ public class JobService {
      * @param limit the maximum number of jobs to return
      * @return a list of TopBudgetJobDTO with job details and proposal counts
      */
+    @Cacheable(value = "S2-F6", key = "#limit", unless = "#result == null or #result.isEmpty()")
     public List<TopBudgetJobDTO> getTopBudgetJobs(int limit) {
         return jobRepository.findTopBudgetJobs(limit);
     }

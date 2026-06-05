@@ -19,10 +19,10 @@ class MongoDocumentAdapterTest {
 
         JobEventDTO dto = new MongoDocumentAdapter().adapt(event);
 
-        assertEquals(42L, dto.getJobId());
-        assertEquals("JOB_CREATED", dto.getAction());
-        assertEquals(timestamp, dto.getTimestamp());
-        assertNotNull(dto.getDetails());
-        assertEquals("React App", dto.getDetails().get("title"));
+        assertEquals(42L, dto.jobId());
+        assertEquals("JOB_CREATED", dto.action());
+        assertEquals(timestamp, dto.timestamp());
+        assertNotNull(dto.details());
+        assertEquals("React App", dto.details().get("title"));
     }
 }
