@@ -17,6 +17,10 @@ public class ProposalDetailsDTO {
     private Integer totalMilestones;
     private Integer completedMilestones;
 
+    public static Builder builder() {
+        return new Builder();
+    }
+
     public Long getProposalId() {
         return proposalId;
     }
@@ -89,6 +93,59 @@ public class ProposalDetailsDTO {
         this.completedMilestones = completedMilestones;
     }
 
+    public static class Builder {
+        private final ProposalDetailsDTO dto = new ProposalDetailsDTO();
+
+        public Builder proposalId(Long proposalId) {
+            dto.proposalId = proposalId;
+            return this;
+        }
+
+        public Builder jobId(Long jobId) {
+            dto.jobId = jobId;
+            return this;
+        }
+
+        public Builder freelancerId(Long freelancerId) {
+            dto.freelancerId = freelancerId;
+            return this;
+        }
+
+        public Builder status(ProposalStatus status) {
+            dto.status = status;
+            return this;
+        }
+
+        public Builder bidAmount(Double bidAmount) {
+            dto.bidAmount = bidAmount;
+            return this;
+        }
+
+        public Builder metadata(Map<String, Object> metadata) {
+            dto.metadata = metadata;
+            return this;
+        }
+
+        public Builder milestones(List<MilestoneDTO> milestones) {
+            dto.milestones = milestones;
+            return this;
+        }
+
+        public Builder totalMilestones(Integer totalMilestones) {
+            dto.totalMilestones = totalMilestones;
+            return this;
+        }
+
+        public Builder completedMilestones(Integer completedMilestones) {
+            dto.completedMilestones = completedMilestones;
+            return this;
+        }
+
+        public ProposalDetailsDTO build() {
+            return dto;
+        }
+    }
+
     public static class MilestoneDTO {
         private Long id;
         private Integer milestoneOrder;
@@ -97,6 +154,10 @@ public class ProposalDetailsDTO {
         private Double amount;
         private MilestoneStatus status;
         private Map<String, Object> metadata;
+
+        public static Builder builder() {
+            return new Builder();
+        }
 
         public Long getId() {
             return id;
@@ -152,6 +213,49 @@ public class ProposalDetailsDTO {
 
         public void setMetadata(Map<String, Object> metadata) {
             this.metadata = metadata;
+        }
+
+        public static class Builder {
+            private final MilestoneDTO dto = new MilestoneDTO();
+
+            public Builder id(Long id) {
+                dto.id = id;
+                return this;
+            }
+
+            public Builder milestoneOrder(Integer milestoneOrder) {
+                dto.milestoneOrder = milestoneOrder;
+                return this;
+            }
+
+            public Builder title(String title) {
+                dto.title = title;
+                return this;
+            }
+
+            public Builder description(String description) {
+                dto.description = description;
+                return this;
+            }
+
+            public Builder amount(Double amount) {
+                dto.amount = amount;
+                return this;
+            }
+
+            public Builder status(MilestoneStatus status) {
+                dto.status = status;
+                return this;
+            }
+
+            public Builder metadata(Map<String, Object> metadata) {
+                dto.metadata = metadata;
+                return this;
+            }
+
+            public MilestoneDTO build() {
+                return dto;
+            }
         }
     }
 }

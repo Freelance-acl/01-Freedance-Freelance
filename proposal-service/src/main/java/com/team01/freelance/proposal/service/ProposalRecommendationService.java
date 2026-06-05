@@ -39,7 +39,7 @@ public class ProposalRecommendationService {
     @Autowired
     private ProposalAuthSupport proposalAuthSupport;
 
-    @Cacheable(cacheNames = "S3-F12", key = "#freelancerId + ':' + #limit")
+    @Cacheable(cacheNames = "S3-F12", key = "#freelancerId + ':' + #limit + ':' + #request.getHeader('Authorization')")
     public List<JobRecommendationDTO> getRecommendations(
             Long freelancerId,
             Integer limit,

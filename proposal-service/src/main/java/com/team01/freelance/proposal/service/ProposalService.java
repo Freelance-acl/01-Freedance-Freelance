@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -17,6 +18,7 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.team01.freelance.common.observer.EventSubject;
 import com.team01.freelance.contract.model.Contract;
 import com.team01.freelance.contract.model.ContractStatus;
 import com.team01.freelance.contract.repository.ContractRepository;
@@ -25,12 +27,14 @@ import com.team01.freelance.job.repository.JobRepository;
 import com.team01.freelance.wallet.repository.PayoutRepository;
 import com.team01.freelance.proposal.dto.ProposalAnalyticsDTO;
 import com.team01.freelance.proposal.dto.ProposalDetailsDTO;
+import com.team01.freelance.proposal.graph.InteractionGraphService;
 import com.team01.freelance.proposal.model.MilestoneStatus;
 import com.team01.freelance.proposal.model.Proposal;
 import com.team01.freelance.proposal.model.ProposalMilestone;
 import com.team01.freelance.proposal.model.ProposalStatus;
 import com.team01.freelance.proposal.repository.ProposalAnalyticsProjection;
 import com.team01.freelance.proposal.repository.ProposalRepository;
+import com.team01.freelance.user.model.User;
 import com.team01.freelance.user.repository.UserRepository;
 
 import jakarta.persistence.EntityNotFoundException;
@@ -66,6 +70,12 @@ public class ProposalService {
 
     @Autowired
     private DataSource dataSource;
+
+    @Autowired(required = false)
+    private EventSubject proposalEventSubject;
+
+    @Autowired(required = false)
+    private InteractionGraphService interactionGraphService;
 
     public List<Proposal> getAllProposals() {
         return proposalRepository.findAll();
@@ -198,13 +208,16 @@ public class ProposalService {
             throw new IllegalArgumentException("Freelancer and Job IDs are required to create a Proposal");
         }
 
-        jobRepository.findById(proposal.getJobId())
+        Job job = jobRepository.findById(proposal.getJobId())
                 .orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + proposal.getJobId()));
 
-        userRepository.findById(proposal.getFreelancerId())
+        User freelancer = userRepository.findById(proposal.getFreelancerId())
                 .orElseThrow(() -> new EntityNotFoundException("Freelancer not found with id: " + proposal.getFreelancerId()));
 
-        return proposalRepository.save(proposal);
+        Proposal savedProposal = proposalRepository.save(proposal);
+        notifyProposalEvent("PROPOSAL_CREATED", savedProposal);
+        recordProposalInteraction(savedProposal, freelancer, job);
+        return savedProposal;
     }
 
     /**
@@ -223,7 +236,9 @@ public class ProposalService {
             if (proposalDetails.getStatus() != null) existingProposal.setStatus(proposalDetails.getStatus());
             if (proposalDetails.getMetadata() != null) existingProposal.setMetadata(proposalDetails.getMetadata());
             if (proposalDetails.getAcceptedAt() != null) existingProposal.setAcceptedAt(proposalDetails.getAcceptedAt());
-            return proposalRepository.save(existingProposal);
+            Proposal savedProposal = proposalRepository.save(existingProposal);
+            notifyProposalEvent("PROPOSAL_UPDATED", savedProposal);
+            return savedProposal;
         }).orElseThrow(() -> new EntityNotFoundException("Proposal not found with id: " + id));
     }
 
@@ -348,6 +363,7 @@ public class ProposalService {
 
         proposal.setStatus(ProposalStatus.WITHDRAWN);
         Proposal withdrawnProposal = proposalRepository.save(proposal);
+        notifyProposalEvent("PROPOSAL_WITHDRAWN", withdrawnProposal);
 
         if (activeProposalCount == 1) {
             jobRepository.reopenIfInProgress(proposal.getJobId());
@@ -400,10 +416,12 @@ public class ProposalService {
     }
 
     public boolean deleteProposalById(Long id) {
-        if (!proposalRepository.existsById(id)) {
+        Optional<Proposal> proposal = proposalRepository.findById(id);
+        if (proposal.isEmpty()) {
             return false;
         }
         proposalRepository.deleteById(id);
+        notifyProposalEvent("PROPOSAL_DELETED", proposal.get());
         return true;
     }
 
@@ -473,5 +491,30 @@ public class ProposalService {
         if (startDate.isAfter(endDate)) {
             throw new IllegalArgumentException("startDate must be on or before endDate");
         }
+    }
+
+    private void notifyProposalEvent(String action, Proposal proposal) {
+        if (proposalEventSubject == null || proposal == null || proposal.getId() == null) {
+            return;
+        }
+        proposalEventSubject.notifyObservers(action, Map.of(
+                "proposalId", proposal.getId(),
+                "action", action,
+                "details", Map.of(
+                        "jobId", proposal.getJobId(),
+                        "freelancerId", proposal.getFreelancerId())));
+    }
+
+    private void recordProposalInteraction(Proposal proposal, User freelancer, Job job) {
+        if (interactionGraphService == null || proposal.getId() == null) {
+            return;
+        }
+        interactionGraphService.recordInteraction(
+                proposal.getId(),
+                proposal.getFreelancerId(),
+                freelancer.getName(),
+                proposal.getJobId(),
+                job.getTitle(),
+                job.getCategory() != null ? job.getCategory().name() : null);
     }
 }
