@@ -113,6 +113,7 @@ public class JobService {
             throw new IllegalArgumentException("Client ID is required to create a Job");
         }
 
+        
         if (job.getBudgetMin() != null && job.getBudgetMax() != null
                 && job.getBudgetMin() > job.getBudgetMax()) {
             throw new IllegalArgumentException("Budget minimum cannot be greater than budget maximum");
