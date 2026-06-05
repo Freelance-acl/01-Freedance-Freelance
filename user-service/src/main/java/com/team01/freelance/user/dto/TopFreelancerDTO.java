@@ -46,4 +46,39 @@ public class TopFreelancerDTO {
     public void setContractCount(Long contractCount) {
         this.contractCount = contractCount;
     }
+
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    public static class Builder {
+        private Long userId;
+        private String name;
+        private BigDecimal totalEarnings;
+        private Long contractCount;
+
+        public Builder userId(Long userId) {
+            this.userId = userId;
+            return this;
+        }
+
+        public Builder name(String name) {
+            this.name = name;
+            return this;
+        }
+
+        public Builder totalEarnings(BigDecimal totalEarnings) {
+            this.totalEarnings = totalEarnings;
+            return this;
+        }
+
+        public Builder contractCount(Long contractCount) {
+            this.contractCount = contractCount;
+            return this;
+        }
+
+        public TopFreelancerDTO build() {
+            return new TopFreelancerDTO(userId, name, totalEarnings, contractCount);
+        }
+    }
 }

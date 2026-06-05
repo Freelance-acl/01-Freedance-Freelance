@@ -287,11 +287,12 @@ public class UserService {
     }
 
     private TopFreelancerDTO toTopFreelancerDTO(Object[] row) {
-        return new TopFreelancerDTO(
-                toLong(row[0]),
-                (String) row[1],
-                toBigDecimal(row[2]),
-                toLong(row[3]));
+        return TopFreelancerDTO.builder()
+                .userId(toLong(row[0]))
+                .name((String) row[1])
+                .totalEarnings(toBigDecimal(row[2]))
+                .contractCount(toLong(row[3]))
+                .build();
     }
 
     private Long toLong(Object value) {
