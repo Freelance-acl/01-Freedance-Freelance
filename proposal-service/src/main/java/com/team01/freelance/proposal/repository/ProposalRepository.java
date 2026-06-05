@@ -70,4 +70,29 @@ public interface ProposalRepository extends JpaRepository<Proposal, Long> {
             WHERE p.id = :id
             """)
     Optional<Proposal> findByIdWithMilestones(@Param("id") Long id);
+
+    @Query(value = """
+            SELECT
+                COUNT(*) AS "totalProposals",
+                COALESCE(SUM(CASE WHEN status = 'ACCEPTED' THEN 1 ELSE 0 END), 0) AS "acceptedProposals",
+                COALESCE(AVG(bid_amount), 0.0) AS "averageBidAmount",
+                COALESCE(AVG(estimated_days), 0.0) AS "averageEstimatedDays"
+            FROM proposals
+            WHERE submitted_at >= :start
+              AND submitted_at <= :endInclusive
+            """, nativeQuery = true)
+    ProposalDashboardProjection calculateDashboardBySubmittedAtRange(
+            @Param("start") LocalDateTime start,
+            @Param("endInclusive") LocalDateTime endInclusive);
+
+    @Query(value = """
+            SELECT status AS status, COUNT(*) AS count
+            FROM proposals
+            WHERE submitted_at >= :start
+              AND submitted_at <= :endInclusive
+            GROUP BY status
+            """, nativeQuery = true)
+    List<ProposalStatusCountProjection> countProposalsByStatusInRange(
+            @Param("start") LocalDateTime start,
+            @Param("endInclusive") LocalDateTime endInclusive);
 }

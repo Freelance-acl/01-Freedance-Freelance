@@ -2,8 +2,12 @@ package com.team01.freelance.proposal.controller;
 
 import com.team01.freelance.proposal.dto.FeeEstimateDTO;
 import com.team01.freelance.proposal.dto.FeeEstimateRequest;
+import com.team01.freelance.proposal.dto.ProposalAnalyticsDashboardDTO;
 import com.team01.freelance.proposal.dto.ProposalDetailsDTO;
 import com.team01.freelance.proposal.dto.ProposalAnalyticsDTO;
+import com.team01.freelance.proposal.dto.RecordInteractionResponse;
+import com.team01.freelance.proposal.cache.CacheKeyUtil;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team01.freelance.proposal.model.Proposal;
 import com.team01.freelance.proposal.model.ProposalMilestone;
 import com.team01.freelance.proposal.service.ProposalService;
@@ -30,6 +34,9 @@ public class ProposalController {
 
     @Autowired
     private ProposalService proposalService;
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     @GetMapping
     public ResponseEntity<List<Proposal>> getAllProposals() {
@@ -68,6 +75,17 @@ public class ProposalController {
         return ResponseEntity.ok(proposalService.getProposalAnalytics(startDate, endDate));
     }
 
+    @GetMapping("/analytics/dashboard")
+    public ResponseEntity<ProposalAnalyticsDashboardDTO> getProposalAnalyticsDashboard(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        try {
+            return ResponseEntity.ok(proposalService.getProposalAnalyticsDashboard(startDate, endDate));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<Proposal> getProposalById(@PathVariable Long id) {
         return proposalService.getProposalById(id)
@@ -78,9 +96,24 @@ public class ProposalController {
     @PostMapping("/estimate")
     public ResponseEntity<FeeEstimateDTO> estimatePlatformFee(@RequestBody FeeEstimateRequest request) {
         try {
+            String bodyHash = CacheKeyUtil.hashBody(objectMapper.writeValueAsString(request));
             return ResponseEntity.ok(proposalService.estimatePlatformFee(
                     request.getBidAmount(),
-                    request.getEstimatedDays()));
+                    request.getEstimatedDays(),
+                    bodyHash));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @PostMapping("/{proposalId}/record-interaction")
+    public ResponseEntity<RecordInteractionResponse> recordFreelancerJobInteraction(@PathVariable Long proposalId) {
+        try {
+            return ResponseEntity.ok(proposalService.recordFreelancerJobInteraction(proposalId));
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().build();
         }

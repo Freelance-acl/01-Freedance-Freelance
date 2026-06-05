@@ -3,6 +3,9 @@ package com.team01.freelance.proposal.service;
 import com.team01.freelance.proposal.model.MilestoneStatus;
 import com.team01.freelance.proposal.model.Proposal;
 import com.team01.freelance.proposal.model.ProposalMilestone;
+import com.team01.freelance.proposal.cache.ProposalCacheInvalidationService;
+import com.team01.freelance.proposal.cache.ProposalCacheService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team01.freelance.proposal.repository.ProposalMilestoneRepository;
 import com.team01.freelance.proposal.repository.ProposalRepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -11,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Optional;
 
@@ -32,6 +36,15 @@ class ProposalMilestoneServiceTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
+        ObjectMapper objectMapper = new ObjectMapper();
+        ReflectionTestUtils.setField(
+                proposalMilestoneService,
+                "proposalCacheService",
+                new ProposalCacheService(null, objectMapper));
+        ReflectionTestUtils.setField(
+                proposalMilestoneService,
+                "cacheInvalidationService",
+                new ProposalCacheInvalidationService(null));
     }
 
     @Test
