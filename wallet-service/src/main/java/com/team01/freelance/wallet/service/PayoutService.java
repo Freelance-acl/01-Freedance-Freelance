@@ -244,17 +244,6 @@ public class PayoutService {
                 .orElseThrow(() ->
                         new EntityNotFoundException("Payout not found with id: " + payoutId));
 
-        PayoutDetailsDTO dto = new PayoutDetailsDTO();
-
-        dto.payoutId = payout.getId();
-        dto.contractId = payout.getContractId();
-        dto.freelancerId = payout.getFreelancerId();
-
-        dto.originalAmount = payout.getAmount();
-        dto.method = payout.getMethod();
-        dto.status = payout.getStatus();
-        dto.transactionDetails = payout.getTransactionDetails();
-
         List<AppliedPromoCodeDTO> promoList = new ArrayList<>();
         double totalDiscount = 0.0;
 
@@ -266,7 +255,6 @@ public class PayoutService {
         }
 
         for (PayoutPromo pp : promos) {
-
             AppliedPromoCodeDTO p = new AppliedPromoCodeDTO();
 
             p.promoCode = pp.getPromoCode().getCode();
@@ -278,11 +266,18 @@ public class PayoutService {
             promoList.add(p);
         }
 
-        dto.appliedPromoCodes = promoList;
-        dto.totalDiscount = totalDiscount;
-        dto.finalAmount = dto.originalAmount - totalDiscount;
-
-        return dto;
+        return PayoutDetailsDTO.builder()
+                .payoutId(payout.getId())
+                .contractId(payout.getContractId())
+                .freelancerId(payout.getFreelancerId())
+                .originalAmount(payout.getAmount())
+                .method(payout.getMethod())
+                .status(payout.getStatus())
+                .transactionDetails(payout.getTransactionDetails())
+                .appliedPromoCodes(promoList)
+                .totalDiscount(totalDiscount)
+                .finalAmount(payout.getAmount() - totalDiscount)
+                .build();
     }
 
     @Cacheable(value = "S5-F9", key = "#limit")
