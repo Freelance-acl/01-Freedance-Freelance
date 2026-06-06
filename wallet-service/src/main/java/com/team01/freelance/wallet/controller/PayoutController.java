@@ -131,7 +131,9 @@ public class PayoutController {
     @PostMapping("/contract/{contractId}")
     public ResponseEntity<Payout> processContractPayout(
             @PathVariable Long contractId,
-            @RequestBody ProcessPayoutRequest request) {
+            @RequestBody ProcessPayoutRequest request,
+            @RequestParam(required = false, defaultValue = "false") boolean simulateFailure) {
+        request.setSimulateFailure(simulateFailure);
         Payout payout = payoutService.processContractPayout(contractId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(payout);
     }

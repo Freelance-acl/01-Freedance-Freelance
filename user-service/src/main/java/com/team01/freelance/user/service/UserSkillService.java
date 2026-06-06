@@ -18,6 +18,10 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
+import com.team01.freelance.common.observer.EventSubject;
+import java.util.HashMap;
+import java.util.Map;
+
 @Service
 public class UserSkillService {
 
@@ -26,6 +30,9 @@ public class UserSkillService {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private EventSubject authEventSubject;
 
     public List<UserSkill> getAllUserSkills() {
         return userSkillRepository.findAll();
@@ -141,6 +148,18 @@ public class UserSkillService {
             throw new EntityNotFoundException("User Skill not found with id: " + skillId);
         }
 
-        return userRepository.save(user);
+        User savedUser = userRepository.save(user);
+
+        Map<String, Object> eventPayload = new HashMap<>();
+        eventPayload.put("action", "PRIMARY_SKILL_SET_AUTH");
+        eventPayload.put("userId", userId);
+        eventPayload.put("skillId", skillId);
+        if (target.getSkillName() != null) {
+            eventPayload.put("skillName", target.getSkillName());
+        }
+
+        authEventSubject.notifyObservers("PRIMARY_SKILL_SET_AUTH", eventPayload);
+
+        return savedUser;
     }
 }

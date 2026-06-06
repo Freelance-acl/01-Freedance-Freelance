@@ -127,7 +127,8 @@ public class PayoutService {
             @CacheEvict(value = "S5-F1", allEntries = true),
             @CacheEvict(value = "S5-F3", allEntries = true),
             @CacheEvict(value = "S5-F6", allEntries = true),
-            @CacheEvict(value = "S5-F8", allEntries = true)
+            @CacheEvict(value = "S5-F8", allEntries = true),
+            @CacheEvict(value = "S5-F10", allEntries = true)
     })
     public Payout updatePayout(Long id, Payout payoutDetails) {
         return payoutRepository.findById(id).map(existingPayout -> {
@@ -140,7 +141,14 @@ public class PayoutService {
         }).orElseThrow(() -> new EntityNotFoundException("Payout not found with id: " + id));
     }
 
-    @CacheEvict(value = "payout", allEntries = true)
+    @Caching(evict = {
+            @CacheEvict(value = "payout", allEntries = true),
+            @CacheEvict(value = "S5-F1", allEntries = true),
+            @CacheEvict(value = "S5-F3", allEntries = true),
+            @CacheEvict(value = "S5-F6", allEntries = true),
+            @CacheEvict(value = "S5-F8", allEntries = true),
+            @CacheEvict(value = "S5-F10", allEntries = true)
+    })
     public boolean deletePayoutById(Long id) {
         if (!payoutRepository.existsById(id)) {
             return false;
@@ -149,13 +157,24 @@ public class PayoutService {
         return true;
     }
 
-    @CacheEvict(value = "payout", allEntries = true)
+    @Caching(evict = {
+            @CacheEvict(value = "payout", allEntries = true),
+            @CacheEvict(value = "S5-F1", allEntries = true),
+            @CacheEvict(value = "S5-F3", allEntries = true),
+            @CacheEvict(value = "S5-F6", allEntries = true),
+            @CacheEvict(value = "S5-F8", allEntries = true),
+            @CacheEvict(value = "S5-F10", allEntries = true)
+    })
     public void deleteAllPayouts() {
         payoutRepository.deleteAll();
     }
 
     @Caching(evict = {
-            @CacheEvict(value = "payout", key = "#id"),
+            @CacheEvict(value = "payout", allEntries = true),
+            @CacheEvict(value = "S5-F1", allEntries = true),
+            @CacheEvict(value = "S5-F3", allEntries = true),
+            @CacheEvict(value = "S5-F6", allEntries = true),
+            @CacheEvict(value = "S5-F8", allEntries = true),
             @CacheEvict(value = "S5-F10", allEntries = true),
             @CacheEvict(value = "S5-F11", allEntries = true)
     })
@@ -184,16 +203,38 @@ public class PayoutService {
             retryAttempt = ((Number) retryValue).intValue();
         }
 
-        // Hardcoded to COMPLETED as there does not exist payments.
-
-        transactionDetails.put("retryAttempt", retryAttempt + 1);
+        int nextAttempt = retryAttempt + 1;
+        transactionDetails.put("retryAttempt", nextAttempt);
         transactionDetails.put("gatewayResponse", "approved");
 
         payout.setStatus(PayoutStatus.COMPLETED);
-
         payout.setTransactionDetails(transactionDetails);
 
-        return payoutRepository.save(payout);
+        Payout saved = payoutRepository.save(payout);
+
+        // Dispatches event to GoF Observers exactly matching PayoutAuditEvent properties
+        try {
+            Map<String, Object> retryAuditParams = new HashMap<>();
+            retryAuditParams.put("payoutId", saved.getId());
+            retryAuditParams.put("action", "COMPLETED");
+            retryAuditParams.put("method", saved.getMethod()); // Passes PayoutMethod enum directly
+            retryAuditParams.put("amount", saved.getAmount()); // Match Double object assignment
+
+            // Populate the document's internal Map<String, Object> details block
+            Map<String, Object> innerDetails = new HashMap<>();
+            innerDetails.put("retryAttempt", nextAttempt);
+            innerDetails.put("gatewayResponse", "approved");
+            innerDetails.put("note", "Payout retried successfully after initial failure");
+
+            retryAuditParams.put("details", innerDetails);
+
+            // Notify GoF Observer Chain
+            payoutEventSubject.notifyObservers("COMPLETED", retryAuditParams);
+        } catch (Exception e) {
+            log.warn("Mongo logging failed during retry processing for payout ID {}: {}", saved.getId(), e.getMessage());
+        }
+
+        return saved;
     }
 
     @Cacheable(value = "S5-F8", key = "#payoutId")
@@ -202,17 +243,6 @@ public class PayoutService {
         Payout payout = payoutRepository.findByIdWithPromos(payoutId)
                 .orElseThrow(() ->
                         new EntityNotFoundException("Payout not found with id: " + payoutId));
-
-        PayoutDetailsDTO dto = new PayoutDetailsDTO();
-
-        dto.payoutId = payout.getId();
-        dto.contractId = payout.getContractId();
-        dto.freelancerId = payout.getFreelancerId();
-
-        dto.originalAmount = payout.getAmount();
-        dto.method = payout.getMethod();
-        dto.status = payout.getStatus();
-        dto.transactionDetails = payout.getTransactionDetails();
 
         List<AppliedPromoCodeDTO> promoList = new ArrayList<>();
         double totalDiscount = 0.0;
@@ -225,7 +255,6 @@ public class PayoutService {
         }
 
         for (PayoutPromo pp : promos) {
-
             AppliedPromoCodeDTO p = new AppliedPromoCodeDTO();
 
             p.promoCode = pp.getPromoCode().getCode();
@@ -237,39 +266,50 @@ public class PayoutService {
             promoList.add(p);
         }
 
-        dto.appliedPromoCodes = promoList;
-        dto.totalDiscount = totalDiscount;
-        dto.finalAmount = dto.originalAmount - totalDiscount;
-
-        return dto;
+        return PayoutDetailsDTO.builder()
+                .payoutId(payout.getId())
+                .contractId(payout.getContractId())
+                .freelancerId(payout.getFreelancerId())
+                .originalAmount(payout.getAmount())
+                .method(payout.getMethod())
+                .status(payout.getStatus())
+                .transactionDetails(payout.getTransactionDetails())
+                .appliedPromoCodes(promoList)
+                .totalDiscount(totalDiscount)
+                .finalAmount(payout.getAmount() - totalDiscount)
+                .build();
     }
 
     @Cacheable(value = "S5-F9", key = "#limit")
     public List<PromoCodeUsageDTO> getTopUsedPromoCodes(int limit) {
 
         List<Object[]> rows = payoutRepository.findTopUsedPromoCodes(limit);
-
         List<PromoCodeUsageDTO> result = new ArrayList<>();
 
+        if (rows == null) {
+            return result;
+        }
+
         for (Object[] r : rows) {
+            boolean isExpired = false;
+            if (r.length > 7 && r[7] != null) {
+                if (r[7] instanceof java.time.LocalDateTime ldt) {
+                    isExpired = ldt.isBefore(java.time.LocalDateTime.now());
+                } else if (r[7] instanceof java.sql.Timestamp ts) {
+                    isExpired = ts.toLocalDateTime().isBefore(java.time.LocalDateTime.now());
+                }
+            }
 
-            PromoCodeUsageDTO dto = new PromoCodeUsageDTO();
-
-            dto.promoCodeId = ((Number) r[0]).longValue();
-            dto.code = (String) r[1];
-            dto.discountType = String.valueOf(r[2]);
-            dto.discountValue = r[3] != null ? ((Number) r[3]).doubleValue() : 0;
-
-            dto.timesUsed = r[4] != null ? ((Number) r[4]).intValue() : 0;
-            dto.totalDiscountGiven = r[5] != null ? ((Number) r[5]).doubleValue() : 0;
-
-            dto.active = (Boolean) r[6];
-
-            LocalDateTime expiry = (LocalDateTime) r[7];
-
-            dto.expired = expiry != null && expiry.isBefore(LocalDateTime.now());
-
-            result.add(dto);
+            result.add(PromoCodeUsageDTO.builder()
+                    .promoCodeId(r[0] != null ? ((Number) r[0]).longValue() : null)
+                    .code(r[1] != null ? String.valueOf(r[1]) : null)
+                    .discountType(r[2] != null ? String.valueOf(r[2]) : null)
+                    .discountValue(r[3] != null ? ((Number) r[3]).doubleValue() : 0.0)
+                    .timesUsed(r[4] != null ? ((Number) r[4]).longValue() : 0L)
+                    .totalDiscountGiven(r[5] != null ? ((Number) r[5]).doubleValue() : 0.0)
+                    .active(r[6] != null ? (Boolean) r[6] : false)
+                    .expired(isExpired)
+                    .build());
         }
 
         return result;
@@ -326,7 +366,11 @@ public class PayoutService {
      * @throws ResponseStatusException 404 if not found, 400 if not COMPLETED
      */
     @Caching(evict = {
-            @CacheEvict(value = "payout", key = "#id"),
+            @CacheEvict(value = "payout", allEntries = true),
+            @CacheEvict(value = "S5-F1", allEntries = true),
+            @CacheEvict(value = "S5-F3", allEntries = true),
+            @CacheEvict(value = "S5-F6", allEntries = true),
+            @CacheEvict(value = "S5-F8", allEntries = true),
             @CacheEvict(value = "S5-F10", allEntries = true),
             @CacheEvict(value = "S5-F11", allEntries = true)
     })
@@ -455,6 +499,10 @@ public class PayoutService {
      */
     @Caching(evict = {
             @CacheEvict(value = "payout", allEntries = true),
+            @CacheEvict(value = "S5-F1", allEntries = true),
+            @CacheEvict(value = "S5-F3", allEntries = true),
+            @CacheEvict(value = "S5-F6", allEntries = true),
+            @CacheEvict(value = "S5-F8", allEntries = true),
             @CacheEvict(value = "S5-F10", allEntries = true),
             @CacheEvict(value = "S5-F11", allEntries = true)
     })
@@ -484,8 +532,21 @@ public class PayoutService {
         if (request == null || request.getMethod() == null) {
             throw new IllegalArgumentException("Payout method is required");
         }
-        payout.setStatus(PayoutStatus.COMPLETED);
+
+        try {
+            Map<String, Object> createdAudit = buildAuditPayload(payout.getId(), payout, null, "CREATED", payout.getAmount());
+            payoutEventSubject.notifyObservers("PAYOUT_AUDIT", createdAudit);
+        } catch (Exception e) {
+            log.warn("Audit event failed for CREATED on contract {}: {}", contractId, e.getMessage());
+        }
+
+        Double agreedAmount = payoutRepository.findAgreedAmountByContractId(contractId);
+        double platformFee = agreedAmount != null ? agreedAmount * 0.10 : payout.getAmount() * 0.10;
+
         payout.setMethod(request.getMethod());
+
+        String action = request.isSimulateFailure() ? "FAILED" : "COMPLETED";
+        payout.setStatus(request.isSimulateFailure() ? PayoutStatus.FAILED : PayoutStatus.COMPLETED);
 
         Map<String, Object> txDetails = new LinkedHashMap<>();
         txDetails.put("transactionId", UUID.randomUUID().toString());
@@ -493,21 +554,34 @@ public class PayoutService {
         if (request.getAccountLastFour() != null) {
             txDetails.put("accountLastFour", request.getAccountLastFour());
         }
+        txDetails.put("platformFee", platformFee);
         txDetails.put("processedAt", LocalDateTime.now().toString());
         payout.setTransactionDetails(txDetails);
 
-        return payoutRepository.save(payout);
+        Payout saved = payoutRepository.save(payout);
+
+        try {
+            Map<String, Object> audit = buildAuditPayload(saved.getId(), saved, null, action, saved.getAmount());
+            payoutEventSubject.notifyObservers("PAYOUT_AUDIT", audit);
+        } catch (Exception e) {
+            log.warn("Audit event failed for {} on contract {}: {}", action, contractId, e.getMessage());
+        }
+
+        return saved;
     }
 
     // S5-F5
     @Caching(evict = {
-            @CacheEvict(value = "payout", key = "#payoutId"),
+            @CacheEvict(value = "payout", allEntries = true),
+            @CacheEvict(value = "S5-F1", allEntries = true),
+            @CacheEvict(value = "S5-F3", allEntries = true),
             @CacheEvict(value = "S5-F5", allEntries = true),
-            @CacheEvict(value = "S5-F8", key = "#payoutId"),
+            @CacheEvict(value = "S5-F6", allEntries = true),
+            @CacheEvict(value = "S5-F8", allEntries = true),
             @CacheEvict(value = "S5-F9", allEntries = true),
             @CacheEvict(value = "S5-F10", allEntries = true),
             @CacheEvict(value = "S5-F11", allEntries = true),
-            @CacheEvict(value = "promo-code", key = "#promoCodeId")
+            @CacheEvict(value = "promo-code", allEntries = true)
     })
     @Transactional
     public Payout applyPromoCode(Long payoutId, Long promoCodeId) {
@@ -554,6 +628,21 @@ public class PayoutService {
 
         promoCode.setCurrentUses(promoCode.getCurrentUses() + 1);
         promoCodeRepository.save(promoCode);
+
+        try {
+            Map<String, Object> promoParams = new HashMap<>();
+            promoParams.put("payoutId", payoutId);
+            promoParams.put("action", "PROMO_APPLIED");
+            promoParams.put("method", payout.getMethod());
+            promoParams.put("amount", discount);
+            Map<String, Object> details = new HashMap<>();
+            details.put("promoCodeId", promoCodeId);
+            details.put("discountType", promoCode.getDiscountType().name());
+            promoParams.put("details", details);
+            payoutEventSubject.notifyObservers("PAYOUT_AUDIT", promoParams);
+        } catch (Exception e) {
+            log.warn("Audit event failed for PROMO_APPLIED on payout {}: {}", payoutId, e.getMessage());
+        }
 
         return payoutRepository.findById(payoutId).orElseThrow();
     }

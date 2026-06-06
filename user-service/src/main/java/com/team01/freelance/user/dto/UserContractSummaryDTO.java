@@ -24,6 +24,67 @@ public class UserContractSummaryDTO {
         this.averageContractValue = averageContractValue;
     }
 
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    public static class Builder {
+        private Long userId;
+        private String name;
+        private Long totalContracts;
+        private Long completedContracts;
+        private Long terminatedContracts;
+        private Double totalEarnings;
+        private Double averageContractValue;
+
+        public Builder userId(Long userId) {
+            this.userId = userId;
+            return this;
+        }
+
+        public Builder name(String name) {
+            this.name = name;
+            return this;
+        }
+
+        public Builder totalContracts(Long totalContracts) {
+            this.totalContracts = totalContracts;
+            return this;
+        }
+
+        public Builder completedContracts(Long completedContracts) {
+            this.completedContracts = completedContracts;
+            return this;
+        }
+
+        public Builder terminatedContracts(Long terminatedContracts) {
+            this.terminatedContracts = terminatedContracts;
+            return this;
+        }
+
+        public Builder totalEarnings(Double totalEarnings) {
+            this.totalEarnings = totalEarnings;
+            return this;
+        }
+
+        public Builder averageContractValue(Double averageContractValue) {
+            this.averageContractValue = averageContractValue;
+            return this;
+        }
+
+        public UserContractSummaryDTO build() {
+            return new UserContractSummaryDTO(
+                    userId,
+                    name,
+                    totalContracts,
+                    completedContracts,
+                    terminatedContracts,
+                    totalEarnings,
+                    averageContractValue
+            );
+        }
+    }
+
     public Long getUserId() {
         return userId;
     }

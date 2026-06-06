@@ -1,7 +1,12 @@
 package com.team01.freelance.user.controller;
 
 import com.team01.freelance.user.dto.TopFreelancerDTO;
+import com.team01.freelance.user.dto.UpdateUserRoleRequest;
+import com.team01.freelance.user.dto.UserActivityFeedDTO;
+import com.team01.freelance.user.dto.UserContractSummaryDTO;
+import com.team01.freelance.user.dto.UserProfileDTO;
 import com.team01.freelance.user.model.User;
+import com.team01.freelance.user.model.UserRole;
 import com.team01.freelance.user.service.UserService;
 import com.team01.freelance.user.service.UserSkillService;
 import jakarta.persistence.EntityNotFoundException;
@@ -15,17 +20,14 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import com.team01.freelance.user.model.UserRole;
-import java.util.Map;
 
 import java.time.LocalDate;
 import java.util.List;
-import com.team01.freelance.user.dto.UpdateUserRoleRequest;
-import com.team01.freelance.user.dto.UserContractSummaryDTO;
-import com.team01.freelance.user.dto.UserProfileDTO;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/users")
@@ -97,7 +99,7 @@ public class UserController {
     /**
      * Updates a user by ID.
      *
-     * @param id the user ID
+     * @param id   the user ID
      * @param user the update payload
      * @return 200 with updated user, or 404 if not found
      */
@@ -148,70 +150,78 @@ public class UserController {
         return ResponseEntity.ok(userService.searchUsers(name, email, role));
     }
 
-    
     @PutMapping("/{id}/preferences")
     @PreAuthorize("hasRole('FREELANCER') or hasRole('CLIENT') or hasRole('ADMIN')")
     public ResponseEntity<User> updatePreferences(
-        @PathVariable Long id,
-        @RequestBody Map<String, Object> preferences) {
-            try {
-                return ResponseEntity.ok(userService.updatePreferences(id, preferences));
-            } catch (EntityNotFoundException e) {
-                return ResponseEntity.notFound().build();
-            }
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> preferences) {
+        try {
+            return ResponseEntity.ok(userService.updatePreferences(id, preferences));
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
         }
-        
-    
-        @GetMapping("/{id}/contract-summary")
-        @PreAuthorize("hasRole('FREELANCER') or hasRole('CLIENT') or hasRole('ADMIN')")
-        public ResponseEntity<UserContractSummaryDTO> getUserContractSummary(@PathVariable Long id) {
-            try {
-                return ResponseEntity.ok(userService.getUserContractSummary(id));
-            } catch (EntityNotFoundException e) {
-                return ResponseEntity.notFound().build();
-            }
+    }
+
+    @GetMapping("/{id}/contract-summary")
+    @PreAuthorize("hasRole('FREELANCER') or hasRole('CLIENT') or hasRole('ADMIN')")
+    public ResponseEntity<UserContractSummaryDTO> getUserContractSummary(@PathVariable Long id) {
+        try {
+            return ResponseEntity.ok(userService.getUserContractSummary(id));
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
         }
-        
-        /**
-         * Sets a user skill as the sole primary skill for that user.
-        *
-        * @param userId the user ID
-        * @param skillId the user-skill ID
-        * @return 200 with user and skills, 400 if skill belongs to another user, or 404 if not found
-        */
-   @PutMapping("/{userId}/skills/{skillId}/primary")
-   @PreAuthorize("hasRole('FREELANCER') or hasRole('CLIENT') or hasRole('ADMIN')")
-   public ResponseEntity<User> setPrimarySkill(
-       @PathVariable Long userId,
-       @PathVariable Long skillId) {
-           try {
-               return ResponseEntity.ok(userSkillService.setPrimarySkill(userId, skillId));
-            } catch (IllegalArgumentException e) {
-                return ResponseEntity.badRequest().build();
-            } catch (EntityNotFoundException e) {
-                return ResponseEntity.notFound().build();
-            }
+    }
+
+    /**
+     * Sets a user skill as the sole primary skill for that user.
+     *
+     * @param userId  the user ID
+     * @param skillId the user-skill ID
+     * @return 200 with user and skills, 400 if skill belongs to another user, or 404 if not found
+     */
+    @PutMapping("/{userId}/skills/{skillId}/primary")
+    @PreAuthorize("hasRole('FREELANCER') or hasRole('CLIENT') or hasRole('ADMIN')")
+    public ResponseEntity<User> setPrimarySkill(
+            @PathVariable Long userId,
+            @PathVariable Long skillId) {
+        try {
+            return ResponseEntity.ok(userSkillService.setPrimarySkill(userId, skillId));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
         }
-        
-        @GetMapping("/{id}/profile")
-        @PreAuthorize("hasRole('FREELANCER') or hasRole('CLIENT') or hasRole('ADMIN')")
-        public ResponseEntity<UserProfileDTO> getUserProfile(@PathVariable Long id) {
-            try {
-                return ResponseEntity.ok(userService.getUserProfile(id));
-            } catch (EntityNotFoundException e) {
-                return ResponseEntity.notFound().build();
-            }
+    }
+
+    @GetMapping("/{id}/profile")
+    @PreAuthorize("hasRole('FREELANCER') or hasRole('CLIENT') or hasRole('ADMIN')")
+    public ResponseEntity<UserProfileDTO> getUserProfile(@PathVariable Long id) {
+        try {
+            return ResponseEntity.ok(userService.getUserProfile(id));
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
         }
-        @GetMapping("/preferences/language")
-        @PreAuthorize("hasRole('FREELANCER') or hasRole('CLIENT') or hasRole('ADMIN')")
-        public ResponseEntity<List<User>> getUsersByLanguageAndMinimumCompletedContracts(
-                @RequestParam String lang,
-                @RequestParam(defaultValue = "0") Long minContracts) {
-            try {
-                return ResponseEntity.ok(userService.findUsersByLanguageAndMinimumCompletedContracts(lang, minContracts));
-            } catch (IllegalArgumentException e) {
-                return ResponseEntity.badRequest().build();
-            }
-        
+    }
+
+    @GetMapping("/{id}/activity")
+    @PreAuthorize("hasRole('FREELANCER') or hasRole('CLIENT') or hasRole('ADMIN')")
+    public ResponseEntity<UserActivityFeedDTO> getUserActivityFeed(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "0") Integer page,
+            @RequestParam(defaultValue = "10") Integer size,
+            @RequestHeader(value = "Authorization", required = false) String authorizationHeader) {
+        return ResponseEntity.ok(userService.getUserActivityFeed(id, page, size, authorizationHeader));
+    }
+
+    @GetMapping("/preferences/language")
+    @PreAuthorize("hasRole('FREELANCER') or hasRole('CLIENT') or hasRole('ADMIN')")
+    public ResponseEntity<List<User>> getUsersByLanguageAndMinimumCompletedContracts(
+            @RequestParam String lang,
+            @RequestParam(defaultValue = "0") Long minContracts) {
+        try {
+            return ResponseEntity.ok(userService.findUsersByLanguageAndMinimumCompletedContracts(lang, minContracts));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
         }
+    }
 }
