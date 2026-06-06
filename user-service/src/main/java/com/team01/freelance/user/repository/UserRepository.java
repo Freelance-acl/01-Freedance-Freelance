@@ -9,6 +9,12 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import com.team01.freelance.user.model.UserRole;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+
+import java.util.List;
 
 import com.team01.freelance.user.model.User;
 import com.team01.freelance.user.model.UserRole;

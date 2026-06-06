@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import com.team01.freelance.user.dto.UserContractSummaryDTO;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -43,6 +44,15 @@ public class UserController {
     @PreAuthorize("hasRole('FREELANCER') or hasRole('CLIENT') or hasRole('ADMIN')")
     public ResponseEntity<List<User>> getAllUsers() {
         return ResponseEntity.ok(userService.getAllUsers());
+    }
+
+    @GetMapping("/{id}/contract-summary")
+    public ResponseEntity<UserContractSummaryDTO> getUserContractSummary(@PathVariable Long id) {
+        try {
+            return ResponseEntity.ok(userService.getUserContractSummary(id));
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        }
     }
 
     @GetMapping("/{id}")
