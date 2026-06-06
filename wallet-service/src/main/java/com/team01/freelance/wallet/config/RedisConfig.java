@@ -54,14 +54,17 @@ public class RedisConfig {
                 .serializeValuesWith(RedisSerializationContext.SerializationPair
                         .fromSerializer(serializer));
 
+        RedisCacheConfiguration fiveMin = defaultConfig.entryTtl(Duration.ofMinutes(5));
         RedisCacheConfiguration tenMin = defaultConfig.entryTtl(Duration.ofMinutes(10));
         RedisCacheConfiguration fifteenMin = defaultConfig.entryTtl(Duration.ofMinutes(15));
 
         Map<String, RedisCacheConfiguration> cacheConfigs = new HashMap<>();
+        cacheConfigs.put("S5-F1", fiveMin);
         cacheConfigs.put("S5-F3", tenMin);
         cacheConfigs.put("S5-F6", tenMin);
         cacheConfigs.put("S5-F8", fifteenMin);
         cacheConfigs.put("S5-F9", tenMin);
+        cacheConfigs.put("S5-F10", tenMin);
         cacheConfigs.put("payout", fifteenMin);
         cacheConfigs.put("promo-code", fifteenMin);
         cacheConfigs.put("payout-promo", fifteenMin);

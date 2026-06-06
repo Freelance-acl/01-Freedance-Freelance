@@ -131,7 +131,9 @@ public class PayoutController {
     @PostMapping("/contract/{contractId}")
     public ResponseEntity<Payout> processContractPayout(
             @PathVariable Long contractId,
-            @RequestBody ProcessPayoutRequest request) {
+            @RequestBody ProcessPayoutRequest request,
+            @RequestParam(required = false, defaultValue = "false") boolean simulateFailure) {
+        request.setSimulateFailure(simulateFailure);
         Payout payout = payoutService.processContractPayout(contractId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(payout);
     }
@@ -190,5 +192,12 @@ public class PayoutController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
         return ResponseEntity.ok(payoutService.getCategoryRevenue(startDate, endDate));
+    }
+
+    @GetMapping("/analytics/methods")
+    public ResponseEntity<List<com.team01.freelance.wallet.dto.PayoutMethodDTO>> getPayoutMethodBreakdown(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        return ResponseEntity.ok(payoutService.getPayoutMethodBreakdown(startDate, endDate));
     }
 }

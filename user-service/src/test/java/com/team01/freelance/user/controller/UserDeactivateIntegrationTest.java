@@ -1,5 +1,7 @@
 package com.team01.freelance.user.controller;
 
+import com.team01.freelance.common.observer.EntityObserver;
+import com.team01.freelance.common.observer.EventSubject;
 import com.team01.freelance.user.model.User;
 import com.team01.freelance.user.model.UserRole;
 import com.team01.freelance.user.model.UserStatus;
@@ -16,8 +18,12 @@ import org.springframework.web.context.WebApplicationContext;
 
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -38,6 +44,9 @@ class UserDeactivateIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private EventSubject authEventSubject;
 
     private User freelancer;
 
@@ -62,6 +71,29 @@ class UserDeactivateIntegrationTest extends AbstractIntegrationTest {
 
         mockMvc.perform(put("/api/users/{id}/deactivate", freelancer.getId()))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void deactivateUser_withoutActiveContracts_notifiesUserDeactivatedAuthEvent() throws Exception {
+        List<Map<?, ?>> events = new ArrayList<>();
+        EntityObserver observer = (eventType, payload) -> {
+            if ("USER_DEACTIVATED".equals(eventType) && payload instanceof Map<?, ?> eventPayload) {
+                events.add(eventPayload);
+            }
+        };
+        authEventSubject.register(observer);
+
+        try {
+            mockMvc.perform(put("/api/users/{id}/deactivate", freelancer.getId()))
+                    .andExpect(status().isOk());
+
+            assertFalse(events.isEmpty());
+            Map<?, ?> payload = events.get(0);
+            assertEquals(freelancer.getId(), payload.get("userId"));
+            assertEquals("USER_DEACTIVATED", payload.get("action"));
+        } finally {
+            authEventSubject.unregister(observer);
+        }
     }
 
     private User saveUser(String name, UserRole role) {

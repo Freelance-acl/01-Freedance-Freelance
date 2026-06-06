@@ -203,11 +203,19 @@ class PayoutControllerTest {
 
     @Test
     void getDetails_returnsOkWithPayoutFields() throws Exception {
-        PayoutDetailsDTO dto = new PayoutDetailsDTO();
-        dto.payoutId = 1L;
-        dto.contractId = 42L;
-        dto.originalAmount = 1500.0;
-        dto.status = PayoutStatus.COMPLETED;
+        PayoutDetailsDTO dto = PayoutDetailsDTO.builder()
+                .payoutId(1L)
+                .contractId(42L)
+                .freelancerId(100L)
+                .originalAmount(1500.0)
+                .method(com.team01.freelance.wallet.model.PayoutMethod.BANK_TRANSFER)
+                .status(PayoutStatus.COMPLETED)
+                .transactionDetails(new java.util.HashMap<>())
+                .appliedPromoCodes(new java.util.ArrayList<>())
+                .totalDiscount(0.0)
+                .finalAmount(1500.0)
+                .build();
+
         when(payoutService.getPayoutDetails(1L)).thenReturn(dto);
 
         mockMvc.perform(get("/api/payouts/{payoutId}/details", 1L))
@@ -230,9 +238,12 @@ class PayoutControllerTest {
 
     @Test
     void getTopUsedPromos_returnsOkWithUsageList() throws Exception {
-        PromoCodeUsageDTO usage = new PromoCodeUsageDTO();
-        usage.code = "SAVE10";
-        usage.timesUsed = 5;
+        // Only chain the fields strictly required by the test scenario assertions
+        PromoCodeUsageDTO usage = PromoCodeUsageDTO.builder()
+                .code("SAVE10")
+                .timesUsed(5L)
+                .build();
+
         when(payoutService.getTopUsedPromoCodes(3)).thenReturn(List.of(usage));
 
         mockMvc.perform(get("/api/payouts/promos/top-used").param("limit", "3"))

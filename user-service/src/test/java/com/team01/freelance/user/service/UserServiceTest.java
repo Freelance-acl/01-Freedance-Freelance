@@ -1,5 +1,6 @@
 package com.team01.freelance.user.service;
 
+import com.team01.freelance.common.observer.EventSubject;
 import com.team01.freelance.user.model.User;
 import com.team01.freelance.user.model.UserStatus;
 import com.team01.freelance.user.dto.TopFreelancerDTO;
@@ -7,6 +8,7 @@ import com.team01.freelance.user.repository.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import javax.sql.DataSource;
@@ -17,11 +19,14 @@ import java.math.BigInteger;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.Map;
 import java.util.Optional;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -31,12 +36,15 @@ class UserServiceTest {
 
     private UserService userService;
     private UserRepository userRepository;
+    private EventSubject authEventSubject;
 
     @BeforeEach
     void setUp() throws Exception {
         userService = new UserService();
         userRepository = mock(UserRepository.class);
+        authEventSubject = mock(EventSubject.class);
         ReflectionTestUtils.setField(userService, "userRepository", userRepository);
+        ReflectionTestUtils.setField(userService, "authEventSubject", authEventSubject);
         stubPostgresDatabase();
     }
 
@@ -81,6 +89,27 @@ class UserServiceTest {
         assertEquals(UserStatus.DEACTIVATED, result.getStatus());
         verify(userRepository).withdrawSubmittedProposalsForUser(1L);
         verify(userRepository).save(user);
+    }
+
+    @Test
+    void deactivateUserNotifiesUserDeactivatedAuthEvent() {
+        User user = new User();
+        user.setId(1L);
+        user.setEmail("deact@test.dev");
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(userRepository.countActiveContractsForUser(1L)).thenReturn(0L);
+        when(userRepository.save(user)).thenReturn(user);
+
+        userService.deactivateUser(1L);
+
+        ArgumentCaptor<Object> payloadCaptor = ArgumentCaptor.forClass(Object.class);
+        verify(authEventSubject).notifyObservers(eq("USER_DEACTIVATED"), payloadCaptor.capture());
+        Map<?, ?> payload = assertInstanceOf(Map.class, payloadCaptor.getValue());
+        assertEquals(1L, payload.get("userId"));
+        assertEquals("USER_DEACTIVATED", payload.get("action"));
+
+        Map<?, ?> details = assertInstanceOf(Map.class, payload.get("details"));
+        assertEquals("deact@test.dev", details.get("email"));
     }
 
     @Test

@@ -10,6 +10,8 @@ public class ProcessPayoutRequest {
     @JsonAlias({"accountLastFour", "account_last_four"})
     private String accountLastFour;
 
+    private boolean simulateFailure = false;
+
     public PayoutMethod getMethod() {
         return method;
     }
@@ -24,5 +26,13 @@ public class ProcessPayoutRequest {
 
     public void setAccountLastFour(String accountLastFour) {
         this.accountLastFour = accountLastFour;
+    }
+
+    public boolean isSimulateFailure() {
+        return simulateFailure;
+    }
+
+    public void setSimulateFailure(boolean simulateFailure) {
+        this.simulateFailure = simulateFailure;
     }
 }
