@@ -2,12 +2,15 @@ package com.team01.freelance.proposal.controller;
 
 import com.team01.freelance.proposal.dto.FeeEstimateDTO;
 import com.team01.freelance.proposal.dto.FeeEstimateRequest;
+import com.team01.freelance.proposal.dto.JobRecommendationDTO;
 import com.team01.freelance.proposal.dto.ProposalDetailsDTO;
 import com.team01.freelance.proposal.dto.ProposalAnalyticsDTO;
 import com.team01.freelance.proposal.model.Proposal;
 import com.team01.freelance.proposal.model.ProposalMilestone;
+import com.team01.freelance.proposal.service.ProposalRecommendationService;
 import com.team01.freelance.proposal.service.ProposalService;
 import jakarta.persistence.EntityNotFoundException;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -30,6 +33,9 @@ public class ProposalController {
 
     @Autowired
     private ProposalService proposalService;
+
+    @Autowired
+    private ProposalRecommendationService proposalRecommendationService;
 
     @GetMapping
     public ResponseEntity<List<Proposal>> getAllProposals() {
@@ -66,6 +72,17 @@ public class ProposalController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
         return ResponseEntity.ok(proposalService.getProposalAnalytics(startDate, endDate));
+    }
+
+    @GetMapping("/recommendations")
+    public ResponseEntity<List<JobRecommendationDTO>> getRecommendations(
+            @RequestParam Long freelancerId,
+            @RequestParam(required = false) Integer limit,
+            HttpServletRequest request) {
+        if (request.getHeader("Authorization") == null) {
+            return ResponseEntity.status(401).build();
+        }
+        return ResponseEntity.ok(proposalRecommendationService.getRecommendations(freelancerId, limit, request));
     }
 
     @GetMapping("/{id}")

@@ -1,5 +1,8 @@
 package com.team01.freelance.user.controller;
 
+import com.team01.freelance.common.observer.EntityObserver;
+import com.team01.freelance.common.observer.EventSubject;
+import com.team01.freelance.user.model.User;
 import com.team01.freelance.user.repository.UserRepository;
 import com.team01.freelance.user.service.JwtService;
 import com.team01.freelance.user.support.AbstractIntegrationTest;
@@ -12,6 +15,9 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -38,6 +44,9 @@ class M2AuthIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private JwtService jwtService;
+
+    @Autowired
+    private EventSubject authEventSubject;
 
     private MockMvc mockMvc;
     private String adminToken;
@@ -99,6 +108,106 @@ class M2AuthIntegrationTest extends AbstractIntegrationTest {
                                 """.formatted(email, PASSWORD)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.token").isNotEmpty());
+    }
+
+    // S1-F11 login: both invalid credentials cases must return 401.
+    @Test
+    void login_withWrongPassword_returns401() throws Exception {
+        String email = uniqueEmail();
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(registerBody(email)))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"%s","password":"wrong-password"}
+                                """.formatted(email)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.message").value("Invalid credentials"));
+    }
+
+    @Test
+    void login_withUnknownEmail_returns401Not404() throws Exception {
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"%s","password":"%s"}
+                                """.formatted(uniqueEmail(), PASSWORD)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.message").value("Invalid credentials"));
+    }
+
+    @Test
+    void login_returnsJwtWithUidAndRoleClaimsAndTokenAccessesProtectedEndpoint() throws Exception {
+        String email = uniqueEmail();
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(registerBody(email)))
+                .andExpect(status().isCreated());
+
+        String loginResponse = mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"%s","password":"%s"}
+                                """.formatted(email, PASSWORD)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.token").isNotEmpty())
+                .andExpect(jsonPath("$.expiresIn").isNumber())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        String token = com.jayway.jsonpath.JsonPath.read(loginResponse, "$.token");
+        User user = userRepository.findByEmail(email).orElseThrow();
+        org.assertj.core.api.Assertions.assertThat(jwtService.extractUsername(token)).isEqualTo(email);
+        org.assertj.core.api.Assertions.assertThat(jwtService.extractUserId(token)).isEqualTo(user.getId());
+        org.assertj.core.api.Assertions.assertThat(jwtService.extractRole(token)).isEqualTo(user.getRole().name());
+
+        mockMvc.perform(get("/api/users/{id}", user.getId())
+                        .header("Authorization", TestAuthHelper.bearer(token)))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/users/{id}", user.getId()))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void login_notifiesLoggedInAuthEvent() throws Exception {
+        String email = uniqueEmail();
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(registerBody(email)))
+                .andExpect(status().isCreated());
+
+        List<Map<String, Object>> observedEvents = new ArrayList<>();
+        EntityObserver observer = (eventType, payload) -> {
+            if (payload instanceof Map<?, ?> payloadMap) {
+                observedEvents.add(Map.of("eventType", eventType, "payload", payloadMap));
+            }
+        };
+        authEventSubject.register(observer);
+        try {
+            mockMvc.perform(post("/api/auth/login")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {"email":"%s","password":"%s"}
+                                    """.formatted(email, PASSWORD)))
+                    .andExpect(status().isOk());
+        } finally {
+            authEventSubject.unregister(observer);
+        }
+
+        User user = userRepository.findByEmail(email).orElseThrow();
+        org.assertj.core.api.Assertions.assertThat(observedEvents).anySatisfy(event -> {
+            org.assertj.core.api.Assertions.assertThat(event.get("eventType")).isEqualTo("LOGGED_IN");
+            @SuppressWarnings("unchecked")
+            Map<String, Object> payload = (Map<String, Object>) event.get("payload");
+            org.assertj.core.api.Assertions.assertThat(payload.get("userId")).isEqualTo(user.getId());
+            org.assertj.core.api.Assertions.assertThat(payload.get("action")).isEqualTo("LOGGED_IN");
+            org.assertj.core.api.Assertions.assertThat(payload.get("details")).isEqualTo(Map.of());
+        });
     }
 
     // (c) Protected M1 endpoint without token → 401
