@@ -12,7 +12,8 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
+import com.team01.freelance.common.observer.EventSubject;
+import java.util.Map;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -55,7 +56,12 @@ public class UserSkillService {
         userSkill.setUser(userRepository.findById(userSkill.getUser().getId())
                 .orElseThrow(() -> new EntityNotFoundException("User not found with id: " + userSkill.getUser().getId())));
 
-        return userSkillRepository.save(userSkill);
+        UserSkill saved = userSkillRepository.save(userSkill);
+        authEventSubject.notifyObservers("USER_SKILL_CREATED", Map.of(
+                "userId", saved.getUser().getId(),
+                "action", "USER_SKILL_CREATED",
+                "details", Map.of()));
+        return saved;
     }
 
     /**
@@ -80,7 +86,13 @@ public class UserSkillService {
                 if (userSkill.getIsPrimary() != null) existing.setIsPrimary(userSkill.getIsPrimary());
                 if (userSkill.getMetadata() != null) existing.setMetadata(userSkill.getMetadata());
                 if (userSkill.getCreatedAt() != null) existing.setCreatedAt(userSkill.getCreatedAt());
-            return userSkillRepository.save(existing);
+            UserSkill saved = userSkillRepository.save(existing);
+            Long userId = saved.getUser() != null ? saved.getUser().getId() : -1L;
+            authEventSubject.notifyObservers("USER_SKILL_UPDATED", Map.of(
+                    "userId", userId,
+                    "action", "USER_SKILL_UPDATED",
+                    "details", Map.of()));
+            return saved;
         }).orElseThrow(() -> new EntityNotFoundException("User Skill not found with id: " + id));
     }
 
@@ -91,7 +103,14 @@ public class UserSkillService {
      public boolean deleteUserSkillById(Long id) {
 
         return userSkillRepository.findById(id).map(existing -> {
+            Long userId = existing.getUser() != null ? existing.getUser().getId() : null;
             userSkillRepository.delete(existing);
+            if (userId != null) {
+                authEventSubject.notifyObservers("USER_SKILL_DELETED", Map.of(
+                        "userId", userId,
+                        "action", "USER_SKILL_DELETED",
+                        "details", Map.of()));
+            }
             return true;
         }).orElse(false);
     }
