@@ -11,40 +11,31 @@ import static org.junit.jupiter.api.Assertions.*;
 public class PayoutDashboardIntegrationTest extends AbstractIntegrationTest {
 
     @Test
-    void payout_details_dto_has_valid_builder_contract() throws Exception {
+    void all_dtos_must_implement_strict_builder_pattern() throws Exception {
+        String[] inScopeDtos = {
+                "com.team01.freelance.wallet.dto.PayoutDetailsDTO",
+                "com.team01.freelance.wallet.dto.PromoCodeUsageDTO"
+        };
 
-        Class<?> dtoClass = Class.forName(
-                "com.team01.freelance.wallet.dto.PayoutDetailsDTO"
-        );
+        for (String dtoName : inScopeDtos) {
+            Class<?> dtoClass = Class.forName(dtoName);
 
-        Method builderMethod = dtoClass.getMethod("builder");
-        Object builder = builderMethod.invoke(null);
-        assertNotNull(builder);
+            Method builderMethod = dtoClass.getMethod("builder");
+            Object builder = builderMethod.invoke(null);
+            assertNotNull(builder, "Class " + dtoName + " must have a static builder() method");
 
-        Method buildMethod = builder.getClass().getMethod("build");
-        assertEquals(dtoClass, buildMethod.getReturnType());
-
-        boolean fluent = true;
-
-        for (Method m : builder.getClass().getMethods()) {
-
-            if (m.getName().equals("build")) continue;
-
-            if (m.getReturnType().equals(builder.getClass())
-                    && m.getParameterCount() >= 1) {
-                continue;
+            boolean hasFluentSetter = false;
+            for (Method m : builder.getClass().getMethods()) {
+                if (m.getParameterCount() == 1 && m.getReturnType().equals(builder.getClass())) {
+                    hasFluentSetter = true;
+                    break;
+                }
             }
+            assertTrue(hasFluentSetter, "Builder for " + dtoName + " must have fluent setters returning the Builder instance");
 
-            if (m.getDeclaringClass().equals(Object.class)) continue;
+            Method buildMethod = builder.getClass().getMethod("build");
+            Object instance = buildMethod.invoke(builder);
+            assertEquals(dtoClass, instance.getClass(), "build() must return the " + dtoName + " type");
         }
-
-        boolean hasFluent = List.of(builder.getClass().getMethods()).stream()
-                .anyMatch(m ->
-                        !m.getName().equals("build")
-                                && m.getReturnType().equals(builder.getClass())
-                                && m.getParameterCount() >= 1
-                );
-
-        assertTrue(hasFluent, "Builder must support fluent chaining");
     }
 }
