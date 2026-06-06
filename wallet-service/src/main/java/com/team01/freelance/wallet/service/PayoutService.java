@@ -14,6 +14,7 @@ import com.team01.freelance.wallet.model.PayoutStatus;
 import com.team01.freelance.wallet.dto.MilestoneReversalRequest;
 import com.team01.freelance.wallet.dto.ProcessPayoutRequest;
 import com.team01.freelance.common.observer.EventSubject;
+import com.team01.freelance.wallet.observer.EntityObserver;
 import com.team01.freelance.wallet.repository.PayoutAuditEventRepository;
 import com.team01.freelance.wallet.strategy.NoReversalStrategy;
 import com.team01.freelance.wallet.strategy.RefundResult;
@@ -73,6 +74,23 @@ public class PayoutService {
     @Autowired
     private EventSubject payoutEventSubject;
 
+    private final List<EntityObserver> observers = new ArrayList<>();
+
+    public void registerObserver(EntityObserver observer) {
+        if (!observers.contains(observer)) {
+            observers.add(observer);
+        }
+    }
+
+    public void unregisterObserver(EntityObserver observer) {
+        observers.remove(observer);
+    }
+
+    private void notifyObservers(String eventType, Object payload) {
+        for (EntityObserver observer : observers) {
+            observer.onEvent(eventType, payload);
+        }
+    }
     @Autowired
     private PayoutAuditEventRepository payoutAuditEventRepository;
 
@@ -369,6 +387,9 @@ public class PayoutService {
      * @return the updated payout
      * @throws ResponseStatusException 404 if not found, 400 if not COMPLETED
      */
+    /**
+     * [S5-F2] Process a refund on a COMPLETED payout.
+     */
     @Caching(evict = {
             @CacheEvict(value = "payout", allEntries = true),
             @CacheEvict(value = "S5-F1", allEntries = true),
@@ -400,7 +421,18 @@ public class PayoutService {
         details.put("refundedAt", LocalDateTime.now().toString());
         payout.setTransactionDetails(details);
 
-        return payoutRepository.save(payout);
+        Payout savedPayout = payoutRepository.save(payout);
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("payoutId", savedPayout.getId());
+        payload.put("amount", savedPayout.getAmount());
+        payload.put("method", savedPayout.getMethod() != null ? savedPayout.getMethod().name() : null);
+        payload.put("timestamp", LocalDateTime.now());
+        payload.put("details", savedPayout.getTransactionDetails());
+
+        notifyObservers("REFUNDED", payload);
+
+        return savedPayout;
     }
 
     /**
