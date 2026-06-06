@@ -1,6 +1,7 @@
 package com.team01.freelance.user.service;
 
 
+import com.team01.freelance.common.observer.EventSubject;
 import com.team01.freelance.user.model.User;
 import com.team01.freelance.user.repository.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -28,6 +29,9 @@ class UserServicePreferencesTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private EventSubject authEventSubject;
 
     @InjectMocks
     private UserService userService;

@@ -77,6 +77,8 @@ public class UserService {
 
     @Autowired
     private ObjectArrayDtoAdapter objectArrayDtoAdapter;
+
+    @Autowired
     private JwtService jwtService;
 
     @Autowired

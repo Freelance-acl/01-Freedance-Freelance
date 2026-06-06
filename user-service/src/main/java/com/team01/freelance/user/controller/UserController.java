@@ -46,14 +46,6 @@ public class UserController {
         return ResponseEntity.ok(userService.getAllUsers());
     }
 
-    @GetMapping("/{id}/contract-summary")
-    public ResponseEntity<UserContractSummaryDTO> getUserContractSummary(@PathVariable Long id) {
-        try {
-            return ResponseEntity.ok(userService.getUserContractSummary(id));
-        } catch (EntityNotFoundException e) {
-            return ResponseEntity.notFound().build();
-        }
-    }
 
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('FREELANCER') or hasRole('CLIENT') or hasRole('ADMIN')")
