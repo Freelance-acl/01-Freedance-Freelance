@@ -8,10 +8,16 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
+/**
+ * Test-profile stub that disables Elasticsearch full-text search.
+ */
 @Service
 @Profile("test")
 public class NoOpJobFullTextSearchService implements JobFullTextSearchOperations {
 
+    /**
+     * Returns an empty page because search is disabled in the test profile.
+     */
     @Override
     public Page<JobSearchResultDTO> search(String query, JobCategory category, JobStatus status,
                                            Double minBudget, Double maxBudget, Pageable pageable) {

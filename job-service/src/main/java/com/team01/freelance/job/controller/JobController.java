@@ -69,6 +69,17 @@ public class JobController {
         }
     }
 
+    /**
+     * [S2-F10] Searches jobs in Elasticsearch by title and description with optional filters.
+     *
+     * @param query required free-text search terms
+     * @param category optional category filter
+     * @param status optional status filter
+     * @param minBudget optional minimum budget filter
+     * @param maxBudget optional maximum budget filter
+     * @param pageable pagination settings
+     * @return 200 with relevance-ranked results, or 400 when budget bounds are invalid
+     */
     @GetMapping("/search/full-text")
     public ResponseEntity<?> fullTextSearchJobs(
             @RequestParam String query,

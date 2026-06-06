@@ -21,6 +21,9 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 
+/**
+ * Elasticsearch implementation of full-text job search with Redis-backed caching.
+ */
 @Service
 @Profile("!test")
 public class JobFullTextSearchService implements JobFullTextSearchOperations {
@@ -31,12 +34,19 @@ public class JobFullTextSearchService implements JobFullTextSearchOperations {
     private final ElasticsearchOperations elasticsearchOperations;
     private final ElasticsearchHitAdapter hitAdapter;
 
+    /**
+     * @param elasticsearchOperations Spring Data Elasticsearch operations facade
+     * @param hitAdapter adapter that maps search hits to DTOs
+     */
     public JobFullTextSearchService(ElasticsearchOperations elasticsearchOperations,
                                     ElasticsearchHitAdapter hitAdapter) {
         this.elasticsearchOperations = elasticsearchOperations;
         this.hitAdapter = hitAdapter;
     }
 
+    /**
+     * Executes a relevance-ranked Elasticsearch query and caches the response for five minutes.
+     */
     @Cacheable(value = SEARCH_CACHE,
             key = "#query + '|' + #category + '|' + #status + '|' + #minBudget + '|' + #maxBudget + '|' + #pageable")
     @Override
@@ -96,6 +106,9 @@ public class JobFullTextSearchService implements JobFullTextSearchOperations {
         }
     }
 
+    /**
+     * Maps a single Elasticsearch hit to a search result DTO.
+     */
     private JobSearchResultDTO adapt(SearchHit<JobSearchDocument> hit) {
         return hitAdapter.toDto(hit);
     }

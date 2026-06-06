@@ -9,6 +9,9 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
+/**
+ * Keeps the Elasticsearch jobs index synchronized with PostgreSQL job writes.
+ */
 @Service
 @Profile("!test")
 public class JobSearchIndexService implements JobSearchIndexOperations {
@@ -18,10 +21,16 @@ public class JobSearchIndexService implements JobSearchIndexOperations {
 
     private final JobSearchRepository jobSearchRepository;
 
+    /**
+     * @param jobSearchRepository repository used to persist search documents
+     */
     public JobSearchIndexService(JobSearchRepository jobSearchRepository) {
         this.jobSearchRepository = jobSearchRepository;
     }
 
+    /**
+     * Indexes the job and evicts cached full-text search results.
+     */
     @CacheEvict(value = SEARCH_CACHE, allEntries = true)
     @Override
     public void index(Job job) {
@@ -35,6 +44,9 @@ public class JobSearchIndexService implements JobSearchIndexOperations {
         }
     }
 
+    /**
+     * Deletes the indexed job and evicts cached full-text search results.
+     */
     @CacheEvict(value = SEARCH_CACHE, allEntries = true)
     @Override
     public void delete(Long jobId) {
@@ -48,6 +60,9 @@ public class JobSearchIndexService implements JobSearchIndexOperations {
         }
     }
 
+    /**
+     * Clears the Elasticsearch jobs index and evicts cached full-text search results.
+     */
     @CacheEvict(value = SEARCH_CACHE, allEntries = true)
     @Override
     public void deleteAll() {
@@ -58,6 +73,9 @@ public class JobSearchIndexService implements JobSearchIndexOperations {
         }
     }
 
+    /**
+     * Builds the Elasticsearch document representation of a job.
+     */
     private JobSearchDocument toDocument(Job job) {
         return new JobSearchDocument(
                 job.getId(),

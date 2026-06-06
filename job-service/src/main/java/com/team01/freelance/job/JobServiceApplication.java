@@ -8,6 +8,9 @@ import org.springframework.boot.persistence.autoconfigure.EntityScan;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 
+/**
+ * Entry point for the job service, including Elasticsearch search and Redis caching.
+ */
 @SpringBootApplication(scanBasePackages = {
         "com.team01.freelance.job"
 })
@@ -22,6 +25,11 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 })
 public class JobServiceApplication {
 
+    /**
+     * Boots the Spring application.
+     *
+     * @param args standard JVM arguments
+     */
     public static void main(String[] args) {
         SpringApplication.run(JobServiceApplication.class, args);
     }
