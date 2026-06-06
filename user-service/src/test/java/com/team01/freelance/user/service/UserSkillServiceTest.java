@@ -1,5 +1,6 @@
 package com.team01.freelance.user.service;
 
+import com.team01.freelance.common.observer.EventSubject;
 import com.team01.freelance.user.model.ProficiencyLevel;
 import com.team01.freelance.user.model.User;
 import com.team01.freelance.user.model.UserSkill;
@@ -8,12 +9,14 @@ import com.team01.freelance.user.repository.UserSkillRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -28,6 +31,9 @@ class UserSkillServiceTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private EventSubject authEventSubject;
 
     @InjectMocks
     private UserSkillService userSkillService;
@@ -68,7 +74,7 @@ class UserSkillServiceTest {
         assertEquals(6, updated.getYearsOfExperience()); // Updated
         assertEquals(ProficiencyLevel.EXPERT, updated.getProficiencyLevel()); // Preserved
         assertFalse(updated.getIsPrimary()); // Updated
-        
+
         verify(userSkillRepository).findById(id);
         verify(userSkillRepository).save(updated);
     }
@@ -164,6 +170,17 @@ class UserSkillServiceTest {
         assertTrue(skill2.getIsPrimary());
         verify(userRepository).save(user);
         verify(userSkillRepository, never()).findByUserId(anyLong());
+
+        ArgumentCaptor<Object> payloadCaptor = ArgumentCaptor.forClass(Object.class);
+        verify(authEventSubject).notifyObservers(eq("PRIMARY_SKILL_SET_AUTH"), payloadCaptor.capture());
+
+        assertInstanceOf(Map.class, payloadCaptor.getValue());
+        Map<?, ?> payload = (Map<?, ?>) payloadCaptor.getValue();
+
+        assertEquals("PRIMARY_SKILL_SET_AUTH", payload.get("action"));
+        assertEquals(userId, payload.get("userId"));
+        assertEquals(2L, payload.get("skillId"));
+        assertEquals("Spring", payload.get("skillName"));
     }
 
     @Test
@@ -172,6 +189,7 @@ class UserSkillServiceTest {
 
         assertThrows(EntityNotFoundException.class, () -> userSkillService.setPrimarySkill(99L, 1L));
         verify(userSkillRepository, never()).findById(anyLong());
+        verify(authEventSubject, never()).notifyObservers(anyString(), any());
     }
 
     @Test
@@ -180,6 +198,7 @@ class UserSkillServiceTest {
         when(userSkillRepository.findById(1L)).thenReturn(Optional.empty());
 
         assertThrows(EntityNotFoundException.class, () -> userSkillService.setPrimarySkill(10L, 1L));
+        verify(authEventSubject, never()).notifyObservers(anyString(), any());
     }
 
     @Test
@@ -197,5 +216,6 @@ class UserSkillServiceTest {
 
         assertThrows(IllegalArgumentException.class, () -> userSkillService.setPrimarySkill(userId, 1L));
         verify(userRepository, never()).save(any());
+        verify(authEventSubject, never()).notifyObservers(anyString(), any());
     }
 }
