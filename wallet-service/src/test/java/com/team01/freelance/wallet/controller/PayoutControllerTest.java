@@ -238,9 +238,12 @@ class PayoutControllerTest {
 
     @Test
     void getTopUsedPromos_returnsOkWithUsageList() throws Exception {
-        PromoCodeUsageDTO usage = new PromoCodeUsageDTO();
-        usage.code = "SAVE10";
-        usage.timesUsed = 5;
+        // Only chain the fields strictly required by the test scenario assertions
+        PromoCodeUsageDTO usage = PromoCodeUsageDTO.builder()
+                .code("SAVE10")
+                .timesUsed(5L)
+                .build();
+
         when(payoutService.getTopUsedPromoCodes(3)).thenReturn(List.of(usage));
 
         mockMvc.perform(get("/api/payouts/promos/top-used").param("limit", "3"))
