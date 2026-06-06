@@ -31,9 +31,14 @@ public class MongoEventLogger implements EntityObserver {
         try {
             Map<String, Object> params = toParams(eventType, payload);
             MongoEvent event = eventFactory.createEvent(EventType.JOB, params);
-            jobEventRepository.save((JobEvent) event);
+            if (event instanceof JobEvent jobEvent) {
+                jobEventRepository.save(jobEvent);
+            } else {
+                log.warn("Skipping non-JobEvent from factory: action={}, class={}",
+                        event.getAction(), event.getClass().getName());
+            }
         } catch (Exception ex) {
-            log.warn("Failed to persist job event {}: {}", eventType, ex.getMessage());
+            log.warn("Failed to persist job event {}: {}", eventType, ex.getMessage(), ex);
         }
     }
 

@@ -17,11 +17,10 @@ public class EventFactory {
         Long jobId = requireLong(params, "jobId");
         String action = requireString(params, "action");
         LocalDateTime timestamp = params.containsKey("timestamp")
-                ? (LocalDateTime) params.get("timestamp")
+                ? requireTimestamp(params, "timestamp")
                 : LocalDateTime.now();
-        @SuppressWarnings("unchecked")
         Map<String, Object> details = params.containsKey("details")
-                ? (Map<String, Object>) params.get("details")
+                ? requireMap(params, "details")
                 : Map.of();
         return new JobEvent(jobId, action, timestamp, details);
     }
@@ -40,5 +39,22 @@ public class EventFactory {
             throw new IllegalArgumentException("Missing parameter: " + key);
         }
         return value.toString();
+    }
+
+    private static LocalDateTime requireTimestamp(Map<String, Object> params, String key) {
+        Object value = params.get(key);
+        if (value instanceof LocalDateTime timestamp) {
+            return timestamp;
+        }
+        throw new IllegalArgumentException("Missing or invalid parameter: " + key);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> requireMap(Map<String, Object> params, String key) {
+        Object value = params.get(key);
+        if (value instanceof Map<?, ?> map) {
+            return (Map<String, Object>) map;
+        }
+        throw new IllegalArgumentException("Missing or invalid parameter: " + key);
     }
 }
