@@ -15,6 +15,7 @@ import com.team01.freelance.wallet.dto.MilestoneReversalRequest;
 import com.team01.freelance.wallet.dto.ProcessPayoutRequest;
 import com.team01.freelance.common.observer.EventSubject;
 import com.team01.freelance.wallet.observer.EntityObserver;
+import com.team01.freelance.wallet.repository.PayoutAuditEventRepository;
 import com.team01.freelance.wallet.strategy.NoReversalStrategy;
 import com.team01.freelance.wallet.strategy.RefundResult;
 import com.team01.freelance.wallet.strategy.RefundStrategy;
@@ -90,6 +91,8 @@ public class PayoutService {
             observer.onEvent(eventType, payload);
         }
     }
+    @Autowired
+    private PayoutAuditEventRepository payoutAuditEventRepository;
 
     public List<Payout> getAllPayouts() {
         return payoutRepository.findAll();
@@ -263,17 +266,6 @@ public class PayoutService {
                 .orElseThrow(() ->
                         new EntityNotFoundException("Payout not found with id: " + payoutId));
 
-        PayoutDetailsDTO dto = new PayoutDetailsDTO();
-
-        dto.payoutId = payout.getId();
-        dto.contractId = payout.getContractId();
-        dto.freelancerId = payout.getFreelancerId();
-
-        dto.originalAmount = payout.getAmount();
-        dto.method = payout.getMethod();
-        dto.status = payout.getStatus();
-        dto.transactionDetails = payout.getTransactionDetails();
-
         List<AppliedPromoCodeDTO> promoList = new ArrayList<>();
         double totalDiscount = 0.0;
 
@@ -285,7 +277,6 @@ public class PayoutService {
         }
 
         for (PayoutPromo pp : promos) {
-
             AppliedPromoCodeDTO p = new AppliedPromoCodeDTO();
 
             p.promoCode = pp.getPromoCode().getCode();
@@ -297,39 +288,50 @@ public class PayoutService {
             promoList.add(p);
         }
 
-        dto.appliedPromoCodes = promoList;
-        dto.totalDiscount = totalDiscount;
-        dto.finalAmount = dto.originalAmount - totalDiscount;
-
-        return dto;
+        return PayoutDetailsDTO.builder()
+                .payoutId(payout.getId())
+                .contractId(payout.getContractId())
+                .freelancerId(payout.getFreelancerId())
+                .originalAmount(payout.getAmount())
+                .method(payout.getMethod())
+                .status(payout.getStatus())
+                .transactionDetails(payout.getTransactionDetails())
+                .appliedPromoCodes(promoList)
+                .totalDiscount(totalDiscount)
+                .finalAmount(payout.getAmount() - totalDiscount)
+                .build();
     }
 
     @Cacheable(value = "S5-F9", key = "#limit")
     public List<PromoCodeUsageDTO> getTopUsedPromoCodes(int limit) {
 
         List<Object[]> rows = payoutRepository.findTopUsedPromoCodes(limit);
-
         List<PromoCodeUsageDTO> result = new ArrayList<>();
 
+        if (rows == null) {
+            return result;
+        }
+
         for (Object[] r : rows) {
+            boolean isExpired = false;
+            if (r.length > 7 && r[7] != null) {
+                if (r[7] instanceof java.time.LocalDateTime ldt) {
+                    isExpired = ldt.isBefore(java.time.LocalDateTime.now());
+                } else if (r[7] instanceof java.sql.Timestamp ts) {
+                    isExpired = ts.toLocalDateTime().isBefore(java.time.LocalDateTime.now());
+                }
+            }
 
-            PromoCodeUsageDTO dto = new PromoCodeUsageDTO();
-
-            dto.promoCodeId = ((Number) r[0]).longValue();
-            dto.code = (String) r[1];
-            dto.discountType = String.valueOf(r[2]);
-            dto.discountValue = r[3] != null ? ((Number) r[3]).doubleValue() : 0;
-
-            dto.timesUsed = r[4] != null ? ((Number) r[4]).intValue() : 0;
-            dto.totalDiscountGiven = r[5] != null ? ((Number) r[5]).doubleValue() : 0;
-
-            dto.active = (Boolean) r[6];
-
-            LocalDateTime expiry = (LocalDateTime) r[7];
-
-            dto.expired = expiry != null && expiry.isBefore(LocalDateTime.now());
-
-            result.add(dto);
+            result.add(PromoCodeUsageDTO.builder()
+                    .promoCodeId(r[0] != null ? ((Number) r[0]).longValue() : null)
+                    .code(r[1] != null ? String.valueOf(r[1]) : null)
+                    .discountType(r[2] != null ? String.valueOf(r[2]) : null)
+                    .discountValue(r[3] != null ? ((Number) r[3]).doubleValue() : 0.0)
+                    .timesUsed(r[4] != null ? ((Number) r[4]).longValue() : 0L)
+                    .totalDiscountGiven(r[5] != null ? ((Number) r[5]).doubleValue() : 0.0)
+                    .active(r[6] != null ? (Boolean) r[6] : false)
+                    .expired(isExpired)
+                    .build());
         }
 
         return result;
@@ -744,6 +746,71 @@ public class PayoutService {
         }
 
         return result;
+    }
+
+    // Feature [S5-F11]
+    @Cacheable(value = "S5-F11", key = "T(java.util.Objects).hash(#startDate, #endDate)")
+    public List<com.team01.freelance.wallet.dto.PayoutMethodDTO> getPayoutMethodBreakdown(LocalDate startDate, LocalDate endDate) {
+        if (startDate.isAfter(endDate)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "startDate cannot be after endDate");
+        }
+
+        LocalDateTime startInclusive = startDate.atStartOfDay();
+        LocalDateTime endInclusive = endDate.atTime(23, 59, 59, 999_999_999);
+
+        List<com.team01.freelance.wallet.event.PayoutAuditEvent> events =
+                payoutAuditEventRepository.findByTimestampBetweenAndActionIn(
+                        startInclusive,
+                        endInclusive,
+                        List.of("COMPLETED", "FAILED")
+                );
+
+        Map<com.team01.freelance.wallet.model.PayoutMethod, long[]> analyticsMap = new HashMap<>();
+
+        for (com.team01.freelance.wallet.model.PayoutMethod m : com.team01.freelance.wallet.model.PayoutMethod.values()) {
+            analyticsMap.put(m, new long[]{0L, 0L});
+        }
+
+        Map<com.team01.freelance.wallet.model.PayoutMethod, Double> totalAmountMap = new HashMap<>();
+
+        for (com.team01.freelance.wallet.event.PayoutAuditEvent event : events) {
+            com.team01.freelance.wallet.model.PayoutMethod method = event.getMethod();
+            if (method == null) continue;
+
+            long[] stats = analyticsMap.get(method);
+            if ("COMPLETED".equals(event.getAction())) {
+                stats[0]++;
+                double currentAmt = totalAmountMap.getOrDefault(method, 0.0);
+                totalAmountMap.put(method, currentAmt + (event.getAmount() != null ? event.getAmount() : 0.0));
+            } else if ("FAILED".equals(event.getAction())) {
+                stats[1]++;
+            }
+        }
+
+        List<com.team01.freelance.wallet.dto.PayoutMethodDTO> resultList = new ArrayList<>();
+
+        for (com.team01.freelance.wallet.model.PayoutMethod m : com.team01.freelance.wallet.model.PayoutMethod.values()) {
+            long[] stats = analyticsMap.get(m);
+            long successCount = stats[0];
+            long failureCount = stats[1];
+            long totalCount = successCount + failureCount;
+
+            if (totalCount == 0) continue;
+
+            double successRate = totalCount > 0 ? (double) successCount / totalCount : 0.0;
+            double totalAmount = totalAmountMap.getOrDefault(m, 0.0);
+
+            com.team01.freelance.wallet.dto.PayoutMethodDTO dto = new com.team01.freelance.wallet.dto.PayoutMethodDTO();
+            dto.setMethod(m);
+            dto.setSuccessCount(successCount);
+            dto.setFailureCount(failureCount);
+            dto.setSuccessRate(successRate);
+            dto.setTotalAmount(totalAmount);
+
+            resultList.add(dto);
+        }
+
+        return resultList;
     }
 
 }

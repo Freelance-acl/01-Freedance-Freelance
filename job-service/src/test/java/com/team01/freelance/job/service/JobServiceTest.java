@@ -4,7 +4,6 @@ import com.team01.freelance.common.observer.EventSubject;
 import com.team01.freelance.job.dto.JobProposalSummaryDTO;
 import com.team01.freelance.job.client.ContractLookupClient;
 import com.team01.freelance.job.client.ContractSummary;
-import com.team01.freelance.common.observer.EventSubject;
 import com.team01.freelance.job.event.JobEventTypes;
 import com.team01.freelance.job.exception.ForbiddenOperationException;
 import com.team01.freelance.job.dto.TopBudgetJobDTO;
