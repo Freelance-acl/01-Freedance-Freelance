@@ -1,5 +1,8 @@
 package com.team01.freelance.user.support;
 
+import org.junit.jupiter.api.BeforeEach;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.CacheManager;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -14,6 +17,20 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 @SpringBootTest
 @ActiveProfiles("test")
 public abstract class AbstractIntegrationTest {
+
+    @Autowired(required = false)
+    private CacheManager cacheManager;
+
+    @BeforeEach
+    void clearCaches() {
+        if (cacheManager == null) {
+            return;
+        }
+        cacheManager.getCacheNames().stream()
+                .map(cacheManager::getCache)
+                .filter(cache -> cache != null)
+                .forEach(org.springframework.cache.Cache::clear);
+    }
 
     protected static org.springframework.test.web.servlet.MockMvc buildMockMvc(WebApplicationContext context) {
         return MockMvcBuilders.webAppContextSetup(context)
