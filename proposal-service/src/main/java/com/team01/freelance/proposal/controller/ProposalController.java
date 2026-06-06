@@ -1,8 +1,16 @@
 package com.team01.freelance.proposal.controller;
 
+import com.team01.freelance.proposal.dto.FeeEstimateDTO;
+import com.team01.freelance.proposal.dto.FeeEstimateRequest;
+import com.team01.freelance.proposal.dto.JobRecommendationDTO;
+import com.team01.freelance.proposal.dto.ProposalDetailsDTO;
+import com.team01.freelance.proposal.dto.ProposalAnalyticsDTO;
 import com.team01.freelance.proposal.model.Proposal;
+import com.team01.freelance.proposal.model.ProposalMilestone;
+import com.team01.freelance.proposal.service.ProposalRecommendationService;
 import com.team01.freelance.proposal.service.ProposalService;
 import jakarta.persistence.EntityNotFoundException;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -12,8 +20,11 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.format.annotation.DateTimeFormat;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -23,9 +34,55 @@ public class ProposalController {
     @Autowired
     private ProposalService proposalService;
 
+    @Autowired
+    private ProposalRecommendationService proposalRecommendationService;
+
     @GetMapping
     public ResponseEntity<List<Proposal>> getAllProposals() {
         return ResponseEntity.ok(proposalService.getAllProposals());
+    }
+
+    /**
+     * Search proposals by optional status and inclusive date range on {@code submittedAt}, newest first.
+     */
+    @GetMapping("/search")
+    public ResponseEntity<List<Proposal>> searchProposals(
+            @RequestParam(required = false) String status,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        return ResponseEntity.ok(proposalService.searchProposals(status, startDate, endDate));
+    }
+
+    /**
+     * [S3-F5] Filter proposals by a metadata key/value pair (JSONB equality).
+     */
+    @GetMapping("/metadata/search")
+    public ResponseEntity<List<Proposal>> searchProposalsByMetadata(
+            @RequestParam String key,
+            @RequestParam String value) {
+        try {
+            return ResponseEntity.ok(proposalService.searchProposalsByMetadata(key, value));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @GetMapping("/analytics")
+    public ResponseEntity<ProposalAnalyticsDTO> getProposalAnalytics(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        return ResponseEntity.ok(proposalService.getProposalAnalytics(startDate, endDate));
+    }
+
+    @GetMapping("/recommendations")
+    public ResponseEntity<List<JobRecommendationDTO>> getRecommendations(
+            @RequestParam Long freelancerId,
+            @RequestParam(required = false) Integer limit,
+            HttpServletRequest request) {
+        if (request.getHeader("Authorization") == null) {
+            return ResponseEntity.status(401).build();
+        }
+        return ResponseEntity.ok(proposalRecommendationService.getRecommendations(freelancerId, limit, request));
     }
 
     @GetMapping("/{id}")
@@ -33,6 +90,26 @@ public class ProposalController {
         return proposalService.getProposalById(id)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @PostMapping("/estimate")
+    public ResponseEntity<FeeEstimateDTO> estimatePlatformFee(@RequestBody FeeEstimateRequest request) {
+        try {
+            return ResponseEntity.ok(proposalService.estimatePlatformFee(
+                    request.getBidAmount(),
+                    request.getEstimatedDays()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @GetMapping("/{proposalId}/details")
+    public ResponseEntity<ProposalDetailsDTO> getProposalDetails(@PathVariable Long proposalId) {
+        try {
+            return ResponseEntity.ok(proposalService.getProposalDetails(proposalId));
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        }
     }
 
     @PostMapping
@@ -59,6 +136,54 @@ public class ProposalController {
             return ResponseEntity.notFound().build();
         
         } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @PutMapping("/{id}/accept")
+    public ResponseEntity<Proposal> acceptProposal(@PathVariable("id") Long proposalId) {
+        try {
+            return ResponseEntity.ok(proposalService.acceptProposal(proposalId));
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @PostMapping("/{proposalId}/milestones")
+    public ResponseEntity<Proposal> addMilestones(
+            @PathVariable Long proposalId,
+            @RequestBody List<ProposalMilestone> milestones) {
+        try {
+            return ResponseEntity.ok(proposalService.addMilestones(proposalId, milestones));
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @PutMapping("/{id}/withdraw")
+    public ResponseEntity<Proposal> withdrawProposal(@PathVariable Long id) {
+        try {
+            return ResponseEntity.ok(proposalService.withdrawProposal(id));
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @PutMapping("/{id}/complete")
+    public ResponseEntity<Proposal> completeProposal(@PathVariable("id") Long proposalId) {
+        try {
+            return ResponseEntity.ok(proposalService.completeProposal(proposalId));
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        } catch (IllegalStateException e) {
             return ResponseEntity.badRequest().build();
         }
     }

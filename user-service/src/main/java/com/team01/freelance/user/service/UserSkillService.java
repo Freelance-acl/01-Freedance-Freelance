@@ -4,11 +4,19 @@ import com.team01.freelance.user.model.UserSkill;
 import com.team01.freelance.user.repository.UserRepository;
 import com.team01.freelance.user.repository.UserSkillRepository;
 import jakarta.persistence.EntityNotFoundException;
+import com.team01.freelance.user.model.User;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
+
+import com.team01.freelance.common.observer.EventSubject;
+import java.util.HashMap;
+import java.util.Map;
 
 @Service
 public class UserSkillService {
@@ -18,6 +26,9 @@ public class UserSkillService {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private EventSubject authEventSubject;
 
     public List<UserSkill> getAllUserSkills() {
         return userSkillRepository.findAll();
@@ -70,5 +81,59 @@ public class UserSkillService {
 
     public void deleteAllUserSkills() {
         userSkillRepository.deleteAll();
+    }
+
+    /**
+     * Sets the given skill as the user's sole primary skill (transactional, via user cascade).
+     *
+     * @param userId the user ID
+     * @param skillId the user-skill ID to mark primary
+     * @return the user with updated skills
+     * @throws EntityNotFoundException if the user or skill is not found
+     * @throws IllegalArgumentException if the skill does not belong to the user
+     */
+    @Transactional
+    public User setPrimarySkill(Long userId, Long skillId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new EntityNotFoundException("User not found with id: " + userId));
+
+        UserSkill target = userSkillRepository.findById(skillId)
+                .orElseThrow(() -> new EntityNotFoundException("User Skill not found with id: " + skillId));
+
+        if (target.getUser() == null || !Objects.equals(userId, target.getUser().getId())) {
+            throw new IllegalArgumentException("Skill does not belong to this user");
+        }
+
+        List<UserSkill> skills = user.getUserSkills();
+        if (skills == null || skills.isEmpty()) {
+            user.setUserSkills(new ArrayList<>(userSkillRepository.findByUserId(userId)));
+            skills = user.getUserSkills();
+        }
+
+        boolean skillFoundForUser = false;
+        for (UserSkill skill : skills) {
+            boolean isTarget = Objects.equals(skill.getId(), skillId);
+            skill.setIsPrimary(isTarget);
+            if (isTarget) {
+                skillFoundForUser = true;
+            }
+        }
+        if (!skillFoundForUser) {
+            throw new EntityNotFoundException("User Skill not found with id: " + skillId);
+        }
+
+        User savedUser = userRepository.save(user);
+
+        Map<String, Object> eventPayload = new HashMap<>();
+        eventPayload.put("action", "PRIMARY_SKILL_SET_AUTH");
+        eventPayload.put("userId", userId);
+        eventPayload.put("skillId", skillId);
+        if (target.getSkillName() != null) {
+            eventPayload.put("skillName", target.getSkillName());
+        }
+
+        authEventSubject.notifyObservers("PRIMARY_SKILL_SET_AUTH", eventPayload);
+
+        return savedUser;
     }
 }

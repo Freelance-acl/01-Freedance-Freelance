@@ -6,6 +6,8 @@ import com.team01.freelance.wallet.repository.PayoutRepository;
 import com.team01.freelance.wallet.repository.PromoCodeRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -27,6 +29,7 @@ public class PayoutPromoService {
         return payoutPromoRepository.findAll();
     }
 
+    @Cacheable(value = "payout-promo", key = "#id", unless = "#result == null")
     public Optional<PayoutPromo> getPayoutPromoById(Long id) {
         return payoutPromoRepository.findById(id);
     }
@@ -57,6 +60,7 @@ public class PayoutPromoService {
      * @return The updated payout promo
      * @throws EntityNotFoundException if the payout promo is not found
      */
+    @CacheEvict(value = "payout-promo", allEntries = true)
     public PayoutPromo updatePayoutPromo(Long id, PayoutPromo payoutPromo) {
         return payoutPromoRepository.findById(id).map(existing -> {
             if (payoutPromo.getDiscountApplied() != null) {
@@ -69,6 +73,7 @@ public class PayoutPromoService {
         }).orElseThrow(() -> new EntityNotFoundException("Payout Promo not found with id: " + id));
     }
 
+    @CacheEvict(value = "payout-promo", allEntries = true)
     public boolean deletePayoutPromoById(Long id) {
         if (!payoutPromoRepository.existsById(id)) {
             return false;
@@ -77,6 +82,7 @@ public class PayoutPromoService {
         return true;
     }
 
+    @CacheEvict(value = "payout-promo", allEntries = true)
     public void deleteAllPayoutPromos() {
         payoutPromoRepository.deleteAll();
     }
