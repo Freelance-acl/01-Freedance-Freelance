@@ -37,6 +37,14 @@ import java.time.LocalTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.HashMap;
+import org.springframework.transaction.annotation.Transactional;
+import com.team01.freelance.user.dto.UserContractSummaryDTO;
+import com.team01.freelance.user.dto.UserProfileDTO;
+import com.team01.freelance.user.dto.UserProfileSkillDTO;
+import com.team01.freelance.user.model.UserSkill;
+import com.team01.freelance.user.repository.UserSkillRepository;
+import com.team01.freelance.user.adapter.ObjectArrayDtoAdapter;
 import java.util.Optional;
 
 @Service
@@ -63,6 +71,7 @@ public class UserService {
     private EventSubject authEventSubject;
 
     @Autowired
+    private ObjectArrayDtoAdapter objectArrayDtoAdapter;
     private JwtService jwtService;
 
     @Autowired
