@@ -1,30 +1,30 @@
 package com.team01.freelance.contract.dto;
 
-public class StalledContractDTO {
+public class ContractSummaryDTO {
     private Long contractId;
     private String freelancerName;
     private String jobTitle;
     private Double agreedAmount;
-    private Double progressPercentage;
-    private Long daysSinceLastActivity;
+    private String status;
+    private Long durationDays;
 
-    public StalledContractDTO() {
+    public ContractSummaryDTO() {
     }
 
-    public StalledContractDTO(
+    public ContractSummaryDTO(
             Long contractId,
             String freelancerName,
             String jobTitle,
             Double agreedAmount,
-            Double progressPercentage,
-            Long daysSinceLastActivity
+            String status,
+            Long durationDays
     ) {
         this.contractId = contractId;
         this.freelancerName = freelancerName;
         this.jobTitle = jobTitle;
         this.agreedAmount = agreedAmount;
-        this.progressPercentage = progressPercentage;
-        this.daysSinceLastActivity = daysSinceLastActivity;
+        this.status = status;
+        this.durationDays = durationDays;
     }
 
     public static Builder builder() {
@@ -63,24 +63,24 @@ public class StalledContractDTO {
         this.agreedAmount = agreedAmount;
     }
 
-    public Double getProgressPercentage() {
-        return progressPercentage;
+    public String getStatus() {
+        return status;
     }
 
-    public void setProgressPercentage(Double progressPercentage) {
-        this.progressPercentage = progressPercentage;
+    public void setStatus(String status) {
+        this.status = status;
     }
 
-    public Long getDaysSinceLastActivity() {
-        return daysSinceLastActivity;
+    public Long getDurationDays() {
+        return durationDays;
     }
 
-    public void setDaysSinceLastActivity(Long daysSinceLastActivity) {
-        this.daysSinceLastActivity = daysSinceLastActivity;
+    public void setDurationDays(Long durationDays) {
+        this.durationDays = durationDays;
     }
 
     public static final class Builder {
-        private final StalledContractDTO dto = new StalledContractDTO();
+        private final ContractSummaryDTO dto = new ContractSummaryDTO();
 
         public Builder contractId(Long contractId) {
             dto.setContractId(contractId);
@@ -102,17 +102,17 @@ public class StalledContractDTO {
             return this;
         }
 
-        public Builder progressPercentage(Double progressPercentage) {
-            dto.setProgressPercentage(progressPercentage);
+        public Builder status(String status) {
+            dto.setStatus(status);
             return this;
         }
 
-        public Builder daysSinceLastActivity(Long daysSinceLastActivity) {
-            dto.setDaysSinceLastActivity(daysSinceLastActivity);
+        public Builder durationDays(Long durationDays) {
+            dto.setDurationDays(durationDays);
             return this;
         }
 
-        public StalledContractDTO build() {
+        public ContractSummaryDTO build() {
             return dto;
         }
     }

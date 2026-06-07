@@ -27,6 +27,10 @@ public class FreelancerPerformanceDTO {
         this.totalEarnings = totalEarnings;
     }
 
+    public static Builder builder() {
+        return new Builder();
+    }
+
     public Long getFreelancerId() {
         return freelancerId;
     }
@@ -73,5 +77,43 @@ public class FreelancerPerformanceDTO {
 
     public void setTotalEarnings(Double totalEarnings) {
         this.totalEarnings = totalEarnings;
+    }
+
+    public static final class Builder {
+        private final FreelancerPerformanceDTO dto = new FreelancerPerformanceDTO();
+
+        public Builder freelancerId(Long freelancerId) {
+            dto.setFreelancerId(freelancerId);
+            return this;
+        }
+
+        public Builder totalContracts(Long totalContracts) {
+            dto.setTotalContracts(totalContracts);
+            return this;
+        }
+
+        public Builder averageContractValue(Double averageContractValue) {
+            dto.setAverageContractValue(averageContractValue);
+            return this;
+        }
+
+        public Builder completionRate(Double completionRate) {
+            dto.setCompletionRate(completionRate);
+            return this;
+        }
+
+        public Builder averageDurationDays(Double averageDurationDays) {
+            dto.setAverageDurationDays(averageDurationDays);
+            return this;
+        }
+
+        public Builder totalEarnings(Double totalEarnings) {
+            dto.setTotalEarnings(totalEarnings);
+            return this;
+        }
+
+        public FreelancerPerformanceDTO build() {
+            return dto;
+        }
     }
 }
