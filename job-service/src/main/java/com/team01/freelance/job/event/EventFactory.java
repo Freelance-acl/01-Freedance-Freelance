@@ -11,16 +11,19 @@ import java.util.Map;
 public class EventFactory {
 
     public MongoEvent createEvent(EventType type, Map<String, Object> params) {
+        if (params == null) {
+            throw new IllegalArgumentException("params cannot be null");
+        }
         if (type != EventType.JOB) {
             throw new IllegalArgumentException("job-service EventFactory only supports JOB, got " + type);
         }
         Long jobId = requireLong(params, "jobId");
         String action = requireString(params, "action");
-        LocalDateTime timestamp = params.containsKey("timestamp")
+        LocalDateTime timestamp = (params.containsKey("timestamp") && params.get("timestamp") instanceof LocalDateTime)
                 ? (LocalDateTime) params.get("timestamp")
                 : LocalDateTime.now();
         @SuppressWarnings("unchecked")
-        Map<String, Object> details = params.containsKey("details")
+        Map<String, Object> details = (params.get("details") instanceof Map<?, ?>)
                 ? (Map<String, Object>) params.get("details")
                 : Map.of();
         return new JobEvent(jobId, action, timestamp, details);
