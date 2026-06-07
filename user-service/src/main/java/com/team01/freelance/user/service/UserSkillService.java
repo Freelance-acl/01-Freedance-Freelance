@@ -1,18 +1,27 @@
 package com.team01.freelance.user.service;
 
+import com.team01.freelance.user.cache.UserCacheNames;
 import com.team01.freelance.user.model.UserSkill;
 import com.team01.freelance.user.repository.UserRepository;
 import com.team01.freelance.user.repository.UserSkillRepository;
 import jakarta.persistence.EntityNotFoundException;
 import com.team01.freelance.user.model.User;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
+import com.team01.freelance.common.observer.EventSubject;
+import java.util.Map;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+
+import com.team01.freelance.common.observer.EventSubject;
+import java.util.HashMap;
+import java.util.Map;
 
 @Service
 public class UserSkillService {
@@ -23,14 +32,22 @@ public class UserSkillService {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private EventSubject authEventSubject;
+
     public List<UserSkill> getAllUserSkills() {
         return userSkillRepository.findAll();
     }
 
+    @Cacheable(value = UserCacheNames.USER_SKILL, key = "#id", unless = "#result == null")
     public Optional<UserSkill> getUserSkillById(Long id) {
         return userSkillRepository.findById(id);
     }
 
+    @Caching(evict = {
+            @CacheEvict(value = UserCacheNames.USER_SKILL, allEntries = true),
+            @CacheEvict(value = UserCacheNames.S1_F8, allEntries = true)
+    })
     public UserSkill createUserSkill(UserSkill userSkill) {
         if (userSkill.getUser() == null || userSkill.getUser().getId() == null) {
             throw new IllegalArgumentException("User ID is required to create a UserSkill");
@@ -39,7 +56,12 @@ public class UserSkillService {
         userSkill.setUser(userRepository.findById(userSkill.getUser().getId())
                 .orElseThrow(() -> new EntityNotFoundException("User not found with id: " + userSkill.getUser().getId())));
 
-        return userSkillRepository.save(userSkill);
+        UserSkill saved = userSkillRepository.save(userSkill);
+        authEventSubject.notifyObservers("USER_SKILL_CREATED", Map.of(
+                "userId", saved.getUser().getId(),
+                "action", "USER_SKILL_CREATED",
+                "details", Map.of()));
+        return saved;
     }
 
     /**
@@ -51,6 +73,10 @@ public class UserSkillService {
      * @return The updated user skill
      * @throws EntityNotFoundException if the user skill is not found
      */
+    @Caching(evict = {
+            @CacheEvict(value = UserCacheNames.USER_SKILL, key = "#id"),
+            @CacheEvict(value = UserCacheNames.S1_F8, allEntries = true)
+    })
     public UserSkill updateUserSkill(Long id, UserSkill userSkill) {
         return userSkillRepository.findById(id).map(existing -> {
                 if (userSkill.getSkillName() != null) existing.setSkillName(userSkill.getSkillName());
@@ -60,18 +86,39 @@ public class UserSkillService {
                 if (userSkill.getIsPrimary() != null) existing.setIsPrimary(userSkill.getIsPrimary());
                 if (userSkill.getMetadata() != null) existing.setMetadata(userSkill.getMetadata());
                 if (userSkill.getCreatedAt() != null) existing.setCreatedAt(userSkill.getCreatedAt());
-            return userSkillRepository.save(existing);
+            UserSkill saved = userSkillRepository.save(existing);
+            Long userId = saved.getUser() != null ? saved.getUser().getId() : -1L;
+            authEventSubject.notifyObservers("USER_SKILL_UPDATED", Map.of(
+                    "userId", userId,
+                    "action", "USER_SKILL_UPDATED",
+                    "details", Map.of()));
+            return saved;
         }).orElseThrow(() -> new EntityNotFoundException("User Skill not found with id: " + id));
     }
 
+    @Caching(evict = {
+            @CacheEvict(value = UserCacheNames.USER_SKILL, key = "#id"),
+            @CacheEvict(value = UserCacheNames.S1_F8, allEntries = true)
+    })
      public boolean deleteUserSkillById(Long id) {
 
         return userSkillRepository.findById(id).map(existing -> {
+            Long userId = existing.getUser() != null ? existing.getUser().getId() : null;
             userSkillRepository.delete(existing);
+            if (userId != null) {
+                authEventSubject.notifyObservers("USER_SKILL_DELETED", Map.of(
+                        "userId", userId,
+                        "action", "USER_SKILL_DELETED",
+                        "details", Map.of()));
+            }
             return true;
         }).orElse(false);
     }
 
+    @Caching(evict = {
+            @CacheEvict(value = UserCacheNames.USER_SKILL, allEntries = true),
+            @CacheEvict(value = UserCacheNames.S1_F8, allEntries = true)
+    })
     public void deleteAllUserSkills() {
         userSkillRepository.deleteAll();
     }
@@ -86,6 +133,11 @@ public class UserSkillService {
      * @throws IllegalArgumentException if the skill does not belong to the user
      */
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(value = UserCacheNames.USER, key = "#userId"),
+            @CacheEvict(value = UserCacheNames.USER_SKILL, allEntries = true),
+            @CacheEvict(value = UserCacheNames.S1_F8, allEntries = true)
+    })
     public User setPrimarySkill(Long userId, Long skillId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new EntityNotFoundException("User not found with id: " + userId));
@@ -115,6 +167,18 @@ public class UserSkillService {
             throw new EntityNotFoundException("User Skill not found with id: " + skillId);
         }
 
-        return userRepository.save(user);
+        User savedUser = userRepository.save(user);
+
+        Map<String, Object> eventPayload = new HashMap<>();
+        eventPayload.put("action", "PRIMARY_SKILL_SET_AUTH");
+        eventPayload.put("userId", userId);
+        eventPayload.put("skillId", skillId);
+        if (target.getSkillName() != null) {
+            eventPayload.put("skillName", target.getSkillName());
+        }
+
+        authEventSubject.notifyObservers("PRIMARY_SKILL_SET_AUTH", eventPayload);
+
+        return savedUser;
     }
 }

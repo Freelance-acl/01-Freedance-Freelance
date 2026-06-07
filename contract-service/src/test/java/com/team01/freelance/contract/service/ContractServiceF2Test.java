@@ -1,30 +1,37 @@
 package com.team01.freelance.contract.service;
 
 import com.team01.freelance.contract.model.Contract;
+import com.team01.freelance.contract.observer.EntityObserver;
 import com.team01.freelance.contract.repository.ContractRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class ContractServiceF2Test {
 
     private ContractService contractService;
     private ContractRepository contractRepository;
+    private EntityObserver observer;
 
     @BeforeEach
     void setUp() {
         contractService = new ContractService();
         contractRepository = mock(ContractRepository.class);
+        observer = mock(EntityObserver.class);
         ReflectionTestUtils.setField(contractService, "contractRepository", contractRepository);
+        ReflectionTestUtils.setField(contractService, "observers", List.of(observer));
     }
 
     @Test
@@ -47,5 +54,6 @@ class ContractServiceF2Test {
         assertEquals("keep", updated.getMetadata().get("existingKey"));
         assertEquals(50, updated.getMetadata().get("progressPercentage"));
         assertEquals("2026-03-15", updated.getMetadata().get("lastActivityDate"));
+        verify(observer).onEvent(eq("PROGRESS_UPDATED"), any(Map.class));
     }
 }

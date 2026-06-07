@@ -9,6 +9,12 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import com.team01.freelance.user.model.UserRole;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+
+import java.util.List;
 
 import com.team01.freelance.user.model.User;
 import com.team01.freelance.user.model.UserRole;
@@ -22,8 +28,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     @Query("""
             SELECT u FROM User u
-            WHERE (:name IS NULL OR LOWER(u.name) LIKE LOWER(CONCAT('%', :name, '%')))
-              AND (:email IS NULL OR LOWER(u.email) LIKE LOWER(CONCAT('%', :email, '%')))
+            WHERE LOWER(u.name) LIKE LOWER(CONCAT('%', COALESCE(:name, ''), '%'))
+              AND LOWER(u.email) LIKE LOWER(CONCAT('%', COALESCE(:email, ''), '%'))
               AND (:role IS NULL OR u.role = :role)
             """)
     List<User> searchUsers(
@@ -107,4 +113,3 @@ public interface UserRepository extends JpaRepository<User, Long> {
             @Param("endDate") LocalDateTime endDate,
             @Param("limit") int limit);
 }
-

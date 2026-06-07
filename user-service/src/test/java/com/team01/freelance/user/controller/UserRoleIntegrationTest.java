@@ -220,6 +220,50 @@ class UserRoleIntegrationTest extends AbstractIntegrationTest {
                 userRepository.findById(target.getId()).orElseThrow().getRole());
     }
 
+    @Test
+    void updateRole_withoutToken_returnsUnauthorized() throws Exception {
+        User target = UserTestFixtures.saveUser(
+                userRepository, "No Token Target", uniqueEmail("target-401"),
+                "+1444" + (System.nanoTime() % 10_000_000L), UserRole.CLIENT, UserTestFixtures.SEED_PASSWORD);
+
+        mockMvc.perform(put("/api/users/{id}/role", target.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"role\":\"ADMIN\"}"))
+                .andExpect(status().isUnauthorized());
+
+        assertEquals(UserRole.CLIENT,
+                userRepository.findById(target.getId()).orElseThrow().getRole());
+    }
+
+    @Test
+    void updateRole_withAdminToken_userNotFound_returnsNotFound() throws Exception {
+        String adminToken = loginToken(UserTestFixtures.SEED_ADMIN_EMAIL);
+
+        mockMvc.perform(put("/api/users/{id}/role", 999999L)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"role\":\"ADMIN\"}"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void updateRole_withAdminToken_invalidRole_returnsBadRequest() throws Exception {
+        User target = UserTestFixtures.saveUser(
+                userRepository, "Invalid Role Target", uniqueEmail("target-400"),
+                "+1333" + (System.nanoTime() % 10_000_000L), UserRole.CLIENT, UserTestFixtures.SEED_PASSWORD);
+
+        String adminToken = loginToken(UserTestFixtures.SEED_ADMIN_EMAIL);
+
+        mockMvc.perform(put("/api/users/{id}/role", target.getId())
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"role\":\"BANANA\"}"))
+                .andExpect(status().isBadRequest());
+
+        assertEquals(UserRole.CLIENT,
+                userRepository.findById(target.getId()).orElseThrow().getRole());
+    }
+
     // (i) CLIENT token → regular user endpoint (S1-F1 search) → 200
     @Test
     void search_withClientToken_succeeds() throws Exception {

@@ -9,35 +9,42 @@ import java.util.HashMap;
 import java.util.Map;
 
 @Document(collection = "job_events")
-public class JobEvent implements MongoEvent {
+public class JobEvent {
 
     @Id
     private String id;
 
+    private String eventType;
     private Long jobId;
-    private String action;
     private LocalDateTime timestamp;
     private Map<String, Object> details = new HashMap<>();
 
     public JobEvent() {
     }
 
-    public JobEvent(Long jobId, String action, LocalDateTime timestamp, Map<String, Object> details) {
+    public JobEvent(String eventType, Long jobId, LocalDateTime timestamp, Map<String, Object> details) {
+        this.eventType = eventType;
         this.jobId = jobId;
-        this.action = action;
         this.timestamp = timestamp;
         if (details != null) {
             this.details = new HashMap<>(details);
         }
     }
 
-    @Override
     public String getId() {
         return id;
     }
 
     public void setId(String id) {
         this.id = id;
+    }
+
+    public String getEventType() {
+        return eventType;
+    }
+
+    public void setEventType(String eventType) {
+        this.eventType = eventType;
     }
 
     public Long getJobId() {
@@ -48,16 +55,6 @@ public class JobEvent implements MongoEvent {
         this.jobId = jobId;
     }
 
-    @Override
-    public String getAction() {
-        return action;
-    }
-
-    public void setAction(String action) {
-        this.action = action;
-    }
-
-    @Override
     public LocalDateTime getTimestamp() {
         return timestamp;
     }
@@ -66,7 +63,6 @@ public class JobEvent implements MongoEvent {
         this.timestamp = timestamp;
     }
 
-    @Override
     public Map<String, Object> getDetails() {
         return details;
     }

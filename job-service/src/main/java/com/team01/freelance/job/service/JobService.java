@@ -1,8 +1,10 @@
 package com.team01.freelance.job.service;
 
+import com.team01.freelance.common.observer.EventSubject;
 import com.team01.freelance.job.dto.JobProposalSummaryDTO;
 import com.team01.freelance.job.client.ContractLookupClient;
 import com.team01.freelance.job.client.ContractSummary;
+import com.team01.freelance.job.event.JobEventTypes;
 import com.team01.freelance.job.exception.ForbiddenOperationException;
 import com.team01.freelance.job.model.JobAttachmentAlertDTO;
 import com.team01.freelance.job.model.JobAttachment;
@@ -13,11 +15,16 @@ import com.team01.freelance.job.model.JobStatus;
 import com.team01.freelance.job.dto.TopBudgetJobDTO;
 import com.team01.freelance.job.repository.JobAttachmentRepository;
 import com.team01.freelance.job.repository.JobRepository;
+import com.team01.freelance.job.search.service.JobSearchIndexOperations;
 import com.team01.freelance.user.model.User;
 import com.team01.freelance.user.model.UserRole;
 import com.team01.freelance.user.repository.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Caching;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -55,14 +62,26 @@ public class JobService {
     @Autowired
     private DataSource dataSource;
 
+    @Autowired
+    private JobSearchIndexOperations jobSearchIndexOperations;
+
+    @Autowired
+    @Qualifier("jobEventSubject")
+    private EventSubject jobEventSubject;
+
     public List<Job> getAllJobs() {
         return jobRepository.findAll();
     }
 
+    @Cacheable(value = "job-by-id", key = "#id", unless = "#result == null")
     public Optional<Job> getJobById(Long id) {
         return jobRepository.findById(id);
     }
 
+    @Cacheable(
+            value = "S2-F1",
+            key = "(#status == null ? 'ALL' : #status.trim()) + ':' + #minBudget + ':' + #maxBudget + ':' + #pageable.pageNumber + ':' + #pageable.pageSize + ':' + #pageable.sort.toString()"
+    )
     public Page<Job> searchJobsByStatusAndBudgetRange(String status, Double minBudget, Double maxBudget, Pageable pageable) {
         if (minBudget == null || maxBudget == null) {
             throw new IllegalArgumentException("minBudget and maxBudget are required");
@@ -80,6 +99,11 @@ public class JobService {
         return jobRepository.searchJobsByStatusAndBudgetRange(normalizedStatus, minBudget, maxBudget, pageable);
     }
 
+    @Caching(evict = {
+            @CacheEvict(value = "S2-F1", allEntries = true),
+            @CacheEvict(value = "S2-F5", allEntries = true),
+            @CacheEvict(value = "S2-F6", allEntries = true)
+    })
     public Job createJob(Job job) {
         if (job.getClientId() == null) {
             throw new IllegalArgumentException("Client ID is required to create a Job");
@@ -93,7 +117,9 @@ public class JobService {
         userRepository.findById(job.getClientId())
                 .orElseThrow(() -> new EntityNotFoundException("Client not found with id: " + job.getClientId()));
 
-        return jobRepository.save(job);
+        Job savedJob = jobRepository.save(job);
+        jobSearchIndexOperations.index(savedJob);
+        return savedJob;
     }
 
     /**
@@ -106,6 +132,13 @@ public class JobService {
      * @throws IllegalArgumentException if the budget range is invalid
      * @throws EntityNotFoundException if the job is not found
      */
+    @Caching(evict = {
+            @CacheEvict(value = "job-by-id", key = "#id"),
+            @CacheEvict(value = "S2-F1", allEntries = true),
+            @CacheEvict(value = "S2-F3", allEntries = true),
+            @CacheEvict(value = "S2-F5", allEntries = true),
+            @CacheEvict(value = "S2-F6", allEntries = true)
+    })
     public Job updateJob(Long id, Job jobDetails) {
         return jobRepository.findById(id).map(existingJob -> {
                 if (jobDetails.getTitle() != null) existingJob.setTitle(jobDetails.getTitle());
@@ -121,34 +154,65 @@ public class JobService {
                 throw new IllegalArgumentException("Budget minimum cannot be greater than budget maximum");
             }
 
-            return jobRepository.save(existingJob);
+            Job savedJob = jobRepository.save(existingJob);
+            jobSearchIndexOperations.index(savedJob);
+            return savedJob;
         }).orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + id));
     }
 
+    @Caching(evict = {
+            @CacheEvict(value = "job-by-id", key = "#id"),
+            @CacheEvict(value = "S2-F5", allEntries = true)
+    })
     public Job updateJobRequirements(Long id, Map<String, Object> requirements) {
         return jobRepository.findById(id).map(existingJob -> {
+            Map<String, Object> changedRequirements = requirements == null
+                    ? Map.of()
+                    : new LinkedHashMap<>(requirements);
             Map<String, Object> mergedRequirements = new HashMap<>();
             if (existingJob.getRequirements() != null) {
                 mergedRequirements.putAll(existingJob.getRequirements());
             }
-            if (requirements != null) {
-                mergedRequirements.putAll(requirements);
-            }
+            mergedRequirements.putAll(changedRequirements);
             existingJob.setRequirements(mergedRequirements);
-            return jobRepository.save(existingJob);
+            Job savedJob = jobRepository.save(existingJob);
+            jobSearchIndexOperations.index(savedJob);
+            jobEventSubject.notifyObservers(JobEventTypes.REQUIREMENTS_UPDATED_JOB, Map.of(
+                    "jobId", savedJob.getId(),
+                    "timestamp", LocalDateTime.now(),
+                    "changedRequirements", changedRequirements,
+                    "requirements", new LinkedHashMap<>(mergedRequirements)
+            ));
+            return savedJob;
         }).orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + id));
     }
 
+    @Caching(evict = {
+            @CacheEvict(value = "job-by-id", key = "#id", condition = "#result == true"),
+            @CacheEvict(value = "S2-F1", allEntries = true, condition = "#result == true"),
+            @CacheEvict(value = "S2-F3", allEntries = true, condition = "#result == true"),
+            @CacheEvict(value = "S2-F5", allEntries = true, condition = "#result == true"),
+            @CacheEvict(value = "S2-F6", allEntries = true, condition = "#result == true")
+    })
     public boolean deleteJobById(Long id) {
         if (!jobRepository.existsById(id)) {
             return false;
         }
         jobRepository.deleteById(id);
+        jobSearchIndexOperations.delete(id);
         return true;
     }
 
+    @Caching(evict = {
+            @CacheEvict(value = "job-by-id", allEntries = true),
+            @CacheEvict(value = "S2-F1", allEntries = true),
+            @CacheEvict(value = "S2-F3", allEntries = true),
+            @CacheEvict(value = "S2-F5", allEntries = true),
+            @CacheEvict(value = "S2-F6", allEntries = true)
+    })
     public void deleteAllJobs() {
         jobRepository.deleteAll();
+        jobSearchIndexOperations.deleteAll();
     }
 
     /**
@@ -162,6 +226,10 @@ public class JobService {
      * @throws IllegalArgumentException if startDate is after endDate
      * @throws EntityNotFoundException if job is not found
      */
+    @Cacheable(
+            value = "S2-F3",
+            key = "#jobId + ':' + (#startDate == null ? 'null' : #startDate.toString()) + ':' + (#endDate == null ? 'null' : #endDate.toString())"
+    )
     public JobProposalSummaryDTO getJobProposalSummary(Long jobId, LocalDate startDate, LocalDate endDate) {
         if (startDate == null || endDate == null) {
             throw new IllegalArgumentException("startDate and endDate are required");
@@ -189,14 +257,14 @@ public class JobService {
     }
 
     private JobProposalSummaryDTO toJobProposalSummaryDTO(Object[] row) {
-        return new JobProposalSummaryDTO(
-                row[0] != null ? ((Number) row[0]).longValue() : null,
-                row[1] != null ? row[1].toString() : null,
-                row[2] != null ? ((Number) row[2]).longValue() : 0L,
-                row[3] != null ? ((Number) row[3]).doubleValue() : 0.0,
-                row[4] != null ? ((Number) row[4]).doubleValue() : 0.0,
-                row[5] != null ? ((Number) row[5]).doubleValue() : 0.0
-        );
+        return JobProposalSummaryDTO.builder()
+                .jobId(row[0] != null ? ((Number) row[0]).longValue() : null)
+                .title(row[1] != null ? row[1].toString() : null)
+                .totalProposals(row[2] != null ? ((Number) row[2]).longValue() : 0L)
+                .averageBidAmount(row[3] != null ? ((Number) row[3]).doubleValue() : 0.0)
+                .lowestBid(row[4] != null ? ((Number) row[4]).doubleValue() : 0.0)
+                .highestBid(row[5] != null ? ((Number) row[5]).doubleValue() : 0.0)
+                .build();
     }
     @Transactional(readOnly = true)
     public List<JobAttachmentAlertDTO> getJobsWithExpiredAttachments() {
@@ -215,19 +283,24 @@ public class JobService {
                         return null;
                     }
 
-                    JobAttachmentAlertDTO dto = new JobAttachmentAlertDTO();
-                    dto.setJobId(job.getId());
-                    dto.setJobTitle(job.getTitle());
-                    dto.setJobStatus(job.getStatus());
-                    dto.setExpiredAttachments(expiredAttachments);
-                    dto.setExpiredCount(expiredAttachments.size());
-                    return dto;
+                        return JobAttachmentAlertDTO.builder()
+                            .jobId(job.getId())
+                            .jobTitle(job.getTitle())
+                            .jobStatus(job.getStatus())
+                            .expiredAttachments(expiredAttachments)
+                            .expiredCount(expiredAttachments.size())
+                            .build();
                 })
                 .filter(Objects::nonNull)
                 .toList();
     }
 
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(value = "job-by-id", key = "#jobId"),
+            @CacheEvict(value = "S2-F1", allEntries = true),
+            @CacheEvict(value = "S2-F6", allEntries = true)
+    })
     public Job rateJob(Long jobId, JobRatingRequest ratingRequest) {
         Job job = jobRepository.findById(jobId)
                 .orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + jobId));
@@ -257,10 +330,16 @@ public class JobService {
         job.setRating(newRating);
         job.setTotalRatings(currentTotalRatings + 1);
 
-        return jobRepository.save(job);
+        Job savedJob = jobRepository.save(job);
+        jobSearchIndexOperations.index(savedJob);
+        return savedJob;
     }
 
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(value = "job-by-id", key = "#jobId"),
+            @CacheEvict(value = "job-attachment-by-id", key = "#attachmentId")
+    })
     public Job verifyJobAttachment(Long jobId, Long attachmentId, JobAttachmentVerificationRequest request) {
         if (request == null || request.getVerifiedBy() == null) {
             throw new IllegalArgumentException("verifiedBy is required to verify a JobAttachment");
@@ -318,6 +397,10 @@ public class JobService {
      * @param status the optional job status filter
      * @return a list of jobs matching the criteria
      */
+    @Cacheable(
+            value = "S2-F5",
+            key = "#key + ':' + #value + ':' + (#status == null ? 'ALL' : #status)"
+    )
     public List<Job> searchByRequirements(String key, String value, String status) {
         if (!usesPostgresDatabase()) {
             return filterJobsByRequirements(key, value, status);
@@ -360,6 +443,12 @@ public class JobService {
      * @throws IllegalArgumentException if an ACTIVE contract exists for the job
      */
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(value = "job-by-id", key = "#jobId"),
+            @CacheEvict(value = "S2-F1", allEntries = true),
+            @CacheEvict(value = "S2-F5", allEntries = true),
+            @CacheEvict(value = "S2-F6", allEntries = true)
+    })
     public Job closeJob(Long jobId) {
         Job job = jobRepository.findById(jobId)
                 .orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + jobId));
@@ -379,8 +468,19 @@ public class JobService {
 
         jobRepository.rejectSubmittedProposalsByJobId(jobId);
 
-        return jobRepository.findById(jobId)
+        Job closedJob = jobRepository.findById(jobId)
                 .orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + jobId));
+        jobSearchIndexOperations.index(closedJob);
+        publishJobClosedEvent(closedJob);
+        return closedJob;
+    }
+
+    private void publishJobClosedEvent(Job job) {
+        jobEventSubject.notifyObservers("JOB_CLOSED", Map.of(
+                "jobId", job.getId(),
+                "status", job.getStatus().name(),
+                "source", "S2-F4"
+        ));
     }
 
     /**
@@ -390,7 +490,15 @@ public class JobService {
      * @param limit the maximum number of jobs to return
      * @return a list of TopBudgetJobDTO with job details and proposal counts
      */
+    @Cacheable(value = "S2-F6", key = "#limit")
     public List<TopBudgetJobDTO> getTopBudgetJobs(int limit) {
-        return jobRepository.findTopBudgetJobs(limit);
+        return jobRepository.findTopBudgetJobs(limit).stream()
+                .map(job -> TopBudgetJobDTO.builder()
+                        .jobId(job.getJobId())
+                        .title(job.getTitle())
+                        .budgetMax(job.getBudgetMax())
+                        .totalProposals(job.getTotalProposals())
+                        .build())
+                .toList();
     }
 }
