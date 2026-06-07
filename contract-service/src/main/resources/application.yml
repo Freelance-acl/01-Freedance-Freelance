@@ -1,0 +1,43 @@
+spring:
+  application:
+    name: contract-service
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.cassandra.autoconfigure.CassandraAutoConfiguration
+      - org.springframework.boot.cassandra.autoconfigure.health.CassandraHealthContributorAutoConfiguration
+      - org.springframework.boot.cassandra.autoconfigure.health.CassandraReactiveHealthContributorAutoConfiguration
+      - org.springframework.boot.data.cassandra.autoconfigure.DataCassandraAutoConfiguration
+      - org.springframework.boot.data.cassandra.autoconfigure.DataCassandraReactiveAutoConfiguration
+      - org.springframework.boot.data.cassandra.autoconfigure.DataCassandraRepositoriesAutoConfiguration
+      - org.springframework.boot.data.cassandra.autoconfigure.DataCassandraReactiveRepositoriesAutoConfiguration
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://postgres:5432/freelancedb}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:postgres}
+  data:
+    mongodb:
+      uri: ${SPRING_DATA_MONGODB_URI:mongodb://root:rootpass@mongo:27017/freelancemongo?authSource=admin}
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:redis}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+      password: ${SPRING_DATA_REDIS_PASSWORD:redispass}
+  cassandra:
+    contact-points: ${SPRING_CASSANDRA_CONTACT_POINTS:cassandra}
+    port: ${SPRING_CASSANDRA_PORT:9042}
+    local-datacenter: ${SPRING_CASSANDRA_LOCAL_DATACENTER:datacenter1}
+    keyspace-name: ${SPRING_CASSANDRA_KEYSPACE_NAME:freelanceks}
+    schema-action: CREATE_IF_NOT_EXISTS
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        type:
+          json_format_mapper: jackson
+server:
+  port: 8084
+jwt:
+  secret: ${JWT_SECRET:Y29udHJhY3Qtc2VydmljZS1tczItc2VjcmV0LWtleS0zMg==}
+  expiration: ${JWT_EXPIRATION_MS:86400000}
