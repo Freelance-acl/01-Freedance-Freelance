@@ -9,7 +9,7 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
         "com.team01.freelance.contract"
 })
 @EnableJpaRepositories(basePackages = {
-        "com.team01.freelance.contract",
+        "com.team01.freelance.contract.repository",
         "com.team01.freelance.user",
         "com.team01.freelance.job",
         "com.team01.freelance.proposal"
