@@ -15,6 +15,7 @@ public class JobEvent implements MongoEvent {
     @Id
     private String id;
 
+    private String action;
     private Long jobId;
     private String action;
     private LocalDateTime timestamp;
@@ -39,6 +40,24 @@ public class JobEvent implements MongoEvent {
 
     public void setId(String id) {
         this.id = id;
+    }
+
+    @Override
+    public String getAction() {
+        return action;
+    }
+
+    public void setAction(String action) {
+        this.action = action;
+    }
+
+    // Backward compatibility - delegates to getAction()
+    public String getEventType() {
+        return getAction();
+    }
+
+    public void setEventType(String eventType) {
+        this.action = eventType;
     }
 
     public Long getJobId() {

@@ -1,13 +1,9 @@
 package com.team01.freelance.job.observer;
 
-import com.team01.freelance.common.event.EventType;
-import com.team01.freelance.common.event.MongoEvent;
 import com.team01.freelance.common.observer.EntityObserver;
-import com.team01.freelance.job.event.EventFactory;
-import com.team01.freelance.job.event.JobEvent;
-import com.team01.freelance.job.repository.JobEventRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.team01.freelance.job.audit.JobEventAudit;
+import com.team01.freelance.job.audit.JobEventAuditRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.HashMap;

@@ -1,5 +1,6 @@
 package com.team01.freelance.job.config;
 
+import com.team01.freelance.common.observer.EntityObserver;
 import com.team01.freelance.common.observer.EventSubject;
 import com.team01.freelance.job.observer.MongoEventLogger;
 import org.springframework.context.annotation.Bean;
