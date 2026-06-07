@@ -184,7 +184,6 @@ public class JobService {
                     "changedRequirements", changedRequirements,
                     "requirements", new LinkedHashMap<>(mergedRequirements)
             ));
-            publishJobEvent("JOB_UPDATED", savedJob.getId(), jobEventDetails(savedJob));
             return savedJob;
         }).orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + id));
     }
@@ -538,7 +537,9 @@ public class JobService {
      */
     @Cacheable(value = "S2-F6", key = "#limit", unless = "#result == null or #result.isEmpty()")
     public List<TopBudgetJobDTO> getTopBudgetJobs(int limit) {
-        return jobRepository.findTopBudgetJobs(limit);
+        return jobRepository.findTopBudgetJobs(limit).stream()
+                .map(d -> new TopBudgetJobDTO(d.getJobId(), d.getTitle(), d.getBudgetMax(), d.getTotalProposals()))
+                .toList();
     }
 
     private void publishJobEvent(String eventType, Long jobId, Map<String, Object> details) {
