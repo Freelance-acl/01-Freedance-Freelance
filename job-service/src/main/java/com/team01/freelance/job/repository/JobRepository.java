@@ -160,7 +160,7 @@ List<TopBudgetJobDTO> findTopBudgetJobs(@Param("limit") int limit);
 			    (SELECT COUNT(*) FROM proposals WHERE job_id = j.id) AS totalProposals,
 			    (SELECT COUNT(*) FROM proposals WHERE job_id = j.id AND status = 'ACCEPTED') AS acceptedProposals,
 			    COALESCE((SELECT AVG(bid_amount) FROM proposals WHERE job_id = j.id), 0.0) AS averageBidAmount,
-			    (SELECT COUNT(*) FROM job_attachments WHERE job_id = j.id AND expiry_date >= CURRENT_DATE) AS activeAttachments
+			    (SELECT COUNT(*) FROM job_attachments WHERE job_id = j.id AND expiry_date > CURRENT_DATE) AS activeAttachments
 			FROM jobs j
 			WHERE j.id = :jobId
 			""", nativeQuery = true)

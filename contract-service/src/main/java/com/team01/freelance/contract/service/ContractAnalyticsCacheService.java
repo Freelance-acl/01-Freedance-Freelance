@@ -62,13 +62,13 @@ public class ContractAnalyticsCacheService {
 
     private ContractAnalyticsDTO buildAnalyticsInMemory(LocalDate startDate, LocalDate endDate) {
         List<Contract> all = contractRepository.findAll();
-        List<Contract> contracts = (startDate != null && endDate != null)
-                ? all.stream()
+        List<Contract> contracts = (startDate == null && endDate == null)
+                ? all
+                : all.stream()
                         .filter(c -> c.getStartDate() != null
-                                && !c.getStartDate().toLocalDate().isBefore(startDate)
-                                && !c.getStartDate().toLocalDate().isAfter(endDate))
-                        .toList()
-                : all;
+                                && (startDate == null || !c.getStartDate().toLocalDate().isBefore(startDate))
+                                && (endDate == null || !c.getStartDate().toLocalDate().isAfter(endDate)))
+                        .toList();
         long totalContracts = contracts.size();
         double avgValue = contracts.stream()
                 .map(Contract::getAgreedAmount)

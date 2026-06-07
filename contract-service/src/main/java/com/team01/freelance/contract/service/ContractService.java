@@ -68,6 +68,12 @@ public class ContractService {
     }
 
     public ContractAnalyticsDTO getContractAnalytics(java.time.LocalDate startDate, java.time.LocalDate endDate) {
+        if ((startDate == null) != (endDate == null)) {
+            throw new IllegalArgumentException("Both startDate and endDate must be provided together, or neither");
+        }
+        if (startDate != null && startDate.isAfter(endDate)) {
+            throw new IllegalArgumentException("startDate must not be after endDate");
+        }
         notifyObservers("ANALYTICS_VIEWED", Map.of(
                 "contractId", -1L,
                 "view", "contract-analytics"));

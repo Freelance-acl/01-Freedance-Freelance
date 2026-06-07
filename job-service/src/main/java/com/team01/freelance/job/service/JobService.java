@@ -137,7 +137,8 @@ public class JobService {
             @CacheEvict(value = "S2-F1", allEntries = true),
             @CacheEvict(value = "S2-F3", allEntries = true),
             @CacheEvict(value = "S2-F5", allEntries = true),
-            @CacheEvict(value = "S2-F6", allEntries = true)
+            @CacheEvict(value = "S2-F6", allEntries = true),
+            @CacheEvict(value = "S2-F12", key = "#id")
     })
     public Job updateJob(Long id, Job jobDetails) {
         return jobRepository.findById(id).map(existingJob -> {
@@ -193,7 +194,8 @@ public class JobService {
             @CacheEvict(value = "S2-F1", allEntries = true, condition = "#result == true"),
             @CacheEvict(value = "S2-F3", allEntries = true, condition = "#result == true"),
             @CacheEvict(value = "S2-F5", allEntries = true, condition = "#result == true"),
-            @CacheEvict(value = "S2-F6", allEntries = true, condition = "#result == true")
+            @CacheEvict(value = "S2-F6", allEntries = true, condition = "#result == true"),
+            @CacheEvict(value = "S2-F12", key = "#id", condition = "#result == true")
     })
     public boolean deleteJobById(Long id) {
         if (!jobRepository.existsById(id)) {
@@ -210,7 +212,8 @@ public class JobService {
             @CacheEvict(value = "S2-F1", allEntries = true),
             @CacheEvict(value = "S2-F3", allEntries = true),
             @CacheEvict(value = "S2-F5", allEntries = true),
-            @CacheEvict(value = "S2-F6", allEntries = true)
+            @CacheEvict(value = "S2-F6", allEntries = true),
+            @CacheEvict(value = "S2-F12", allEntries = true)
     })
     public void deleteAllJobs() {
         jobRepository.deleteAll();
@@ -303,7 +306,8 @@ public class JobService {
     @Caching(evict = {
             @CacheEvict(value = "job-by-id", key = "#jobId"),
             @CacheEvict(value = "S2-F1", allEntries = true),
-            @CacheEvict(value = "S2-F6", allEntries = true)
+            @CacheEvict(value = "S2-F6", allEntries = true),
+            @CacheEvict(value = "S2-F12", key = "#jobId")
     })
     public Job rateJob(Long jobId, JobRatingRequest ratingRequest) {
         Job job = jobRepository.findById(jobId)
@@ -347,7 +351,8 @@ public class JobService {
     @Transactional
     @Caching(evict = {
             @CacheEvict(value = "job-by-id", key = "#jobId"),
-            @CacheEvict(value = "job-attachment-by-id", key = "#attachmentId")
+            @CacheEvict(value = "job-attachment-by-id", key = "#attachmentId"),
+            @CacheEvict(value = "S2-F12", key = "#jobId")
     })
     public Job verifyJobAttachment(Long jobId, Long attachmentId, JobAttachmentVerificationRequest request) {
         if (request == null || request.getVerifiedBy() == null) {
@@ -463,7 +468,8 @@ public class JobService {
             @CacheEvict(value = "job-by-id", key = "#jobId"),
             @CacheEvict(value = "S2-F1", allEntries = true),
             @CacheEvict(value = "S2-F5", allEntries = true),
-            @CacheEvict(value = "S2-F6", allEntries = true)
+            @CacheEvict(value = "S2-F6", allEntries = true),
+            @CacheEvict(value = "S2-F12", key = "#jobId")
     })
     public Job closeJob(Long jobId) {
         Job job = jobRepository.findById(jobId)
