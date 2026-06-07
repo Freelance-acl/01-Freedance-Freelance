@@ -6,27 +6,48 @@ import com.team01.freelance.job.audit.JobEventAuditRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.util.HashMap;
 import java.util.Map;
 
-/**
- * Event observer that logs job events to MongoDB.
- * Captures all job events (INDEXED, etc.) for audit trail purposes.
- */
 @Component
 public class MongoEventLogger implements EntityObserver {
 
-    @Autowired
-    private JobEventAuditRepository jobEventAuditRepository;
+    private static final Logger log = LoggerFactory.getLogger(MongoEventLogger.class);
+
+    private final EventFactory eventFactory;
+    private final JobEventRepository jobEventRepository;
+
+    public MongoEventLogger(EventFactory eventFactory, JobEventRepository jobEventRepository) {
+        this.eventFactory = eventFactory;
+        this.jobEventRepository = jobEventRepository;
+    }
 
     @Override
     public void onEvent(String eventType, Object payload) {
         try {
-            Map<String, Object> payloadMap = (payload instanceof Map) ? (Map<String, Object>) payload : Map.of();
-            JobEventAudit auditEvent = new JobEventAudit(eventType, payloadMap);
-            jobEventAuditRepository.save(auditEvent);
-        } catch (Exception e) {
-            // Log to Mongo but don't fail the operation
-            System.err.println("Failed to log event to MongoDB: " + e.getMessage());
+            Map<String, Object> params = toParams(eventType, payload);
+            MongoEvent event = eventFactory.createEvent(EventType.JOB, params);
+            if (event instanceof JobEvent jobEvent) {
+                jobEventRepository.save(jobEvent);
+            } else {
+                log.warn("Skipping non-JobEvent from factory: action={}, class={}",
+                        event.getAction(), event.getClass().getName());
+            }
+        } catch (Exception ex) {
+            log.warn("Failed to persist job event {}: {}", eventType, ex.getMessage(), ex);
         }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> toParams(String eventType, Object payload) {
+        if (payload instanceof Map<?, ?> map) {
+            Map<String, Object> params = new HashMap<>();
+            map.forEach((k, v) -> params.put(String.valueOf(k), v));
+            if (!params.containsKey("action")) {
+                params.put("action", eventType);
+            }
+            return params;
+        }
+        throw new IllegalArgumentException("Job event payload must be a Map");
     }
 }

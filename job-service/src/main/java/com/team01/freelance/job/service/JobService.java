@@ -21,10 +21,10 @@ import com.team01.freelance.user.model.UserRole;
 import com.team01.freelance.user.repository.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Caching;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,12 +37,10 @@ import java.util.Map;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import java.util.Map;
 
 @Service
 public class JobService {
@@ -119,6 +117,7 @@ public class JobService {
 
         Job savedJob = jobRepository.save(job);
         jobSearchIndexOperations.index(savedJob);
+        publishJobEvent("JOB_CREATED", savedJob.getId(), jobEventDetails(savedJob));
         return savedJob;
     }
 
@@ -156,6 +155,7 @@ public class JobService {
 
             Job savedJob = jobRepository.save(existingJob);
             jobSearchIndexOperations.index(savedJob);
+            publishJobEvent("JOB_UPDATED", savedJob.getId(), jobEventDetails(savedJob));
             return savedJob;
         }).orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + id));
     }
@@ -183,6 +183,7 @@ public class JobService {
                     "changedRequirements", changedRequirements,
                     "requirements", new LinkedHashMap<>(mergedRequirements)
             ));
+            publishJobEvent("JOB_UPDATED", savedJob.getId(), jobEventDetails(savedJob));
             return savedJob;
         }).orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + id));
     }
@@ -200,6 +201,7 @@ public class JobService {
         }
         jobRepository.deleteById(id);
         jobSearchIndexOperations.delete(id);
+        publishJobEvent("JOB_DELETED", id, Map.of());
         return true;
     }
 
@@ -213,6 +215,7 @@ public class JobService {
     public void deleteAllJobs() {
         jobRepository.deleteAll();
         jobSearchIndexOperations.deleteAll();
+        publishJobEvent("JOB_BULK_DELETED", null, Map.of());
     }
 
     /**
@@ -228,7 +231,8 @@ public class JobService {
      */
     @Cacheable(
             value = "S2-F3",
-            key = "#jobId + ':' + (#startDate == null ? 'null' : #startDate.toString()) + ':' + (#endDate == null ? 'null' : #endDate.toString())"
+            key = "#jobId + ':' + (#startDate == null ? 'NONE' : #startDate.toString()) + ':' + (#endDate == null ? 'NONE' : #endDate.toString())",
+            unless = "#result == null"
     )
     public JobProposalSummaryDTO getJobProposalSummary(Long jobId, LocalDate startDate, LocalDate endDate) {
         if (startDate == null || endDate == null) {
@@ -332,6 +336,11 @@ public class JobService {
 
         Job savedJob = jobRepository.save(job);
         jobSearchIndexOperations.index(savedJob);
+        publishJobEvent("JOB_RATED", savedJob.getId(), Map.of(
+            "contractId", ratingRequest.getContractId(),
+            "rating", ratingRequest.getRating(),
+            "ratingCount", savedJob.getTotalRatings()
+        ));
         return savedJob;
     }
 
@@ -378,6 +387,12 @@ public class JobService {
 
         jobAttachmentRepository.save(attachment);
 
+        publishJobEvent("JOB_ATTACHMENT_VERIFIED", jobId, Map.of(
+            "attachmentId", attachmentId,
+            "verifiedBy", request.getVerifiedBy(),
+            "verified", true
+        ));
+
         Job refreshedJob = jobRepository.findById(jobId)
                 .orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + jobId));
 
@@ -399,7 +414,8 @@ public class JobService {
      */
     @Cacheable(
             value = "S2-F5",
-            key = "#key + ':' + #value + ':' + (#status == null ? 'ALL' : #status)"
+            key = "#key + ':' + #value + ':' + (#status == null ? 'ALL' : #status)",
+            unless = "#result == null or #result.isEmpty()"
     )
     public List<Job> searchByRequirements(String key, String value, String status) {
         if (!usesPostgresDatabase()) {
@@ -490,15 +506,31 @@ public class JobService {
      * @param limit the maximum number of jobs to return
      * @return a list of TopBudgetJobDTO with job details and proposal counts
      */
-    @Cacheable(value = "S2-F6", key = "#limit")
+    @Cacheable(value = "S2-F6", key = "#limit", unless = "#result == null or #result.isEmpty()")
     public List<TopBudgetJobDTO> getTopBudgetJobs(int limit) {
-        return jobRepository.findTopBudgetJobs(limit).stream()
-                .map(job -> TopBudgetJobDTO.builder()
-                        .jobId(job.getJobId())
-                        .title(job.getTitle())
-                        .budgetMax(job.getBudgetMax())
-                        .totalProposals(job.getTotalProposals())
-                        .build())
-                .toList();
+        return jobRepository.findTopBudgetJobs(limit);
+    }
+
+    private void publishJobEvent(String eventType, Long jobId, Map<String, Object> details) {
+        if (jobEventSubject == null) {
+            return;
+        }
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("jobId", jobId);
+        payload.put("details", details == null ? Map.of() : details);
+        payload.put("timestamp", LocalDateTime.now());
+        payload.put("action", eventType);
+        jobEventSubject.notifyObservers(eventType, payload);
+    }
+
+    private Map<String, Object> jobEventDetails(Job job) {
+        Map<String, Object> details = new HashMap<>();
+        if (job.getTitle() != null) {
+            details.put("title", job.getTitle());
+        }
+        if (job.getStatus() != null) {
+            details.put("status", job.getStatus().name());
+        }
+        return details;
     }
 }
