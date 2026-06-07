@@ -67,11 +67,11 @@ public class ContractService {
         return contractRepository.findAll();
     }
 
-    public ContractAnalyticsDTO getContractAnalytics() {
+    public ContractAnalyticsDTO getContractAnalytics(java.time.LocalDate startDate, java.time.LocalDate endDate) {
         notifyObservers("ANALYTICS_VIEWED", Map.of(
                 "contractId", -1L,
                 "view", "contract-analytics"));
-        return contractAnalyticsCacheService.getContractAnalytics();
+        return contractAnalyticsCacheService.getContractAnalytics(startDate, endDate);
     }
 
     public Optional<Contract> getContractById(Long id) {

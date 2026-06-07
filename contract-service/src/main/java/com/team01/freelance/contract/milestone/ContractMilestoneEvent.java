@@ -1,30 +1,27 @@
 package com.team01.freelance.contract.milestone;
 
-import com.datastax.oss.driver.api.mapper.annotations.CqlName;
-import com.datastax.oss.driver.api.mapper.annotations.Entity;
-import com.datastax.oss.driver.api.mapper.annotations.PartitionKey;
-import com.datastax.oss.driver.api.mapper.annotations.ClusteringColumn;
+import org.springframework.data.cassandra.core.mapping.Column;
+import org.springframework.data.cassandra.core.mapping.PrimaryKeyColumn;
+import org.springframework.data.cassandra.core.mapping.Table;
+import org.springframework.data.cassandra.core.cql.PrimaryKeyType;
 
 import java.time.LocalDateTime;
 
-@Entity
-@CqlName("contract_milestone_events")
+@Table("contract_milestone_events")
 public class ContractMilestoneEvent {
 
-    @PartitionKey
-    @CqlName("contract_id")
+    @PrimaryKeyColumn(name = "contract_id", type = PrimaryKeyType.PARTITIONED)
     private Long contractId;
 
-    @ClusteringColumn(0)
-    @CqlName("timestamp")
+    @PrimaryKeyColumn(name = "timestamp", type = PrimaryKeyType.CLUSTERED, ordinal = 0)
     private LocalDateTime timestamp;
 
-    @CqlName("milestone_order")
+    @Column("milestone_order")
     private Integer milestoneOrder;
 
     private ContractMilestoneStatus status;
 
-    @CqlName("recorded_by")
+    @Column("recorded_by")
     private String recordedBy;
 
     private String notes;

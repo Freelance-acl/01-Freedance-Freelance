@@ -4,15 +4,13 @@ import com.team01.freelance.common.observer.EntityObserver;
 import com.team01.freelance.job.audit.JobEventAudit;
 import com.team01.freelance.job.audit.JobEventAuditRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
 
-/**
- * Event observer that logs job events to MongoDB.
- * Captures all job events (INDEXED, etc.) for audit trail purposes.
- */
 @Component
+@Profile("!test")
 public class MongoEventLogger implements EntityObserver {
 
     @Autowired

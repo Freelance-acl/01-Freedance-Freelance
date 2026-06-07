@@ -70,4 +70,23 @@ public interface ProposalRepository extends JpaRepository<Proposal, Long> {
             WHERE p.id = :id
             """)
     Optional<Proposal> findByIdWithMilestones(@Param("id") Long id);
+
+    @Query(value = """
+            SELECT status, COUNT(*) AS cnt
+            FROM proposals
+            WHERE submitted_at >= :start AND submitted_at < :endExclusive
+            GROUP BY status
+            """, nativeQuery = true)
+    List<Object[]> getProposalCountByStatus(
+            @Param("start") LocalDateTime start,
+            @Param("endExclusive") LocalDateTime endExclusive);
+
+    @Query(value = """
+            SELECT COALESCE(AVG(estimated_days), 0.0)
+            FROM proposals
+            WHERE submitted_at >= :start AND submitted_at < :endExclusive
+            """, nativeQuery = true)
+    Double getAverageEstimatedDays(
+            @Param("start") LocalDateTime start,
+            @Param("endExclusive") LocalDateTime endExclusive);
 }

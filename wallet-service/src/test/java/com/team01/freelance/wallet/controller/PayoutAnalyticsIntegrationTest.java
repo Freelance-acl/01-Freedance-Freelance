@@ -1,5 +1,6 @@
 package com.team01.freelance.wallet.controller;
 
+import com.team01.freelance.wallet.dto.CategoryRevenueDTO;
 import com.team01.freelance.wallet.dto.PayoutMethodDTO;
 import com.team01.freelance.wallet.model.PayoutMethod;
 import com.team01.freelance.wallet.service.PayoutService;
@@ -33,6 +34,45 @@ public class PayoutAnalyticsIntegrationTest {
 
         this.mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
     }
+
+    // [S5-F10] Category revenue analytics
+
+    @Test
+    void testS5F10_CategoryRevenue_returnsList() throws Exception {
+        when(payoutService.getCategoryRevenue(any(LocalDate.class), any(LocalDate.class)))
+                .thenReturn(List.of(
+                        new CategoryRevenueDTO("WEB_DEV", 50.0, 450.0, 500.0, 2L),
+                        new CategoryRevenueDTO("MOBILE", 30.0, 270.0, 300.0, 1L)
+                ));
+
+        mockMvc.perform(get("/api/payouts/analytics/category")
+                        .param("startDate", "2026-06-01")
+                        .param("endDate", "2026-06-30")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].category").value("WEB_DEV"))
+                .andExpect(jsonPath("$[0].platformFeeRevenue").value(50.0))
+                .andExpect(jsonPath("$[0].netPayoutRevenue").value(450.0))
+                .andExpect(jsonPath("$[0].totalRevenue").value(500.0))
+                .andExpect(jsonPath("$[0].payoutCount").value(2))
+                .andExpect(jsonPath("$[1].category").value("MOBILE"));
+    }
+
+    @Test
+    void testS5F10_CategoryRevenue_emptyResult() throws Exception {
+        when(payoutService.getCategoryRevenue(any(LocalDate.class), any(LocalDate.class)))
+                .thenReturn(List.of());
+
+        mockMvc.perform(get("/api/payouts/analytics/category")
+                        .param("startDate", "2020-01-01")
+                        .param("endDate", "2020-01-31")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    // [S5-F11] Payout method breakdown
 
     @Test
     void testS5F11_MethodBreakdown_Success() throws Exception {

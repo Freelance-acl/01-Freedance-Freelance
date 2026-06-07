@@ -9,6 +9,7 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 
 import javax.sql.DataSource;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.LinkedHashMap;
@@ -26,16 +27,26 @@ public class ContractAnalyticsCacheService {
         this.dataSource = dataSource;
     }
 
-    @Cacheable(value = "S4-F10", key = "'analytics'")
-    public ContractAnalyticsDTO getContractAnalytics() {
+    @Cacheable(value = "S4-F10", key = "(#startDate == null ? 'ALL' : #startDate.toString()) + ':' + (#endDate == null ? 'ALL' : #endDate.toString())")
+    public ContractAnalyticsDTO getContractAnalytics(LocalDate startDate, LocalDate endDate) {
         if (!usesPostgresDatabase()) {
-            return buildAnalyticsInMemory();
+            return buildAnalyticsInMemory(startDate, endDate);
         }
         try {
-            Object[] row = contractRepository.getContractAnalytics();
             Map<String, Long> byStatus = new LinkedHashMap<>();
-            for (Object[] statusRow : contractRepository.countContractsByStatus()) {
-                byStatus.put(String.valueOf(statusRow[0]), ((Number) statusRow[1]).longValue());
+            Object[] row;
+            if (startDate != null && endDate != null) {
+                LocalDateTime start = startDate.atStartOfDay();
+                LocalDateTime endExclusive = endDate.plusDays(1).atStartOfDay();
+                row = contractRepository.getContractAnalyticsByDateRange(start, endExclusive);
+                for (Object[] statusRow : contractRepository.countContractsByStatusInDateRange(start, endExclusive)) {
+                    byStatus.put(String.valueOf(statusRow[0]), ((Number) statusRow[1]).longValue());
+                }
+            } else {
+                row = contractRepository.getContractAnalytics();
+                for (Object[] statusRow : contractRepository.countContractsByStatus()) {
+                    byStatus.put(String.valueOf(statusRow[0]), ((Number) statusRow[1]).longValue());
+                }
             }
             return ContractAnalyticsDTO.builder()
                     .totalContracts(((Number) row[0]).longValue())
@@ -45,12 +56,19 @@ public class ContractAnalyticsCacheService {
                     .byStatus(byStatus)
                     .build();
         } catch (DataAccessException ex) {
-            return buildAnalyticsInMemory();
+            return buildAnalyticsInMemory(startDate, endDate);
         }
     }
 
-    private ContractAnalyticsDTO buildAnalyticsInMemory() {
-        List<Contract> contracts = contractRepository.findAll();
+    private ContractAnalyticsDTO buildAnalyticsInMemory(LocalDate startDate, LocalDate endDate) {
+        List<Contract> all = contractRepository.findAll();
+        List<Contract> contracts = (startDate != null && endDate != null)
+                ? all.stream()
+                        .filter(c -> c.getStartDate() != null
+                                && !c.getStartDate().toLocalDate().isBefore(startDate)
+                                && !c.getStartDate().toLocalDate().isAfter(endDate))
+                        .toList()
+                : all;
         long totalContracts = contracts.size();
         double avgValue = contracts.stream()
                 .map(Contract::getAgreedAmount)

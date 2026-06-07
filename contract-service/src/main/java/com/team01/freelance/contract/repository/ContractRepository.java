@@ -240,4 +240,40 @@ public interface ContractRepository extends JpaRepository<Contract, Long> {
             ORDER BY status ASC
             """, nativeQuery = true)
     List<Object[]> countContractsByStatus();
+
+    @Query(value = """
+            SELECT
+                CAST(COUNT(*) AS BIGINT) AS total_contracts,
+                COALESCE(AVG(agreed_amount), 0) AS avg_value,
+                CASE
+                    WHEN COUNT(*) = 0 THEN 0
+                    ELSE SUM(CASE WHEN status = 'COMPLETED' THEN 1 ELSE 0 END) * 100.0 / COUNT(*)
+                END AS completion_rate,
+                COALESCE(
+                    AVG(
+                        CASE
+                            WHEN end_date IS NOT NULL
+                            THEN EXTRACT(EPOCH FROM (end_date - start_date)) / 86400.0
+                            ELSE NULL
+                        END
+                    ),
+                    0
+                ) AS avg_duration_days
+            FROM contracts
+            WHERE start_date >= :start AND start_date < :endExclusive
+            """, nativeQuery = true)
+    Object[] getContractAnalyticsByDateRange(
+            @Param("start") LocalDateTime start,
+            @Param("endExclusive") LocalDateTime endExclusive);
+
+    @Query(value = """
+            SELECT status, CAST(COUNT(*) AS BIGINT) AS contract_count
+            FROM contracts
+            WHERE start_date >= :start AND start_date < :endExclusive
+            GROUP BY status
+            ORDER BY status ASC
+            """, nativeQuery = true)
+    List<Object[]> countContractsByStatusInDateRange(
+            @Param("start") LocalDateTime start,
+            @Param("endExclusive") LocalDateTime endExclusive);
 }

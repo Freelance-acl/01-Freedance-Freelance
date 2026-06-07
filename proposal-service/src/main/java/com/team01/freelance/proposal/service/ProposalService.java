@@ -1,6 +1,8 @@
 package com.team01.freelance.proposal.service;
 
 import com.team01.freelance.proposal.dto.FeeEstimateDTO;
+import com.team01.freelance.proposal.dto.ProposalAnalyticsDashboardDTO;
+import com.team01.freelance.proposal.graph.InteractionGraphService;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -70,7 +72,13 @@ public class ProposalService {
     private EventSubject proposalEventSubject;
 
     @Autowired
+    private InteractionGraphService interactionGraphService;
+
+    @Autowired
     private DataSource dataSource;
+
+    @Autowired
+    private ProposalAnalyticsCacheService proposalAnalyticsCacheService;
 
     public List<Proposal> getAllProposals() {
         return proposalRepository.findAll();
@@ -181,7 +189,45 @@ public class ProposalService {
                 .toList();
     }
 
-        
+    public ProposalAnalyticsDashboardDTO getProposalAnalyticsDashboard(LocalDate startDate, LocalDate endDate) {
+        validateDateRange(startDate, endDate);
+        proposalEventSubject.notifyObservers("ANALYTICS_VIEWED", Map.of(
+                "proposalId", -1L,
+                "view", "proposal-analytics"));
+        return proposalAnalyticsCacheService.getAnalyticsDashboard(startDate, endDate);
+    }
+
+    public void recordProposalInteraction(Long proposalId) {
+        Proposal proposal = proposalRepository.findById(proposalId)
+                .orElseThrow(() -> new EntityNotFoundException("Proposal not found with id: " + proposalId));
+
+        if (proposal.getStatus() != ProposalStatus.SUBMITTED) {
+            throw new IllegalArgumentException("Interaction can only be recorded for SUBMITTED proposals");
+        }
+
+        com.team01.freelance.user.model.User freelancer = userRepository.findById(proposal.getFreelancerId())
+                .orElseThrow(() -> new EntityNotFoundException("Freelancer not found with id: " + proposal.getFreelancerId()));
+
+        Job job = jobRepository.findById(proposal.getJobId())
+                .orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + proposal.getJobId()));
+
+        interactionGraphService.recordInteraction(
+                proposalId,
+                proposal.getFreelancerId(),
+                freelancer.getName(),
+                proposal.getJobId(),
+                job.getTitle(),
+                job.getCategory() != null ? job.getCategory().name() : "UNKNOWN"
+        );
+
+        proposalEventSubject.notifyObservers("INTERACTION_RECORDED", Map.of(
+                "proposalId", proposalId,
+                "freelancerId", proposal.getFreelancerId(),
+                "jobId", proposal.getJobId(),
+                "timestamp", LocalDateTime.now()
+        ));
+    }
+
     public ProposalAnalyticsDTO getProposalAnalytics(LocalDate startDate, LocalDate endDate) {
         validateDateRange(startDate, endDate);
 

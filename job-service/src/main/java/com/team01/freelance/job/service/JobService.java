@@ -1,6 +1,7 @@
 package com.team01.freelance.job.service;
 
 import com.team01.freelance.common.observer.EventSubject;
+import com.team01.freelance.job.dto.JobDashboardDTO;
 import com.team01.freelance.job.dto.JobProposalSummaryDTO;
 import com.team01.freelance.job.client.ContractLookupClient;
 import com.team01.freelance.job.client.ContractSummary;
@@ -481,6 +482,35 @@ public class JobService {
                 "status", job.getStatus().name(),
                 "source", "S2-F4"
         ));
+    }
+
+    public JobDashboardDTO getJobDashboard(Long id) {
+        if (!jobRepository.existsById(id)) {
+            throw new EntityNotFoundException("Job not found with id: " + id);
+        }
+        jobEventSubject.notifyObservers(JobEventTypes.DASHBOARD_VIEWED, Map.of(
+                "jobId", id,
+                "timestamp", LocalDateTime.now()
+        ));
+        return getCachedJobDashboard(id);
+    }
+
+    @Cacheable(value = "S2-F12", key = "#id")
+    public JobDashboardDTO getCachedJobDashboard(Long id) {
+        List<Object[]> rows = jobRepository.getJobDashboard(id);
+        if (rows == null || rows.isEmpty()) {
+            throw new EntityNotFoundException("Job not found with id: " + id);
+        }
+        Object[] row = rows.get(0);
+        return JobDashboardDTO.builder()
+                .jobId(row[0] != null ? ((Number) row[0]).longValue() : null)
+                .title(row[1] != null ? row[1].toString() : null)
+                .rating(row[2] != null ? ((Number) row[2]).doubleValue() : 0.0)
+                .totalProposals(row[3] != null ? ((Number) row[3]).longValue() : 0L)
+                .acceptedProposals(row[4] != null ? ((Number) row[4]).longValue() : 0L)
+                .averageBidAmount(row[5] != null ? ((Number) row[5]).doubleValue() : 0.0)
+                .activeAttachments(row[6] != null ? ((Number) row[6]).longValue() : 0L)
+                .build();
     }
 
     /**

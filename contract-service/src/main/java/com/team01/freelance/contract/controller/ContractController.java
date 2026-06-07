@@ -113,8 +113,10 @@ public class ContractController {
     }
 
     @GetMapping("/analytics")
-    public ResponseEntity<ContractAnalyticsDTO> getContractAnalytics() {
-        return ResponseEntity.ok(contractService.getContractAnalytics());
+    public ResponseEntity<ContractAnalyticsDTO> getContractAnalytics(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        return ResponseEntity.ok(contractService.getContractAnalytics(startDate, endDate));
     }
 
     @DeleteMapping("/{id}")
