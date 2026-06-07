@@ -5,6 +5,7 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -16,6 +17,7 @@ public class JobEvent implements MongoEvent {
 
     private String action;
     private Long jobId;
+    private String action;
     private LocalDateTime timestamp;
     private Map<String, Object> details = new HashMap<>();
 
@@ -31,6 +33,7 @@ public class JobEvent implements MongoEvent {
         }
     }
 
+    @Override
     public String getId() {
         return id;
     }
@@ -65,6 +68,16 @@ public class JobEvent implements MongoEvent {
         this.jobId = jobId;
     }
 
+    @Override
+    public String getAction() {
+        return action;
+    }
+
+    public void setAction(String action) {
+        this.action = action;
+    }
+
+    @Override
     public LocalDateTime getTimestamp() {
         return timestamp;
     }
@@ -73,8 +86,12 @@ public class JobEvent implements MongoEvent {
         this.timestamp = timestamp;
     }
 
+    @Override
     public Map<String, Object> getDetails() {
-        return details;
+        if (details == null) {
+            return Map.of();
+        }
+        return Collections.unmodifiableMap(new HashMap<>(details));
     }
 
     public void setDetails(Map<String, Object> details) {
