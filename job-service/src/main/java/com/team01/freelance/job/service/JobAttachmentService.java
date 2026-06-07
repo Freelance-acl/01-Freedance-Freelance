@@ -31,6 +31,10 @@ public class JobAttachmentService {
         return jobAttachmentRepository.findById(id);
     }
 
+    @Caching(evict = {
+            @CacheEvict(value = "job-attachment-by-id", allEntries = true),
+            @CacheEvict(value = "job-by-id", allEntries = true)
+    })
     public JobAttachment createJobAttachment(JobAttachment jobAttachment) {
         if (jobAttachment.getJob() == null || jobAttachment.getJob().getId() == null) {
             throw new IllegalArgumentException("Job ID is required to create a JobAttachment");
@@ -52,7 +56,8 @@ public class JobAttachmentService {
      * @throws EntityNotFoundException if the job attachment is not found
      */
     @Caching(evict = {
-            @CacheEvict(value = "job-attachment-by-id", key = "#id")
+            @CacheEvict(value = "job-attachment-by-id", key = "#id"),
+            @CacheEvict(value = "job-by-id", allEntries = true)
     })
     public JobAttachment updateJobAttachment(Long id, JobAttachment jobAttachment) {
         return jobAttachmentRepository.findById(id).map(existing -> {
@@ -67,7 +72,8 @@ public class JobAttachmentService {
     }
 
     @Caching(evict = {
-            @CacheEvict(value = "job-attachment-by-id", key = "#id")
+            @CacheEvict(value = "job-attachment-by-id", key = "#id", condition = "#result == true"),
+            @CacheEvict(value = "job-by-id", allEntries = true, condition = "#result == true")
     })
     public boolean deleteJobAttachmentById(Long id) {
         if (!jobAttachmentRepository.existsById(id)) {
@@ -77,7 +83,10 @@ public class JobAttachmentService {
         return true;
     }
 
-    @CacheEvict(value = "job-attachment-by-id", allEntries = true)
+    @Caching(evict = {
+            @CacheEvict(value = "job-attachment-by-id", allEntries = true),
+            @CacheEvict(value = "job-by-id", allEntries = true)
+    })
     public void deleteAllJobAttachments() {
         jobAttachmentRepository.deleteAll();
     }

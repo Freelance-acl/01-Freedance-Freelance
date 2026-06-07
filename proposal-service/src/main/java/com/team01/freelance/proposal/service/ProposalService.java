@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -17,6 +18,7 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.team01.freelance.common.observer.EventSubject;
 import com.team01.freelance.contract.model.Contract;
 import com.team01.freelance.contract.model.ContractStatus;
 import com.team01.freelance.contract.repository.ContractRepository;
@@ -63,6 +65,9 @@ public class ProposalService {
 
     @Autowired
     private PayoutRepository payoutRepository;
+
+    @Autowired
+    private EventSubject proposalEventSubject;
 
     @Autowired
     private DataSource dataSource;
@@ -315,7 +320,12 @@ public class ProposalService {
             proposal.addProposalMilestone(milestone);
         }
 
-        return proposalRepository.save(proposal);
+        Proposal saved = proposalRepository.save(proposal);
+        proposalEventSubject.notifyObservers("PROPOSAL_MILESTONES_ADDED", Map.of(
+                "proposalId", proposalId,
+                "action", "PROPOSAL_MILESTONES_ADDED"
+        ));
+        return saved;
     }
 
     private void validateMilestone(ProposalMilestone milestone) {
@@ -400,10 +410,14 @@ public class ProposalService {
     }
 
     public boolean deleteProposalById(Long id) {
-        if (!proposalRepository.existsById(id)) {
+        if (proposalRepository.findById(id).isEmpty()) {
             return false;
         }
         proposalRepository.deleteById(id);
+        proposalEventSubject.notifyObservers("PROPOSAL_DELETED", Map.of(
+                "proposalId", id,
+                "action", "PROPOSAL_DELETED"
+        ));
         return true;
     }
 

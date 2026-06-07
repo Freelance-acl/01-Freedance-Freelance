@@ -33,7 +33,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return !jwtEnabled;
+        return !jwtEnabled
+                || "OPTIONS".equalsIgnoreCase(request.getMethod())
+                || "/api/contracts/health".equals(request.getRequestURI());
     }
 
     @Override

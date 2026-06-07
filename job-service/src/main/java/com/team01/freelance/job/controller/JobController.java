@@ -5,11 +5,12 @@ import com.team01.freelance.job.exception.ForbiddenOperationException;
 import com.team01.freelance.job.model.JobAttachmentAlertDTO;
 import com.team01.freelance.job.model.JobAttachmentVerificationRequest;
 import com.team01.freelance.job.model.JobCloseRequest;
-import com.team01.freelance.job.model.JobRatingRequest;
-import com.team01.freelance.job.model.JobCloseRequest;
+import com.team01.freelance.job.service.JobIndexService;
 import com.team01.freelance.job.model.Job;
+import com.team01.freelance.job.model.JobCategory;
 import com.team01.freelance.job.model.JobStatus;
-import com.team01.freelance.job.model.JobStatus;
+import com.team01.freelance.job.search.dto.JobSearchResultDTO;
+import com.team01.freelance.job.search.service.JobFullTextSearchOperations;
 import com.team01.freelance.job.dto.TopBudgetJobDTO;
 import com.team01.freelance.job.service.JobService;
 import jakarta.persistence.EntityNotFoundException;
@@ -28,6 +29,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -37,8 +39,16 @@ import java.util.Map;
 @RequestMapping("/api/jobs")
 public class JobController {
 
+    private final JobService jobService;
+    private final JobIndexService jobIndexService;
+
+    public JobController(JobService jobService, JobIndexService jobIndexService) {
+        this.jobService = jobService;
+        this.jobIndexService = jobIndexService;
+    }
+
     @Autowired
-    private JobService jobService;
+    private JobFullTextSearchOperations jobFullTextSearchOperations;
 
     @GetMapping
     public ResponseEntity<List<Job>> getAllJobs() {
@@ -53,6 +63,34 @@ public class JobController {
             Pageable pageable) {
         try {
             Page<Job> results = jobService.searchJobsByStatusAndBudgetRange(status, minBudget, maxBudget, pageable);
+            return ResponseEntity.ok(results);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    /**
+     * [S2-F10] Searches jobs in Elasticsearch by title and description with optional filters.
+     *
+     * @param query required free-text search terms
+     * @param category optional category filter
+     * @param status optional status filter
+     * @param minBudget optional minimum budget filter
+     * @param maxBudget optional maximum budget filter
+     * @param pageable pagination settings
+     * @return 200 with relevance-ranked results, or 400 when budget bounds are invalid
+     */
+    @GetMapping("/search/full-text")
+    public ResponseEntity<?> fullTextSearchJobs(
+            @RequestParam String query,
+            @RequestParam(required = false) JobCategory category,
+            @RequestParam(required = false) JobStatus status,
+            @RequestParam(required = false) Double minBudget,
+            @RequestParam(required = false) Double maxBudget,
+            Pageable pageable) {
+        try {
+            Page<JobSearchResultDTO> results = jobFullTextSearchOperations.search(
+                    query, category, status, minBudget, maxBudget, pageable);
             return ResponseEntity.ok(results);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
@@ -145,13 +183,38 @@ public class JobController {
      * @return 200 with updated job, 400 for invalid contract or rating, or 404 if job or contract is not found
      */
     @PostMapping("/{id}/rate")
-    public ResponseEntity<Job> rateJob(@PathVariable Long id, @RequestBody JobRatingRequest ratingRequest) {
+    public ResponseEntity<Job> rateJob(
+            @PathVariable Long id,
+            @RequestBody com.team01.freelance.job.model.JobRatingRequest ratingRequest) {
         try {
             return ResponseEntity.ok(jobService.rateJob(id, ratingRequest));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().build();
         } catch (EntityNotFoundException e) {
             return ResponseEntity.notFound().build();
+        }
+    }
+
+    /**
+     * [S2-F11] Indexes a job in Elasticsearch for full-text search.
+     * Loads the job from PostgreSQL, creates/updates an Elasticsearch document,
+     * and logs an INDEXED event through the Observer chain.
+     *
+     * @param id the job ID to index
+     * @return 200 with indexing status, 404 if job not found, or 500 if Elasticsearch fails
+     */
+    @PostMapping("/{id}/index")
+    public ResponseEntity<?> indexJob(@PathVariable Long id) {
+        try {
+            Map<String, Object> indexingResult = jobIndexService.indexJob(id);
+            return ResponseEntity.ok(indexingResult);
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (RuntimeException e) {
+            Map<String, Object> errorResponse = new LinkedHashMap<>();
+            errorResponse.put("error", "Elasticsearch indexing failed");
+            errorResponse.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
     }
 

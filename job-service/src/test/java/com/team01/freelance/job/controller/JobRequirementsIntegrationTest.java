@@ -1,10 +1,12 @@
 package com.team01.freelance.job.controller;
 
+import com.team01.freelance.job.event.JobEventTypes;
 import com.team01.freelance.job.model.Job;
 import com.team01.freelance.job.model.JobCategory;
 import com.team01.freelance.job.model.JobStatus;
 import com.team01.freelance.job.repository.JobRepository;
 import com.team01.freelance.job.support.AbstractIntegrationTest;
+import com.team01.freelance.job.support.TestJobEventObserver;
 import com.team01.freelance.user.model.User;
 import com.team01.freelance.user.model.UserRole;
 import com.team01.freelance.user.model.UserStatus;
@@ -19,8 +21,11 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -43,11 +48,15 @@ class JobRequirementsIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private TestJobEventObserver testJobEventObserver;
+
     private Job job;
 
     @BeforeEach
     void setUp() {
         mockMvc = buildMockMvc(webApplicationContext);
+        testJobEventObserver.reset();
         User client = saveUser("Client", UserRole.CLIENT);
         job = saveJob(client.getId(), Map.of("experienceLevel", "MID"));
     }
@@ -60,6 +69,15 @@ class JobRequirementsIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.requirements.experienceLevel").value("SENIOR"))
                 .andExpect(jsonPath("$.requirements.duration").value("8 weeks"));
+
+        List<Map<String, Object>> events = testJobEventObserver.getEvents();
+        assertEquals(1, events.size());
+        Map<String, Object> event = events.get(0);
+        assertEquals(JobEventTypes.REQUIREMENTS_UPDATED_JOB, event.get("eventType"));
+        assertEquals(job.getId(), ((Number) event.get("jobId")).longValue());
+        assertFalse(((Map<?, ?>) event.get("changedRequirements")).isEmpty());
+        assertEquals("SENIOR", ((Map<?, ?>) event.get("changedRequirements")).get("experienceLevel"));
+        assertEquals("8 weeks", ((Map<?, ?>) event.get("changedRequirements")).get("duration"));
     }
 
     private User saveUser(String name, UserRole role) {

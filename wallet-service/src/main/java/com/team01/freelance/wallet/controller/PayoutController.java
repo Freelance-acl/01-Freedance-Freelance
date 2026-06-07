@@ -193,4 +193,11 @@ public class PayoutController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
         return ResponseEntity.ok(payoutService.getCategoryRevenue(startDate, endDate));
     }
+
+    @GetMapping("/analytics/methods")
+    public ResponseEntity<List<com.team01.freelance.wallet.dto.PayoutMethodDTO>> getPayoutMethodBreakdown(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        return ResponseEntity.ok(payoutService.getPayoutMethodBreakdown(startDate, endDate));
+    }
 }

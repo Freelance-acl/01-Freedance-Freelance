@@ -3,6 +3,7 @@ package com.team01.freelance.contract.service;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team01.freelance.contract.dto.ContractSummaryDTO;
+import com.team01.freelance.contract.dto.ContractAnalyticsDTO;
 import com.team01.freelance.contract.dto.BatchContractStatusUpdateRequest;
 import com.team01.freelance.contract.dto.BatchContractStatusUpdateResponse;
 import com.team01.freelance.contract.dto.ContractMilestoneDTO;
@@ -57,10 +58,20 @@ public class ContractService {
     @Autowired
     private ContractMilestoneTimelineRepository milestoneTimelineRepository;
 
+    @Autowired
+    private ContractAnalyticsCacheService contractAnalyticsCacheService;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public List<Contract> getAllContracts() {
         return contractRepository.findAll();
+    }
+
+    public ContractAnalyticsDTO getContractAnalytics() {
+        notifyObservers("ANALYTICS_VIEWED", Map.of(
+                "contractId", -1L,
+                "view", "contract-analytics"));
+        return contractAnalyticsCacheService.getContractAnalytics();
     }
 
     public Optional<Contract> getContractById(Long id) {
@@ -160,14 +171,14 @@ public class ContractService {
         }
 
         List<Object[]> rows = contractRepository.searchContracts(minAmount, maxAmount, normalizedStatus);
-        return rows.stream().map(row -> new ContractSummaryDTO(
-                toLong(row[0]),
-                row[1] == null ? null : row[1].toString(),
-                row[2] == null ? null : row[2].toString(),
-                toDouble(row[3]),
-                row[4] == null ? null : row[4].toString(),
-                calculateDurationDays(row[5], row[6])
-        )).toList();
+        return rows.stream().map(row -> ContractSummaryDTO.builder()
+                .contractId(toLong(row[0]))
+                .freelancerName(row[1] == null ? null : row[1].toString())
+                .jobTitle(row[2] == null ? null : row[2].toString())
+                .agreedAmount(toDouble(row[3]))
+                .status(row[4] == null ? null : row[4].toString())
+                .durationDays(calculateDurationDays(row[5], row[6]))
+                .build()).toList();
     }
 
     public boolean deleteContractById(Long id) {

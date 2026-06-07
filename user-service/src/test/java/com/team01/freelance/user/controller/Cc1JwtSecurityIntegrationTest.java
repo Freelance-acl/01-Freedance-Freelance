@@ -1,9 +1,12 @@
 package com.team01.freelance.user.controller;
 
 import com.team01.freelance.user.config.JwtConfig;
+import com.team01.freelance.user.model.ProficiencyLevel;
 import com.team01.freelance.user.model.User;
 import com.team01.freelance.user.model.UserRole;
+import com.team01.freelance.user.model.UserSkill;
 import com.team01.freelance.user.repository.UserRepository;
+import com.team01.freelance.user.repository.UserSkillRepository;
 import com.team01.freelance.user.service.JwtService;
 import com.team01.freelance.user.support.AbstractIntegrationTest;
 import com.team01.freelance.user.support.JwtTestSupport;
@@ -19,6 +22,7 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
 
@@ -50,6 +54,9 @@ class Cc1JwtSecurityIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private UserSkillRepository userSkillRepository;
 
     @Autowired
     private JwtService jwtService;
@@ -129,6 +136,59 @@ class Cc1JwtSecurityIntegrationTest extends AbstractIntegrationTest {
 
     /** (d) Expired token on a protected endpoint → 401. */
     @Test
+    void assignedUserM1Endpoints_withoutToken_return401() throws Exception {
+        List<MockHttpServletRequestBuilder> assignedEndpoints = List.of(
+                get("/api/users"),
+                get("/api/users/1"),
+                post("/api/users").contentType(MediaType.APPLICATION_JSON).content("{}"),
+                put("/api/users/1/deactivate"),
+                get("/api/users/preferences/search").param("key", "language").param("value", "ar"),
+                get("/api/users/reports/top-freelancers")
+                        .param("startDate", "2026-03-01")
+                        .param("endDate", "2026-03-31")
+                        .param("limit", "2"),
+                put("/api/users/1").contentType(MediaType.APPLICATION_JSON).content("{}"),
+                delete("/api/users/1"),
+                delete("/api/users/all"),
+                get("/api/users/search").param("role", "CLIENT"),
+                put("/api/users/1/preferences").contentType(MediaType.APPLICATION_JSON).content("{}"),
+                get("/api/users/1/contract-summary"),
+                put("/api/users/1/skills/1/primary"),
+                get("/api/users/1/profile"),
+                get("/api/users/preferences/language").param("lang", "ar").param("minContracts", "0"),
+                get("/api/user-skills"),
+                get("/api/user-skills/1"),
+                post("/api/user-skills").contentType(MediaType.APPLICATION_JSON).content("{}"),
+                put("/api/user-skills/1").contentType(MediaType.APPLICATION_JSON).content("{}"),
+                delete("/api/user-skills/1"),
+                delete("/api/user-skills/all"));
+
+        for (MockHttpServletRequestBuilder request : assignedEndpoints) {
+            mockMvc.perform(request).andExpect(status().isUnauthorized());
+        }
+    }
+
+    @Test
+    void assignedUserReadEndpoints_withValidToken_succeed() throws Exception {
+        User admin = UserTestFixtures.seedAdmin(userRepository);
+        UserSkill skill = saveSkill(admin);
+        String bearerToken = TestAuthHelper.bearer(jwtService.generateToken(admin));
+
+        mockMvc.perform(get("/api/users").header("Authorization", bearerToken))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/users/{id}", admin.getId()).header("Authorization", bearerToken))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/users/search")
+                        .header("Authorization", bearerToken)
+                        .param("email", admin.getEmail()))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/user-skills").header("Authorization", bearerToken))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/user-skills/{id}", skill.getId()).header("Authorization", bearerToken))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void protectedEndpoint_withExpiredToken_returns401() throws Exception {
         User admin = UserTestFixtures.seedAdmin(userRepository);
         String expired = JwtTestSupport.expiredToken(admin, jwtConfig);
@@ -184,6 +244,17 @@ class Cc1JwtSecurityIntegrationTest extends AbstractIntegrationTest {
         assertEquals(3, categories.size());
         assertTrue(publicCount >= 3, "expected at least register, login, and health");
         assertTrue(protectedCount > 0, "expected protected M1/CC endpoints");
+    }
+
+    private UserSkill saveSkill(User user) {
+        UserSkill skill = new UserSkill();
+        skill.setUser(user);
+        skill.setSkillName("Spring Security");
+        skill.setCategory("Backend");
+        skill.setYearsOfExperience(2);
+        skill.setProficiencyLevel(ProficiencyLevel.INTERMEDIATE);
+        skill.setIsPrimary(false);
+        return userSkillRepository.save(skill);
     }
 
 }

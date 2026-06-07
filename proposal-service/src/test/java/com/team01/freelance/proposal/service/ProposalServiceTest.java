@@ -2,6 +2,7 @@ package com.team01.freelance.proposal.service;
 
 import com.team01.freelance.contract.model.Contract;
 import com.team01.freelance.contract.model.ContractStatus;
+import com.team01.freelance.common.observer.EventSubject;
 import com.team01.freelance.contract.repository.ContractRepository;
 import com.team01.freelance.proposal.dto.FeeEstimateDTO;
 import com.team01.freelance.job.model.Job;
@@ -53,6 +54,8 @@ class ProposalServiceTest {
 
     @Mock
     private ProposalRepository proposalRepository;
+    @Mock
+    private EventSubject proposalEventSubject;
     @Mock
     private JobRepository jobRepository;
     @Mock

@@ -16,6 +16,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.context.jdbc.Sql;
 import org.springframework.web.context.WebApplicationContext;
 
 import java.sql.Timestamp;
@@ -30,6 +31,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * [S2-F4] Integration tests for {@code PUT /api/jobs/{id}/close}.
  */
 @WithMockUser(roles = "ADMIN")
+@Sql(statements = {
+        "DELETE FROM job_attachments",
+        "DELETE FROM proposals",
+        "DELETE FROM contracts",
+        "DELETE FROM jobs",
+        "DELETE FROM user_skills",
+        "DELETE FROM users"
+}, executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD)
 class CloseJobIntegrationTest extends AbstractIntegrationTest {
 
     private static final String CLOSE_URL = "/api/jobs/{id}/close";

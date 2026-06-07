@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import jakarta.persistence.EntityNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 
 import java.time.LocalDateTime;
@@ -15,16 +16,22 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(EntityNotFoundException.class)
+    public ResponseEntity<Object> handleEntityNotFoundException(
+            EntityNotFoundException ex, HttpServletRequest request) {
+        return errorBody(ex.getMessage(), HttpStatus.NOT_FOUND, request);
+    }
+
+    @ExceptionHandler(ForbiddenOperationException.class)
+    public ResponseEntity<Object> handleForbiddenOperationException(
+            ForbiddenOperationException ex, HttpServletRequest request) {
+        return errorBody(ex.getMessage(), HttpStatus.FORBIDDEN, request);
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Object> handleIllegalArgumentException(
             IllegalArgumentException ex, HttpServletRequest request) {
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("timestamp", LocalDateTime.now().toString());
-        body.put("status", HttpStatus.BAD_REQUEST.value());
-        body.put("error", "Bad Request");
-        body.put("message", ex.getMessage());
-        body.put("path", request.getRequestURI());
-        return new ResponseEntity<>(body, HttpStatus.BAD_REQUEST);
+        return errorBody(ex.getMessage(), HttpStatus.BAD_REQUEST, request);
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
@@ -42,14 +49,7 @@ public class GlobalExceptionHandler {
             cause = cause.getCause();
         }
 
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("timestamp", LocalDateTime.now().toString());
-        body.put("status", HttpStatus.BAD_REQUEST.value());
-        body.put("error", "Bad Request");
-        body.put("message", message);
-        body.put("path", request.getRequestURI());
-
-        return new ResponseEntity<>(body, HttpStatus.BAD_REQUEST);
+        return errorBody(message, HttpStatus.BAD_REQUEST, request);
     }
     
     @ExceptionHandler(DataIntegrityViolationException.class)
@@ -63,27 +63,23 @@ public class GlobalExceptionHandler {
             message = "This record already exists.";
         }
 
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("timestamp", LocalDateTime.now().toString());
-        body.put("status", HttpStatus.CONFLICT.value());
-        body.put("error", "Conflict");
-        body.put("message", message);
-        body.put("path", request.getRequestURI());
-
-        return new ResponseEntity<>(body, HttpStatus.CONFLICT);
+        return errorBody(message, HttpStatus.CONFLICT, request);
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Object> handleAllOtherExceptions(
             Exception ex, HttpServletRequest request) {
             
+        return errorBody("An unexpected error occurred: " + ex.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR, request);
+    }
+
+    private static ResponseEntity<Object> errorBody(String message, HttpStatus status, HttpServletRequest request) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("timestamp", LocalDateTime.now().toString());
-        body.put("status", HttpStatus.INTERNAL_SERVER_ERROR.value());
-        body.put("error", "Internal Server Error");
-        body.put("message", "An unexpected error occurred: " + ex.getMessage());
+        body.put("status", status.value());
+        body.put("error", status.getReasonPhrase());
+        body.put("message", message);
         body.put("path", request.getRequestURI());
-
-        return new ResponseEntity<>(body, HttpStatus.INTERNAL_SERVER_ERROR);
+        return new ResponseEntity<>(body, status);
     }
 }
