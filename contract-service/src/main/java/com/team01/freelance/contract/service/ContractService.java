@@ -160,14 +160,14 @@ public class ContractService {
         }
 
         List<Object[]> rows = contractRepository.searchContracts(minAmount, maxAmount, normalizedStatus);
-        return rows.stream().map(row -> new ContractSummaryDTO(
-                toLong(row[0]),
-                row[1] == null ? null : row[1].toString(),
-                row[2] == null ? null : row[2].toString(),
-                toDouble(row[3]),
-                row[4] == null ? null : row[4].toString(),
-                calculateDurationDays(row[5], row[6])
-        )).toList();
+        return rows.stream().map(row -> ContractSummaryDTO.builder()
+                .contractId(toLong(row[0]))
+                .freelancerName(row[1] == null ? null : row[1].toString())
+                .jobTitle(row[2] == null ? null : row[2].toString())
+                .agreedAmount(toDouble(row[3]))
+                .status(row[4] == null ? null : row[4].toString())
+                .durationDays(calculateDurationDays(row[5], row[6]))
+                .build()).toList();
     }
 
     public boolean deleteContractById(Long id) {
