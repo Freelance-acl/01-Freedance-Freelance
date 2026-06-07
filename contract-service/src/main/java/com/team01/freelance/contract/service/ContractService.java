@@ -67,11 +67,17 @@ public class ContractService {
         return contractRepository.findAll();
     }
 
-    public ContractAnalyticsDTO getContractAnalytics() {
+    public ContractAnalyticsDTO getContractAnalytics(java.time.LocalDate startDate, java.time.LocalDate endDate) {
+        if ((startDate == null) != (endDate == null)) {
+            throw new IllegalArgumentException("Both startDate and endDate must be provided together, or neither");
+        }
+        if (startDate != null && startDate.isAfter(endDate)) {
+            throw new IllegalArgumentException("startDate must not be after endDate");
+        }
         notifyObservers("ANALYTICS_VIEWED", Map.of(
                 "contractId", -1L,
                 "view", "contract-analytics"));
-        return contractAnalyticsCacheService.getContractAnalytics();
+        return contractAnalyticsCacheService.getContractAnalytics(startDate, endDate);
     }
 
     public Optional<Contract> getContractById(Long id) {

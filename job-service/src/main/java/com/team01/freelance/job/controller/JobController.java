@@ -1,5 +1,6 @@
 package com.team01.freelance.job.controller;
 
+import com.team01.freelance.job.dto.JobDashboardDTO;
 import com.team01.freelance.job.dto.JobProposalSummaryDTO;
 import com.team01.freelance.job.exception.ForbiddenOperationException;
 import com.team01.freelance.job.model.JobAttachmentAlertDTO;
@@ -94,6 +95,15 @@ public class JobController {
             return ResponseEntity.ok(results);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @GetMapping("/{id}/dashboard")
+    public ResponseEntity<JobDashboardDTO> getJobDashboard(@PathVariable Long id) {
+        try {
+            return ResponseEntity.ok(jobService.getJobDashboard(id));
+        } catch (jakarta.persistence.EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
         }
     }
 

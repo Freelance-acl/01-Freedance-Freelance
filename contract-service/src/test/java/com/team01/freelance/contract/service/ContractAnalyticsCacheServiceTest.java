@@ -6,8 +6,6 @@ import com.team01.freelance.contract.model.ContractStatus;
 import com.team01.freelance.contract.repository.ContractRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.test.util.ReflectionTestUtils;
-
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.time.LocalDateTime;
@@ -50,7 +48,7 @@ class ContractAnalyticsCacheServiceTest {
 
         when(contractRepository.findAll()).thenReturn(List.of(active, completed));
 
-        ContractAnalyticsDTO dto = analyticsCacheService.getContractAnalytics();
+        ContractAnalyticsDTO dto = analyticsCacheService.getContractAnalytics(null, null);
 
         assertEquals(2L, dto.getTotalContracts());
         assertEquals(2000.0, dto.getAvgValue());

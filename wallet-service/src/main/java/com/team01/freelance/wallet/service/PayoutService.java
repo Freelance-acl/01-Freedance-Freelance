@@ -719,9 +719,10 @@ public class PayoutService {
             throw new IllegalStateException("startDate cannot be after endDate");
         }
 
-        // TODO: publish ANALYTICS_VIEWED event to MongoDB payout_audit_trail collection
-        //       once Observer infrastructure is ready.
-        log.info("ANALYTICS_VIEWED: category revenue requested for {} to {}", startDate, endDate);
+        payoutEventSubject.notifyObservers("ANALYTICS_VIEWED", Map.of(
+                "view", "category-revenue",
+                "startDate", startDate.toString(),
+                "endDate", endDate.toString()));
 
         LocalDateTime start = startDate.atStartOfDay();
         LocalDateTime end = endDate.atTime(23, 59, 59, 999_999_999);

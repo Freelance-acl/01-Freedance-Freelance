@@ -3,6 +3,7 @@ package com.team01.freelance.proposal.controller;
 import com.team01.freelance.proposal.dto.FeeEstimateDTO;
 import com.team01.freelance.proposal.dto.FeeEstimateRequest;
 import com.team01.freelance.proposal.dto.JobRecommendationDTO;
+import com.team01.freelance.proposal.dto.ProposalAnalyticsDashboardDTO;
 import com.team01.freelance.proposal.dto.ProposalDetailsDTO;
 import com.team01.freelance.proposal.dto.ProposalAnalyticsDTO;
 import com.team01.freelance.proposal.model.Proposal;
@@ -72,6 +73,29 @@ public class ProposalController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
         return ResponseEntity.ok(proposalService.getProposalAnalytics(startDate, endDate));
+    }
+
+    @GetMapping("/analytics/dashboard")
+    public ResponseEntity<ProposalAnalyticsDashboardDTO> getProposalAnalyticsDashboard(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        try {
+            return ResponseEntity.ok(proposalService.getProposalAnalyticsDashboard(startDate, endDate));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @PostMapping("/{proposalId}/record-interaction")
+    public ResponseEntity<Void> recordInteraction(@PathVariable Long proposalId) {
+        try {
+            proposalService.recordProposalInteraction(proposalId);
+            return ResponseEntity.ok().build();
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
     }
 
     @GetMapping("/recommendations")

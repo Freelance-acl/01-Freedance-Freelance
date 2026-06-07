@@ -29,7 +29,7 @@ public class JobMongoEventLogger implements EntityObserver {
         try {
             Map<String, Object> details = toDetails(eventType, payload);
             Long jobId = toLong(details.get("jobId"));
-            jobEventRepository.save(new JobEvent(eventType, jobId, LocalDateTime.now(), details));
+            jobEventRepository.save(new JobEvent(jobId, eventType, LocalDateTime.now(), details));
         } catch (Exception ex) {
             log.warn("Failed to persist job event {}: {}", eventType, ex.getMessage());
         }

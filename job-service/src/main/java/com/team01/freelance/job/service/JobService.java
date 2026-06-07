@@ -1,6 +1,7 @@
 package com.team01.freelance.job.service;
 
 import com.team01.freelance.common.observer.EventSubject;
+import com.team01.freelance.job.dto.JobDashboardDTO;
 import com.team01.freelance.job.dto.JobProposalSummaryDTO;
 import com.team01.freelance.job.client.ContractLookupClient;
 import com.team01.freelance.job.client.ContractSummary;
@@ -136,7 +137,8 @@ public class JobService {
             @CacheEvict(value = "S2-F1", allEntries = true),
             @CacheEvict(value = "S2-F3", allEntries = true),
             @CacheEvict(value = "S2-F5", allEntries = true),
-            @CacheEvict(value = "S2-F6", allEntries = true)
+            @CacheEvict(value = "S2-F6", allEntries = true),
+            @CacheEvict(value = "S2-F12", key = "#id")
     })
     public Job updateJob(Long id, Job jobDetails) {
         return jobRepository.findById(id).map(existingJob -> {
@@ -183,7 +185,6 @@ public class JobService {
                     "changedRequirements", changedRequirements,
                     "requirements", new LinkedHashMap<>(mergedRequirements)
             ));
-            publishJobEvent("JOB_UPDATED", savedJob.getId(), jobEventDetails(savedJob));
             return savedJob;
         }).orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + id));
     }
@@ -193,7 +194,8 @@ public class JobService {
             @CacheEvict(value = "S2-F1", allEntries = true, condition = "#result == true"),
             @CacheEvict(value = "S2-F3", allEntries = true, condition = "#result == true"),
             @CacheEvict(value = "S2-F5", allEntries = true, condition = "#result == true"),
-            @CacheEvict(value = "S2-F6", allEntries = true, condition = "#result == true")
+            @CacheEvict(value = "S2-F6", allEntries = true, condition = "#result == true"),
+            @CacheEvict(value = "S2-F12", key = "#id", condition = "#result == true")
     })
     public boolean deleteJobById(Long id) {
         if (!jobRepository.existsById(id)) {
@@ -210,7 +212,8 @@ public class JobService {
             @CacheEvict(value = "S2-F1", allEntries = true),
             @CacheEvict(value = "S2-F3", allEntries = true),
             @CacheEvict(value = "S2-F5", allEntries = true),
-            @CacheEvict(value = "S2-F6", allEntries = true)
+            @CacheEvict(value = "S2-F6", allEntries = true),
+            @CacheEvict(value = "S2-F12", allEntries = true)
     })
     public void deleteAllJobs() {
         jobRepository.deleteAll();
@@ -303,7 +306,8 @@ public class JobService {
     @Caching(evict = {
             @CacheEvict(value = "job-by-id", key = "#jobId"),
             @CacheEvict(value = "S2-F1", allEntries = true),
-            @CacheEvict(value = "S2-F6", allEntries = true)
+            @CacheEvict(value = "S2-F6", allEntries = true),
+            @CacheEvict(value = "S2-F12", key = "#jobId")
     })
     public Job rateJob(Long jobId, JobRatingRequest ratingRequest) {
         Job job = jobRepository.findById(jobId)
@@ -347,7 +351,8 @@ public class JobService {
     @Transactional
     @Caching(evict = {
             @CacheEvict(value = "job-by-id", key = "#jobId"),
-            @CacheEvict(value = "job-attachment-by-id", key = "#attachmentId")
+            @CacheEvict(value = "job-attachment-by-id", key = "#attachmentId"),
+            @CacheEvict(value = "S2-F12", key = "#jobId")
     })
     public Job verifyJobAttachment(Long jobId, Long attachmentId, JobAttachmentVerificationRequest request) {
         if (request == null || request.getVerifiedBy() == null) {
@@ -463,7 +468,8 @@ public class JobService {
             @CacheEvict(value = "job-by-id", key = "#jobId"),
             @CacheEvict(value = "S2-F1", allEntries = true),
             @CacheEvict(value = "S2-F5", allEntries = true),
-            @CacheEvict(value = "S2-F6", allEntries = true)
+            @CacheEvict(value = "S2-F6", allEntries = true),
+            @CacheEvict(value = "S2-F12", key = "#jobId")
     })
     public Job closeJob(Long jobId) {
         Job job = jobRepository.findById(jobId)
@@ -499,6 +505,35 @@ public class JobService {
         ));
     }
 
+    public JobDashboardDTO getJobDashboard(Long id) {
+        if (!jobRepository.existsById(id)) {
+            throw new EntityNotFoundException("Job not found with id: " + id);
+        }
+        jobEventSubject.notifyObservers(JobEventTypes.DASHBOARD_VIEWED, Map.of(
+                "jobId", id,
+                "timestamp", LocalDateTime.now()
+        ));
+        return getCachedJobDashboard(id);
+    }
+
+    @Cacheable(value = "S2-F12", key = "#id")
+    public JobDashboardDTO getCachedJobDashboard(Long id) {
+        List<Object[]> rows = jobRepository.getJobDashboard(id);
+        if (rows == null || rows.isEmpty()) {
+            throw new EntityNotFoundException("Job not found with id: " + id);
+        }
+        Object[] row = rows.get(0);
+        return JobDashboardDTO.builder()
+                .jobId(row[0] != null ? ((Number) row[0]).longValue() : null)
+                .title(row[1] != null ? row[1].toString() : null)
+                .rating(row[2] != null ? ((Number) row[2]).doubleValue() : 0.0)
+                .totalProposals(row[3] != null ? ((Number) row[3]).longValue() : 0L)
+                .acceptedProposals(row[4] != null ? ((Number) row[4]).longValue() : 0L)
+                .averageBidAmount(row[5] != null ? ((Number) row[5]).doubleValue() : 0.0)
+                .activeAttachments(row[6] != null ? ((Number) row[6]).longValue() : 0L)
+                .build();
+    }
+
     /**
      * Retrieves the top jobs ordered by budgetMax in descending order.
      * Includes the count of proposals for each job.
@@ -508,7 +543,9 @@ public class JobService {
      */
     @Cacheable(value = "S2-F6", key = "#limit", unless = "#result == null or #result.isEmpty()")
     public List<TopBudgetJobDTO> getTopBudgetJobs(int limit) {
-        return jobRepository.findTopBudgetJobs(limit);
+        return jobRepository.findTopBudgetJobs(limit).stream()
+                .map(d -> new TopBudgetJobDTO(d.getJobId(), d.getTitle(), d.getBudgetMax(), d.getTotalProposals()))
+                .toList();
     }
 
     private void publishJobEvent(String eventType, Long jobId, Map<String, Object> details) {

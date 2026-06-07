@@ -1,15 +1,24 @@
 package com.team01.freelance.job.observer;
 
+import com.team01.freelance.common.event.MongoEvent;
+import com.team01.freelance.common.event.EventType;
 import com.team01.freelance.common.observer.EntityObserver;
-import com.team01.freelance.job.audit.JobEventAudit;
-import com.team01.freelance.job.audit.JobEventAuditRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.team01.freelance.job.event.EventFactory;
+import com.team01.freelance.job.event.JobEvent;
+
+import com.team01.freelance.job.repository.JobEventRepository;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+
 
 import java.util.HashMap;
 import java.util.Map;
 
 @Component
+@Profile("!test")
 public class MongoEventLogger implements EntityObserver {
 
     private static final Logger log = LoggerFactory.getLogger(MongoEventLogger.class);
@@ -38,7 +47,6 @@ public class MongoEventLogger implements EntityObserver {
         }
     }
 
-    @SuppressWarnings("unchecked")
     private static Map<String, Object> toParams(String eventType, Object payload) {
         if (payload instanceof Map<?, ?> map) {
             Map<String, Object> params = new HashMap<>();

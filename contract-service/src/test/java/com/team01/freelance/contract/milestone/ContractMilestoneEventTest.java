@@ -1,8 +1,8 @@
 package com.team01.freelance.contract.milestone;
 
-import com.datastax.oss.driver.api.mapper.annotations.ClusteringColumn;
-import com.datastax.oss.driver.api.mapper.annotations.PartitionKey;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.cassandra.core.cql.PrimaryKeyType;
+import org.springframework.data.cassandra.core.mapping.PrimaryKeyColumn;
 
 import java.lang.reflect.Field;
 
@@ -16,8 +16,14 @@ class ContractMilestoneEventTest {
         Field contractId = ContractMilestoneEvent.class.getDeclaredField("contractId");
         Field timestamp = ContractMilestoneEvent.class.getDeclaredField("timestamp");
 
-        assertNotNull(contractId.getAnnotation(PartitionKey.class));
-        assertNotNull(timestamp.getAnnotation(ClusteringColumn.class));
-        assertEquals(0, timestamp.getAnnotation(ClusteringColumn.class).value());
+        PrimaryKeyColumn contractIdKey = contractId.getAnnotation(PrimaryKeyColumn.class);
+        PrimaryKeyColumn timestampKey = timestamp.getAnnotation(PrimaryKeyColumn.class);
+
+        assertNotNull(contractIdKey);
+        assertEquals(PrimaryKeyType.PARTITIONED, contractIdKey.type());
+
+        assertNotNull(timestampKey);
+        assertEquals(PrimaryKeyType.CLUSTERED, timestampKey.type());
+        assertEquals(0, timestampKey.ordinal());
     }
 }

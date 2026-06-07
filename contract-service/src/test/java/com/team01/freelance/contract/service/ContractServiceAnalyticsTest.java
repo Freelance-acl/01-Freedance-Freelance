@@ -40,9 +40,9 @@ class ContractServiceAnalyticsTest {
                 .avgDurationDays(4.0)
                 .byStatus(Map.of("ACTIVE", 4L, "COMPLETED", 3L))
                 .build();
-        when(contractAnalyticsCacheService.getContractAnalytics()).thenReturn(dto);
+        when(contractAnalyticsCacheService.getContractAnalytics(null, null)).thenReturn(dto);
 
-        ContractAnalyticsDTO result = contractService.getContractAnalytics();
+        ContractAnalyticsDTO result = contractService.getContractAnalytics(null, null);
 
         assertSame(dto, result);
         verify(observer).onEvent(eq("ANALYTICS_VIEWED"), any(Map.class));

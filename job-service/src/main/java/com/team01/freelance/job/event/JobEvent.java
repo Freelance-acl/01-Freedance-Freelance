@@ -17,7 +17,6 @@ public class JobEvent implements MongoEvent {
 
     private String action;
     private Long jobId;
-    private String action;
     private LocalDateTime timestamp;
     private Map<String, Object> details = new HashMap<>();
 
@@ -68,14 +67,7 @@ public class JobEvent implements MongoEvent {
         this.jobId = jobId;
     }
 
-    @Override
-    public String getAction() {
-        return action;
-    }
 
-    public void setAction(String action) {
-        this.action = action;
-    }
 
     @Override
     public LocalDateTime getTimestamp() {
