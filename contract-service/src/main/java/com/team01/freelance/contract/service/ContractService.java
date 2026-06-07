@@ -3,6 +3,7 @@ package com.team01.freelance.contract.service;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team01.freelance.contract.dto.ContractSummaryDTO;
+import com.team01.freelance.contract.dto.ContractAnalyticsDTO;
 import com.team01.freelance.contract.dto.BatchContractStatusUpdateRequest;
 import com.team01.freelance.contract.dto.BatchContractStatusUpdateResponse;
 import com.team01.freelance.contract.dto.ContractMilestoneDTO;
@@ -57,10 +58,20 @@ public class ContractService {
     @Autowired
     private ContractMilestoneTimelineRepository milestoneTimelineRepository;
 
+    @Autowired
+    private ContractAnalyticsCacheService contractAnalyticsCacheService;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public List<Contract> getAllContracts() {
         return contractRepository.findAll();
+    }
+
+    public ContractAnalyticsDTO getContractAnalytics() {
+        notifyObservers("ANALYTICS_VIEWED", Map.of(
+                "contractId", -1L,
+                "view", "contract-analytics"));
+        return contractAnalyticsCacheService.getContractAnalytics();
     }
 
     public Optional<Contract> getContractById(Long id) {

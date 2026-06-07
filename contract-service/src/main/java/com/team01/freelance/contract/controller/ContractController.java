@@ -1,5 +1,6 @@
 package com.team01.freelance.contract.controller;
 
+import com.team01.freelance.contract.dto.ContractAnalyticsDTO;
 import com.team01.freelance.contract.dto.ContractSummaryDTO;
 import com.team01.freelance.contract.dto.BatchContractStatusUpdateRequest;
 import com.team01.freelance.contract.dto.BatchContractStatusUpdateResponse;
@@ -109,6 +110,11 @@ public class ContractController {
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().build();
         }
+    }
+
+    @GetMapping("/analytics")
+    public ResponseEntity<ContractAnalyticsDTO> getContractAnalytics() {
+        return ResponseEntity.ok(contractService.getContractAnalytics());
     }
 
     @DeleteMapping("/{id}")
