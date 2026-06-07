@@ -1,5 +1,6 @@
 package com.team01.freelance.job.event;
 
+import com.team01.freelance.common.event.MongoEvent;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
@@ -8,12 +9,12 @@ import java.util.HashMap;
 import java.util.Map;
 
 @Document(collection = "job_events")
-public class JobEvent {
+public class JobEvent implements MongoEvent {
 
     @Id
     private String id;
 
-    private String eventType;
+    private String action;
     private Long jobId;
     private LocalDateTime timestamp;
     private Map<String, Object> details = new HashMap<>();
@@ -21,9 +22,9 @@ public class JobEvent {
     public JobEvent() {
     }
 
-    public JobEvent(String eventType, Long jobId, LocalDateTime timestamp, Map<String, Object> details) {
-        this.eventType = eventType;
+    public JobEvent(Long jobId, String action, LocalDateTime timestamp, Map<String, Object> details) {
         this.jobId = jobId;
+        this.action = action;
         this.timestamp = timestamp;
         if (details != null) {
             this.details = new HashMap<>(details);
@@ -38,12 +39,22 @@ public class JobEvent {
         this.id = id;
     }
 
+    @Override
+    public String getAction() {
+        return action;
+    }
+
+    public void setAction(String action) {
+        this.action = action;
+    }
+
+    // Backward compatibility - delegates to getAction()
     public String getEventType() {
-        return eventType;
+        return getAction();
     }
 
     public void setEventType(String eventType) {
-        this.eventType = eventType;
+        this.action = eventType;
     }
 
     public Long getJobId() {

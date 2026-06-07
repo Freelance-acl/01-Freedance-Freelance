@@ -1,5 +1,6 @@
 package com.team01.freelance.job.observer;
 
+import com.team01.freelance.common.observer.EntityObserver;
 import com.team01.freelance.job.audit.JobEventAudit;
 import com.team01.freelance.job.audit.JobEventAuditRepository;
 import org.springframework.beans.factory.annotation.Autowired;
