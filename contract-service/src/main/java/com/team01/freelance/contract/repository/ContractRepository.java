@@ -9,9 +9,23 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface ContractRepository extends JpaRepository<Contract, Long> {
+    @Query(value = "SELECT COUNT(*) > 0 FROM users WHERE id = :userId", nativeQuery = true)
+    boolean userExists(@Param("userId") Long userId);
+
+    @Query(value = """
+            SELECT *
+            FROM contracts
+            WHERE status = 'ACTIVE'
+              AND (freelancer_id = :userId OR client_id = :userId)
+            ORDER BY created_at DESC
+            LIMIT 1
+            """, nativeQuery = true)
+    Optional<Contract> findMostRecentActiveContractForUser(@Param("userId") Long userId);
+
     @Query(value = """
             SELECT COUNT(*)
             FROM contracts c
@@ -27,6 +41,66 @@ public interface ContractRepository extends JpaRepository<Contract, Long> {
               AND status IN ('COMPLETED', 'TERMINATED')
             """, nativeQuery = true)
     int purgeOldContracts(@Param("cutoff") LocalDateTime cutoff);
+
+    @Query(value = """
+            SELECT
+                c.id AS contract_id,
+                COALESCE(u.name, 'Unknown Freelancer') AS freelancer_name,
+                COALESCE(j.title, 'Unknown Job') AS job_title,
+                c.agreed_amount,
+                c.status,
+                c.start_date,
+                COALESCE(c.end_date, CURRENT_TIMESTAMP) AS effective_end_date
+            FROM contracts c
+            LEFT JOIN users u ON u.id = c.freelancer_id
+            LEFT JOIN jobs j ON j.id = c.job_id
+            WHERE c.agreed_amount >= :minAmount
+              AND c.agreed_amount <= :maxAmount
+              AND (:status IS NULL OR c.status = :status)
+            ORDER BY c.agreed_amount DESC, c.id DESC
+            """, nativeQuery = true)
+    List<Object[]> searchContracts(
+            @Param("minAmount") Double minAmount,
+            @Param("maxAmount") Double maxAmount,
+            @Param("status") String status
+    );
+
+    @Query(value = """
+            SELECT
+                CAST(COUNT(*) AS BIGINT) AS total_contracts,
+                COALESCE(AVG(c.agreed_amount), 0) AS average_contract_value,
+                CAST(SUM(CASE WHEN c.status = 'COMPLETED' THEN 1 ELSE 0 END) AS BIGINT) AS completed_contracts,
+                COALESCE(
+                    AVG(
+                        CASE
+                            WHEN c.status = 'COMPLETED' AND c.end_date IS NOT NULL
+                            THEN EXTRACT(EPOCH FROM (c.end_date - c.start_date)) / 86400.0
+                            ELSE NULL
+                        END
+                    ),
+                    0
+                ) AS average_duration_days
+            FROM contracts c
+            WHERE c.start_date >= :startDate
+              AND c.start_date < :endDateExclusive
+            """, nativeQuery = true)
+    List<Object[]> getContractAnalyticsSummary(
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDateExclusive") LocalDateTime endDateExclusive
+    );
+
+    @Query(value = """
+            SELECT c.status, CAST(COUNT(*) AS BIGINT) AS status_count
+            FROM contracts c
+            WHERE c.start_date >= :startDate
+              AND c.start_date < :endDateExclusive
+            GROUP BY c.status
+            ORDER BY c.status
+            """, nativeQuery = true)
+    List<Object[]> getContractCountsByStatus(
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDateExclusive") LocalDateTime endDateExclusive
+    );
 
     @Query(value = "SELECT COUNT(*) > 0 FROM users WHERE id = :freelancerId", nativeQuery = true)
     boolean freelancerExists(@Param("freelancerId") Long freelancerId);

@@ -1,5 +1,7 @@
 package com.team01.freelance.contract.controller;
 
+import com.team01.freelance.contract.dto.ContractAnalyticsDTO;
+import com.team01.freelance.contract.dto.ContractSummaryDTO;
 import com.team01.freelance.contract.model.Contract;
 import com.team01.freelance.contract.dto.FreelancerPerformanceDTO;
 import com.team01.freelance.contract.dto.StalledContractDTO;
@@ -41,6 +43,17 @@ public class ContractController {
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
+    @GetMapping("/user/{userId}/active")
+    public ResponseEntity<Contract> getActiveContractForUser(@PathVariable Long userId) {
+        try {
+            return ResponseEntity.ok(contractService.getActiveContractForUser(userId));
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
     @PostMapping
     public ResponseEntity<Contract> createContract(@RequestBody Contract contract) {
         try {
@@ -66,6 +79,43 @@ public class ContractController {
         } catch (RuntimeException e) {
             // Maps to the "Contract not found" exception from service
             return ResponseEntity.notFound().build();
+        }
+    }
+
+    @PutMapping("/{contractId}/progress")
+    public ResponseEntity<Contract> updateContractProgress(
+            @PathVariable Long contractId,
+            @RequestBody Map<String, Object> metadataUpdates
+    ) {
+        try {
+            return ResponseEntity.ok(contractService.updateContractProgress(contractId, metadataUpdates));
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    @GetMapping("/search")
+    public ResponseEntity<List<ContractSummaryDTO>> searchContracts(
+            @RequestParam Double minAmount,
+            @RequestParam Double maxAmount,
+            @RequestParam(required = false) String status
+    ) {
+        try {
+            return ResponseEntity.ok(contractService.searchContracts(minAmount, maxAmount, status));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @GetMapping("/analytics")
+    public ResponseEntity<ContractAnalyticsDTO> getContractAnalytics(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate
+    ) {
+        try {
+            return ResponseEntity.ok(contractService.getContractAnalytics(startDate, endDate));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
         }
     }
 
