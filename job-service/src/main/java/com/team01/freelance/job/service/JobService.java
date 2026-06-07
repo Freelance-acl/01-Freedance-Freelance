@@ -15,6 +15,7 @@ import com.team01.freelance.job.model.JobStatus;
 import com.team01.freelance.job.dto.TopBudgetJobDTO;
 import com.team01.freelance.job.repository.JobAttachmentRepository;
 import com.team01.freelance.job.repository.JobRepository;
+import com.team01.freelance.job.search.service.JobSearchIndexOperations;
 import com.team01.freelance.user.model.User;
 import com.team01.freelance.user.model.UserRole;
 import com.team01.freelance.user.repository.UserRepository;
@@ -60,6 +61,9 @@ public class JobService {
 
     @Autowired
     private DataSource dataSource;
+
+    @Autowired
+    private JobSearchIndexOperations jobSearchIndexOperations;
 
     @Autowired
     @Qualifier("jobEventSubject")
@@ -113,7 +117,9 @@ public class JobService {
         userRepository.findById(job.getClientId())
                 .orElseThrow(() -> new EntityNotFoundException("Client not found with id: " + job.getClientId()));
 
-        return jobRepository.save(job);
+        Job savedJob = jobRepository.save(job);
+        jobSearchIndexOperations.index(savedJob);
+        return savedJob;
     }
 
     /**
@@ -148,7 +154,9 @@ public class JobService {
                 throw new IllegalArgumentException("Budget minimum cannot be greater than budget maximum");
             }
 
-            return jobRepository.save(existingJob);
+            Job savedJob = jobRepository.save(existingJob);
+            jobSearchIndexOperations.index(savedJob);
+            return savedJob;
         }).orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + id));
     }
 
@@ -168,6 +176,7 @@ public class JobService {
             mergedRequirements.putAll(changedRequirements);
             existingJob.setRequirements(mergedRequirements);
             Job savedJob = jobRepository.save(existingJob);
+            jobSearchIndexOperations.index(savedJob);
             jobEventSubject.notifyObservers(JobEventTypes.REQUIREMENTS_UPDATED_JOB, Map.of(
                     "jobId", savedJob.getId(),
                     "timestamp", LocalDateTime.now(),
@@ -190,6 +199,7 @@ public class JobService {
             return false;
         }
         jobRepository.deleteById(id);
+        jobSearchIndexOperations.delete(id);
         return true;
     }
 
@@ -202,6 +212,7 @@ public class JobService {
     })
     public void deleteAllJobs() {
         jobRepository.deleteAll();
+        jobSearchIndexOperations.deleteAll();
     }
 
     /**
@@ -319,7 +330,9 @@ public class JobService {
         job.setRating(newRating);
         job.setTotalRatings(currentTotalRatings + 1);
 
-        return jobRepository.save(job);
+        Job savedJob = jobRepository.save(job);
+        jobSearchIndexOperations.index(savedJob);
+        return savedJob;
     }
 
     @Transactional
@@ -457,6 +470,7 @@ public class JobService {
 
         Job closedJob = jobRepository.findById(jobId)
                 .orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + jobId));
+        jobSearchIndexOperations.index(closedJob);
         publishJobClosedEvent(closedJob);
         return closedJob;
     }

@@ -7,10 +7,14 @@ import com.team01.freelance.job.model.JobAttachmentVerificationRequest;
 import com.team01.freelance.job.model.JobCloseRequest;
 import com.team01.freelance.job.service.JobIndexService;
 import com.team01.freelance.job.model.Job;
+import com.team01.freelance.job.model.JobCategory;
 import com.team01.freelance.job.model.JobStatus;
+import com.team01.freelance.job.search.dto.JobSearchResultDTO;
+import com.team01.freelance.job.search.service.JobFullTextSearchOperations;
 import com.team01.freelance.job.dto.TopBudgetJobDTO;
 import com.team01.freelance.job.service.JobService;
 import jakarta.persistence.EntityNotFoundException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.data.domain.Page;
@@ -43,6 +47,9 @@ public class JobController {
         this.jobIndexService = jobIndexService;
     }
 
+    @Autowired
+    private JobFullTextSearchOperations jobFullTextSearchOperations;
+
     @GetMapping
     public ResponseEntity<List<Job>> getAllJobs() {
         return ResponseEntity.ok(jobService.getAllJobs());
@@ -56,6 +63,34 @@ public class JobController {
             Pageable pageable) {
         try {
             Page<Job> results = jobService.searchJobsByStatusAndBudgetRange(status, minBudget, maxBudget, pageable);
+            return ResponseEntity.ok(results);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    /**
+     * [S2-F10] Searches jobs in Elasticsearch by title and description with optional filters.
+     *
+     * @param query required free-text search terms
+     * @param category optional category filter
+     * @param status optional status filter
+     * @param minBudget optional minimum budget filter
+     * @param maxBudget optional maximum budget filter
+     * @param pageable pagination settings
+     * @return 200 with relevance-ranked results, or 400 when budget bounds are invalid
+     */
+    @GetMapping("/search/full-text")
+    public ResponseEntity<?> fullTextSearchJobs(
+            @RequestParam String query,
+            @RequestParam(required = false) JobCategory category,
+            @RequestParam(required = false) JobStatus status,
+            @RequestParam(required = false) Double minBudget,
+            @RequestParam(required = false) Double maxBudget,
+            Pageable pageable) {
+        try {
+            Page<JobSearchResultDTO> results = jobFullTextSearchOperations.search(
+                    query, category, status, minBudget, maxBudget, pageable);
             return ResponseEntity.ok(results);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());

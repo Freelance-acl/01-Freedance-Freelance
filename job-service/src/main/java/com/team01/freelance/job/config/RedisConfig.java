@@ -19,10 +19,17 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * Configures Redis serialization and cache TTLs, including full-text search caching.
+ */
 @Configuration
 @Profile("!test")
 public class RedisConfig {
 
+    /** Cache name used by S2-F10 full-text job search responses. */
+    public static final String JOB_FULL_TEXT_SEARCH_CACHE = "S2-F10";
+
+    /** Builds the Jackson mapper used for Redis value serialization. */
     @Bean
     public ObjectMapper redisObjectMapper() {
         ObjectMapper mapper = new ObjectMapper();
@@ -31,6 +38,7 @@ public class RedisConfig {
         return mapper;
     }
 
+    /** Creates the Redis template used for direct key/value access. */
     @Bean
     public RedisTemplate<String, Object> redisTemplate(RedisConnectionFactory connectionFactory,
                                                        ObjectMapper redisObjectMapper) {
@@ -44,6 +52,7 @@ public class RedisConfig {
         return template;
     }
 
+    /** Registers Redis-backed cache regions and their TTL settings. */
     @Bean
     public CacheManager cacheManager(RedisConnectionFactory connectionFactory,
                                      ObjectMapper redisObjectMapper) {
@@ -64,6 +73,7 @@ public class RedisConfig {
         cacheConfigs.put("S2-F6", tenMin);
         cacheConfigs.put("job-by-id", fifteenMin);
         cacheConfigs.put("job-attachment-by-id", fifteenMin);
+        cacheConfigs.put(JOB_FULL_TEXT_SEARCH_CACHE, fiveMin);
 
         return RedisCacheManager.builder(connectionFactory)
                 .cacheDefaults(defaultConfig)

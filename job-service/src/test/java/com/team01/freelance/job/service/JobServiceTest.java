@@ -16,6 +16,7 @@ import com.team01.freelance.job.model.JobRatingRequest;
 import com.team01.freelance.job.model.JobStatus;
 import com.team01.freelance.job.repository.JobAttachmentRepository;
 import com.team01.freelance.job.repository.JobRepository;
+import com.team01.freelance.job.search.service.JobSearchIndexOperations;
 import com.team01.freelance.user.model.User;
 import com.team01.freelance.user.model.UserRole;
 import com.team01.freelance.user.repository.UserRepository;
@@ -61,6 +62,9 @@ class JobServiceTest {
 
     @Mock
     private DataSource dataSource;
+
+    @Mock
+    private JobSearchIndexOperations jobSearchIndexOperations;
 
     @Mock
     private EventSubject jobEventSubject;
@@ -124,6 +128,7 @@ class JobServiceTest {
         assertEquals(150.0, result.getBudgetMin());
         assertEquals(250.0, result.getBudgetMax());
         verify(jobRepository, times(1)).save(existingJob);
+        verify(jobSearchIndexOperations).index(existingJob);
     }
 
     @Test
@@ -153,6 +158,7 @@ class JobServiceTest {
 
         assertNotNull(result);
         verify(jobRepository).save(job);
+        verify(jobSearchIndexOperations).index(job);
     }
 
     @Test
@@ -353,6 +359,7 @@ class JobServiceTest {
         assertEquals(Arrays.asList("Java"), result.getRequirements().get("skills"));
         assertEquals("8 weeks", result.getRequirements().get("duration"));
         verify(jobRepository).save(existingJob);
+        verify(jobSearchIndexOperations).index(existingJob);
         ArgumentCaptor<Map<String, Object>> payloadCaptor = ArgumentCaptor.forClass(Map.class);
         verify(jobEventSubject).notifyObservers(eq(JobEventTypes.REQUIREMENTS_UPDATED_JOB), payloadCaptor.capture());
         Map<String, Object> payload = payloadCaptor.getValue();
@@ -414,6 +421,7 @@ class JobServiceTest {
         verify(contractLookupClient).getContractById(1L);
         verify(contractLookupClient).getContractById(2L);
         verify(jobRepository, times(2)).save(existingJob);
+        verify(jobSearchIndexOperations, times(2)).index(existingJob);
     }
 
     @Test
@@ -704,6 +712,7 @@ class JobServiceTest {
         verify(jobRepository).rejectSubmittedProposalsByJobId(jobId);
         verify(jobEventSubject).notifyObservers(eq("JOB_CLOSED"), any(Map.class));
         verify(jobRepository, never()).save(any(Job.class));
+        verify(jobSearchIndexOperations).index(closedJob);
     }
 
     @Test
@@ -793,6 +802,7 @@ class JobServiceTest {
 
         assertEquals(JobStatus.CLOSED, result.getStatus());
         verify(jobRepository, never()).closeJobIfEligible(anyLong());
+        verify(jobSearchIndexOperations, never()).index(any(Job.class));
         verify(jobEventSubject, never()).notifyObservers(anyString(), any());
     }
 
