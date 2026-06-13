@@ -44,14 +44,22 @@ done
 # ──────────────────────────────────────────────────────────────
 # Minikube — start if stopped (e.g. after a system reboot)
 # ──────────────────────────────────────────────────────────────
-MINIKUBE_MEMORY="${MINIKUBE_MEMORY:-6144}"
-MINIKUBE_CPUS="${MINIKUBE_CPUS:-4}"
+# Defaults must match setup.bash. Only used when CREATING a fresh cluster — an
+# existing cluster is resumed as-is, because minikube cannot change memory/CPUs
+# on an existing cluster and a forced restart can corrupt the API server.
+MINIKUBE_MEMORY="${MINIKUBE_MEMORY:-12288}"
+MINIKUBE_CPUS="${MINIKUBE_CPUS:-6}"
 
 echo "[run] Checking minikube..."
 if ! minikube status --format='{{.Host}}' 2>/dev/null | grep -q "Running"; then
-  echo "[run] Minikube not running — starting (${MINIKUBE_MEMORY} MB RAM, ${MINIKUBE_CPUS} CPUs)..."
-  minikube start --memory="${MINIKUBE_MEMORY}" --cpus="${MINIKUBE_CPUS}" --driver=docker 2>/dev/null \
-    || minikube start --memory="${MINIKUBE_MEMORY}" --cpus="${MINIKUBE_CPUS}"
+  if docker ps -a --format '{{.Names}}' 2>/dev/null | grep -qx minikube; then
+    echo "[run] Resuming existing minikube cluster..."
+    minikube start
+  else
+    echo "[run] Creating minikube cluster (${MINIKUBE_MEMORY} MB RAM, ${MINIKUBE_CPUS} CPUs)..."
+    minikube start --memory="${MINIKUBE_MEMORY}" --cpus="${MINIKUBE_CPUS}" --driver=docker 2>/dev/null \
+      || minikube start --memory="${MINIKUBE_MEMORY}" --cpus="${MINIKUBE_CPUS}"
+  fi
 else
   echo "[run] Minikube already running."
 fi

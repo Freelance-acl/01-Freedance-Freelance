@@ -158,14 +158,23 @@ echo "[setup] Maven clean install (verifies the build compiles)..."
 # ──────────────────────────────────────────────────────────────
 # Minikube
 # ──────────────────────────────────────────────────────────────
-# Minimum supported host: 16 GB RAM. Per the Lab 9 install guide, the
-# "Recommended" tier for 16 GB hosts is 6144 MB. CPUs default to 4 (the most
-# Docker Desktop typically exposes). Override with MINIKUBE_MEMORY / MINIKUBE_CPUS.
-MINIKUBE_MEMORY="${MINIKUBE_MEMORY:-6144}"
-MINIKUBE_CPUS="${MINIKUBE_CPUS:-4}"
-echo "[setup] Starting minikube (${MINIKUBE_MEMORY} MB RAM, ${MINIKUBE_CPUS} CPUs)..."
-minikube start --memory="${MINIKUBE_MEMORY}" --cpus="${MINIKUBE_CPUS}" --driver=docker 2>/dev/null \
-  || minikube start --memory="${MINIKUBE_MEMORY}" --cpus="${MINIKUBE_CPUS}"
+# The full stack (5 PostgreSQL + MongoDB/Redis/RabbitMQ/Neo4j/Cassandra/Elasticsearch
+# + 6 Spring services + monitoring) needs ~10 GB. Default to 12 GB / 6 CPUs.
+# Requires a 16 GB+ host; override with MINIKUBE_MEMORY / MINIKUBE_CPUS for smaller machines.
+# NOTE: memory/CPUs are FIXED when the cluster is created. minikube refuses to change
+# them on an existing cluster (and a forced restart can corrupt the API server), so we
+# only pass --memory/--cpus when creating fresh and otherwise just resume.
+MINIKUBE_MEMORY="${MINIKUBE_MEMORY:-12288}"
+MINIKUBE_CPUS="${MINIKUBE_CPUS:-6}"
+if docker ps -a --format '{{.Names}}' 2>/dev/null | grep -qx minikube; then
+  echo "[setup] Existing minikube cluster detected — resuming as-is (memory/CPUs fixed at creation)."
+  echo "[setup]   To change memory/CPUs: 'minikube delete' then re-run ./setup.bash"
+  minikube start
+else
+  echo "[setup] Creating minikube cluster (${MINIKUBE_MEMORY} MB RAM, ${MINIKUBE_CPUS} CPUs)..."
+  minikube start --memory="${MINIKUBE_MEMORY}" --cpus="${MINIKUBE_CPUS}" --driver=docker 2>/dev/null \
+    || minikube start --memory="${MINIKUBE_MEMORY}" --cpus="${MINIKUBE_CPUS}"
+fi
 
 echo "[setup] Pointing Docker CLI to minikube's Docker daemon..."
 eval "$(minikube docker-env)"
