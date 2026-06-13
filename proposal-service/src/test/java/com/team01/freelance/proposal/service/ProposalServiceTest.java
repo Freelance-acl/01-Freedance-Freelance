@@ -698,15 +698,14 @@ class ProposalServiceTest {
 
         when(proposalRepository.findById(5L)).thenReturn(Optional.of(proposal));
         when(contractRepository.findByProposalId(5L)).thenReturn(Optional.of(contract));
-        when(contractRepository.completeActiveContract(eq(20L), any(LocalDateTime.class))).thenReturn(1);
-        when(jobRepository.markJobClosed(7L)).thenReturn(1);
+        when(proposalRepository.saveAndFlush(any())).thenReturn(proposal);
 
         Proposal result = proposalService.completeProposal(5L);
 
-        assertThat(result.getStatus()).isEqualTo(ProposalStatus.ACCEPTED);
-        verify(contractRepository).completeActiveContract(eq(20L), any(LocalDateTime.class));
-        verify(jobRepository).markJobClosed(7L);
-        verify(payoutRepository).insertPendingPayout(eq(20L), eq(30L), eq(2000.0), any(LocalDateTime.class));
+        assertThat(result.getStatus()).isEqualTo(ProposalStatus.COMPLETING);
+        verify(contractRepository, never()).completeActiveContract(anyLong(), any(LocalDateTime.class));
+        verify(jobRepository, never()).markJobClosed(anyLong());
+        verify(payoutRepository, never()).insertPendingPayout(anyLong(), anyLong(), anyDouble(), any());
     }
 
     @Test
@@ -749,15 +748,14 @@ class ProposalServiceTest {
         contract.setJobId(7L);
         contract.setFreelancerId(30L);
         contract.setAgreedAmount(2000.0);
-        contract.setStatus(ContractStatus.ACTIVE);
+        contract.setStatus(ContractStatus.COMPLETED);
 
         when(proposalRepository.findById(5L)).thenReturn(Optional.of(proposal));
         when(contractRepository.findByProposalId(5L)).thenReturn(Optional.of(contract));
-        when(contractRepository.completeActiveContract(eq(20L), any(LocalDateTime.class))).thenReturn(0);
 
         assertThatThrownBy(() -> proposalService.completeProposal(5L))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("Contract");
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("ACTIVE contract");
 
         verify(jobRepository, never()).markJobClosed(anyLong());
         verify(payoutRepository, never()).insertPendingPayout(anyLong(), anyLong(), anyDouble(), any());
