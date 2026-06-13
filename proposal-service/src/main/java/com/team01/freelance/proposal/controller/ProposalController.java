@@ -2,6 +2,7 @@ package com.team01.freelance.proposal.controller;
 
 import com.team01.freelance.proposal.dto.FeeEstimateDTO;
 import com.team01.freelance.proposal.dto.FeeEstimateRequest;
+import com.team01.freelance.proposal.dto.JobProposalSummaryByJobDTO;
 import com.team01.freelance.proposal.dto.JobProposalSummaryDTO;
 import com.team01.freelance.proposal.dto.JobRecommendationDTO;
 import com.team01.freelance.proposal.dto.ProposalAnalyticsDashboardDTO;
@@ -108,6 +109,12 @@ public class ProposalController {
             return ResponseEntity.status(401).build();
         }
         return ResponseEntity.ok(proposalRecommendationService.getRecommendations(freelancerId, limit, request));
+    }
+
+    @GetMapping("/jobs/summaries")
+    public ResponseEntity<List<JobProposalSummaryByJobDTO>> getJobProposalSummaries(
+            @RequestParam("jobIds") List<Long> jobIds) {
+        return ResponseEntity.ok(proposalService.getJobProposalSummaries(jobIds));
     }
 
     @GetMapping("/job/{jobId}/summary")

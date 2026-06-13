@@ -41,6 +41,9 @@ public class JobEventPublisher {
     }
 
     public void publishJobClosed(Job job) {
+        if (job == null) {
+            throw new IllegalArgumentException("job must not be null");
+        }
         JobClosedEvent event = new JobClosedEvent(job.getId(), job.getClientId());
         rabbitTemplate.convertAndSend(
                 RabbitMQConfig.JOB_EXCHANGE,

@@ -5,6 +5,7 @@ import com.team01.freelance.job.dto.JobProposalSummaryDTO;
 import com.team01.freelance.job.feign.ContractServiceClient;
 import com.team01.freelance.job.feign.ProposalServiceClient;
 import com.team01.freelance.job.feign.dto.ContractResponse;
+import com.team01.freelance.job.feign.dto.ProposalJobSummaryByJobResponse;
 import com.team01.freelance.job.feign.dto.ProposalJobSummaryResponse;
 import com.team01.freelance.job.messaging.JobEventPublisher;
 import com.team01.freelance.job.event.JobEventTypes;
@@ -751,12 +752,13 @@ class JobServiceTest {
         job.setId(1L);
         job.setTitle("Job A");
         job.setBudgetMax(5000.0);
-        ProposalJobSummaryResponse summary = new ProposalJobSummaryResponse();
+        ProposalJobSummaryByJobResponse summary = new ProposalJobSummaryByJobResponse();
+        summary.setJobId(1L);
         summary.setTotalProposals(2L);
 
         when(jobRepository.findByOrderByBudgetMaxDesc(PageRequest.of(0, 2)))
                 .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(job)));
-        when(proposalServiceClient.getJobProposalSummary(1L, null, null)).thenReturn(summary);
+        when(proposalServiceClient.getJobProposalSummaries(List.of(1L))).thenReturn(List.of(summary));
 
         List<TopBudgetJobDTO> result = jobService.getTopBudgetJobs(2);
 
@@ -766,6 +768,8 @@ class JobServiceTest {
         assertEquals(5000.0, result.getFirst().getBudgetMax());
         assertEquals(2L, result.getFirst().getTotalProposals());
         verify(jobRepository).findByOrderByBudgetMaxDesc(PageRequest.of(0, 2));
+        verify(proposalServiceClient).getJobProposalSummaries(List.of(1L));
+        verify(proposalServiceClient, never()).getJobProposalSummary(any(), any(), any());
     }
 
     @Test

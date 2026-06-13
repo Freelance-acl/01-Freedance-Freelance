@@ -27,6 +27,7 @@ import com.team01.freelance.contract.repository.ContractRepository;
 import com.team01.freelance.job.model.Job;
 import com.team01.freelance.job.repository.JobRepository;
 import com.team01.freelance.wallet.repository.PayoutRepository;
+import com.team01.freelance.proposal.dto.JobProposalSummaryByJobDTO;
 import com.team01.freelance.proposal.dto.JobProposalSummaryDTO;
 import com.team01.freelance.proposal.dto.ProposalAnalyticsDTO;
 import com.team01.freelance.proposal.dto.ProposalDetailsDTO;
@@ -559,5 +560,25 @@ public class ProposalService {
 
     public int getActiveProposalCountForJob(Long jobId) {
         return proposalRepository.countActiveProposalsByJobId(jobId);
+    }
+
+    public List<JobProposalSummaryByJobDTO> getJobProposalSummaries(List<Long> jobIds) {
+        if (jobIds == null || jobIds.isEmpty()) {
+            return List.of();
+        }
+        return proposalRepository.getJobProposalSummaries(jobIds).stream()
+                .map(this::toJobProposalSummaryByJobDTO)
+                .toList();
+    }
+
+    private JobProposalSummaryByJobDTO toJobProposalSummaryByJobDTO(Object[] row) {
+        return new JobProposalSummaryByJobDTO(
+                row[0] != null ? ((Number) row[0]).longValue() : null,
+                row[1] != null ? ((Number) row[1]).longValue() : 0L,
+                row[2] != null ? ((Number) row[2]).longValue() : 0L,
+                row[3] != null ? ((Number) row[3]).doubleValue() : 0.0,
+                row[4] != null ? ((Number) row[4]).doubleValue() : 0.0,
+                row[5] != null ? ((Number) row[5]).doubleValue() : 0.0
+        );
     }
 }

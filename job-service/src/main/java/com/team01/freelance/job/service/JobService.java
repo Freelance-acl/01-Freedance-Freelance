@@ -10,6 +10,7 @@ import com.team01.freelance.job.dto.JobProposalSummaryDTO;
 import com.team01.freelance.job.feign.ContractServiceClient;
 import com.team01.freelance.job.feign.ProposalServiceClient;
 import com.team01.freelance.job.feign.dto.ContractResponse;
+import com.team01.freelance.job.feign.dto.ProposalJobSummaryByJobResponse;
 import com.team01.freelance.job.feign.dto.ProposalJobSummaryResponse;
 import com.team01.freelance.job.event.JobEventTypes;
 import com.team01.freelance.job.exception.ForbiddenOperationException;
@@ -54,6 +55,8 @@ import org.springframework.data.domain.Pageable;
 
 @Service
 public class JobService {
+
+    private static final int MAX_TOP_BUDGET_LIMIT = 50;
 
     @Autowired
     private JobRepository jobRepository;
@@ -303,6 +306,38 @@ public class JobService {
         } catch (FeignException e) {
             throw new IllegalStateException("Failed to fetch proposal summary for job: " + jobId, e);
         }
+    }
+
+    private Map<Long, ProposalJobSummaryResponse> fetchAllTimeProposalSummaries(List<Long> jobIds) {
+        if (jobIds == null || jobIds.isEmpty()) {
+            return Map.of();
+        }
+        try {
+            List<ProposalJobSummaryByJobResponse> summaries = proposalServiceClient.getJobProposalSummaries(jobIds);
+            if (summaries == null || summaries.isEmpty()) {
+                return Map.of();
+            }
+            Map<Long, ProposalJobSummaryResponse> summariesByJobId = new HashMap<>();
+            for (ProposalJobSummaryByJobResponse summary : summaries) {
+                if (summary == null || summary.getJobId() == null) {
+                    continue;
+                }
+                summariesByJobId.put(summary.getJobId(), toProposalJobSummaryResponse(summary));
+            }
+            return summariesByJobId;
+        } catch (FeignException e) {
+            throw new IllegalStateException("Failed to fetch proposal summaries for jobs: " + jobIds, e);
+        }
+    }
+
+    private ProposalJobSummaryResponse toProposalJobSummaryResponse(ProposalJobSummaryByJobResponse summary) {
+        ProposalJobSummaryResponse response = new ProposalJobSummaryResponse();
+        response.setTotalProposals(summary.getTotalProposals());
+        response.setAcceptedProposals(summary.getAcceptedProposals());
+        response.setAverageBidAmount(summary.getAverageBidAmount());
+        response.setLowestBid(summary.getLowestBid());
+        response.setHighestBid(summary.getHighestBid());
+        return response;
     }
 
     private int fetchActiveContractCount(Long jobId) {
@@ -672,10 +707,21 @@ public class JobService {
      */
     @Cacheable(value = "S2-F6", key = "#limit", unless = "#result == null or #result.isEmpty()")
     public List<TopBudgetJobDTO> getTopBudgetJobs(int limit) {
-        return jobRepository.findByOrderByBudgetMaxDesc(PageRequest.of(0, limit)).stream()
+        int cappedLimit = Math.min(Math.max(limit, 1), MAX_TOP_BUDGET_LIMIT);
+        List<Job> jobs = jobRepository.findByOrderByBudgetMaxDesc(PageRequest.of(0, cappedLimit)).getContent();
+        if (jobs.isEmpty()) {
+            return List.of();
+        }
+
+        Map<Long, ProposalJobSummaryResponse> summariesByJobId =
+                fetchAllTimeProposalSummaries(jobs.stream().map(Job::getId).toList());
+
+        return jobs.stream()
                 .map(job -> {
-                    ProposalJobSummaryResponse summary = fetchAllTimeProposalSummary(job.getId());
-                    Long totalProposals = summary.getTotalProposals() != null ? summary.getTotalProposals() : 0L;
+                    ProposalJobSummaryResponse summary = summariesByJobId.get(job.getId());
+                    Long totalProposals = summary != null && summary.getTotalProposals() != null
+                            ? summary.getTotalProposals()
+                            : 0L;
                     return new TopBudgetJobDTO(job.getId(), job.getTitle(), job.getBudgetMax(), totalProposals);
                 })
                 .toList();

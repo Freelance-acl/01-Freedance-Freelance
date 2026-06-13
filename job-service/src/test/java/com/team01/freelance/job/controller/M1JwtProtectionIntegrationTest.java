@@ -4,6 +4,7 @@ import com.team01.freelance.job.model.Job;
 import com.team01.freelance.job.model.JobCategory;
 import com.team01.freelance.job.model.JobStatus;
 import com.team01.freelance.job.repository.JobRepository;
+import com.team01.freelance.job.feign.dto.ProposalJobSummaryByJobResponse;
 import com.team01.freelance.job.feign.dto.ProposalJobSummaryResponse;
 import com.team01.freelance.job.support.AbstractIntegrationTest;
 import com.team01.freelance.job.support.TestAuthHelper;
@@ -21,10 +22,11 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
 import org.springframework.cache.CacheManager;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -135,9 +137,10 @@ class M1JwtProtectionIntegrationTest extends AbstractIntegrationTest {
     @Test
     void topBudgetReport_withValidToken_returns200() throws Exception {
         Job job = saveJob("JWT top budget job", JobStatus.OPEN, 4000.0, Map.of("experienceLevel", "MID"));
-        ProposalJobSummaryResponse summary = new ProposalJobSummaryResponse();
+        ProposalJobSummaryByJobResponse summary = new ProposalJobSummaryByJobResponse();
+        summary.setJobId(job.getId());
         summary.setTotalProposals(0L);
-        when(proposalServiceClient.getJobProposalSummary(any(Long.class), isNull(), isNull())).thenReturn(summary);
+        when(proposalServiceClient.getJobProposalSummaries(anyList())).thenReturn(List.of(summary));
 
         mockMvc.perform(get("/api/jobs/reports/top-budget")
                         .header("Authorization", TestAuthHelper.bearer(adminToken))

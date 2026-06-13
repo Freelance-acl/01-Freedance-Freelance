@@ -37,7 +37,7 @@ public class JobSagaConsumer {
                 log.debug("Ignoring unsupported job-service saga event {}", event.getClass().getName());
             }
         } catch (RuntimeException e) {
-            log.error("Failed to process job-service saga event: {}", e.getMessage());
+            log.error("Failed to process job-service saga event", e);
             throw e;
         }
     }

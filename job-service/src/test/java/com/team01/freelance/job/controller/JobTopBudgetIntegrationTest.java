@@ -4,6 +4,7 @@ import com.team01.freelance.job.model.Job;
 import com.team01.freelance.job.model.JobCategory;
 import com.team01.freelance.job.model.JobStatus;
 import com.team01.freelance.job.repository.JobRepository;
+import com.team01.freelance.job.feign.dto.ProposalJobSummaryByJobResponse;
 import com.team01.freelance.job.feign.dto.ProposalJobSummaryResponse;
 import com.team01.freelance.job.support.AbstractIntegrationTest;
 import com.team01.freelance.user.model.User;
@@ -19,8 +20,9 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
 
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
+import java.util.List;
+
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -65,12 +67,14 @@ class JobTopBudgetIntegrationTest extends AbstractIntegrationTest {
         insertProposal(high.getId());
         insertProposal(mid.getId());
 
-        ProposalJobSummaryResponse highSummary = new ProposalJobSummaryResponse();
+        ProposalJobSummaryByJobResponse highSummary = new ProposalJobSummaryByJobResponse();
+        highSummary.setJobId(high.getId());
         highSummary.setTotalProposals(2L);
-        ProposalJobSummaryResponse midSummary = new ProposalJobSummaryResponse();
+        ProposalJobSummaryByJobResponse midSummary = new ProposalJobSummaryByJobResponse();
+        midSummary.setJobId(mid.getId());
         midSummary.setTotalProposals(1L);
-        when(proposalServiceClient.getJobProposalSummary(eq(high.getId()), isNull(), isNull())).thenReturn(highSummary);
-        when(proposalServiceClient.getJobProposalSummary(eq(mid.getId()), isNull(), isNull())).thenReturn(midSummary);
+        when(proposalServiceClient.getJobProposalSummaries(anyList()))
+                .thenReturn(List.of(highSummary, midSummary));
 
         mockMvc.perform(get("/api/jobs/reports/top-budget").param("limit", "2"))
                 .andExpect(status().isOk())

@@ -82,6 +82,20 @@ public interface ProposalRepository extends JpaRepository<Proposal, Long> {
     int countActiveProposalsByJobId(@Param("jobId") Long jobId);
 
     @Query(value = """
+            SELECT
+                p.job_id AS jobId,
+                COUNT(p.id) AS totalProposals,
+                COALESCE(SUM(CASE WHEN p.status = 'ACCEPTED' THEN 1 ELSE 0 END), 0) AS acceptedProposals,
+                COALESCE(AVG(p.bid_amount), 0) AS averageBidAmount,
+                COALESCE(MIN(p.bid_amount), 0) AS lowestBid,
+                COALESCE(MAX(p.bid_amount), 0) AS highestBid
+            FROM proposals p
+            WHERE p.job_id IN (:jobIds)
+            GROUP BY p.job_id
+            """, nativeQuery = true)
+    List<Object[]> getJobProposalSummaries(@Param("jobIds") List<Long> jobIds);
+
+    @Query(value = """
             SELECT id
             FROM proposals
             WHERE metadata ->> :key = :value
