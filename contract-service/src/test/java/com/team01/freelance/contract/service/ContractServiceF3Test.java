@@ -1,14 +1,21 @@
 package com.team01.freelance.contract.service;
 
 import com.team01.freelance.contract.dto.ContractSummaryDTO;
+import com.team01.freelance.contract.feign.JobServiceClient;
+import com.team01.freelance.contract.feign.UserServiceClient;
+import com.team01.freelance.contract.model.Contract;
 import com.team01.freelance.contract.model.ContractStatus;
 import com.team01.freelance.contract.repository.ContractRepository;
+import com.team01.freelance.job.model.Job;
+import com.team01.freelance.user.model.User;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import javax.sql.DataSource;
+import java.sql.Connection;
+import java.sql.DatabaseMetaData;
 import java.time.LocalDateTime;
-import java.util.Collections;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -21,22 +28,47 @@ class ContractServiceF3Test {
 
     private ContractService contractService;
     private ContractRepository contractRepository;
+    private UserServiceClient userServiceClient;
+    private JobServiceClient jobServiceClient;
 
     @BeforeEach
-    void setUp() {
+    void setUp() throws Exception {
         contractService = new ContractService();
         contractRepository = mock(ContractRepository.class);
+        userServiceClient = mock(UserServiceClient.class);
+        jobServiceClient = mock(JobServiceClient.class);
         ReflectionTestUtils.setField(contractService, "contractRepository", contractRepository);
+        ReflectionTestUtils.setField(contractService, "userServiceClient", userServiceClient);
+        ReflectionTestUtils.setField(contractService, "jobServiceClient", jobServiceClient);
+        DataSource dataSource = mock(DataSource.class);
+        Connection connection = mock(Connection.class);
+        DatabaseMetaData metaData = mock(DatabaseMetaData.class);
+        when(dataSource.getConnection()).thenReturn(connection);
+        when(connection.getMetaData()).thenReturn(metaData);
+        when(metaData.getDatabaseProductName()).thenReturn("PostgreSQL");
+        ReflectionTestUtils.setField(contractService, "dataSource", dataSource);
     }
 
     @Test
     void searchContractsMapsJoinedRowsToDto() {
         LocalDateTime start = LocalDateTime.of(2026, 3, 1, 9, 0);
         LocalDateTime end = LocalDateTime.of(2026, 3, 5, 9, 0);
+        Contract contract = new Contract();
+        contract.setId(9L);
+        contract.setFreelancerId(10L);
+        contract.setJobId(20L);
+        contract.setAgreedAmount(5000.0);
+        contract.setStatus(ContractStatus.ACTIVE);
+        contract.setStartDate(start);
+        contract.setEndDate(end);
+        User user = new User();
+        user.setName("Nour");
+        Job job = new Job();
+        job.setTitle("Backend API");
         when(contractRepository.searchContracts(2000.0, 6000.0, "ACTIVE"))
-                .thenReturn(Collections.singletonList(new Object[]{
-                        9L, "Nour", "Backend API", 5000.0, "ACTIVE", start, end
-                }));
+                .thenReturn(List.of(contract));
+        when(userServiceClient.getUser(10L)).thenReturn(user);
+        when(jobServiceClient.getJob(20L)).thenReturn(job);
 
         List<ContractSummaryDTO> result = contractService.searchContracts(2000.0, 6000.0, "ACTIVE");
 

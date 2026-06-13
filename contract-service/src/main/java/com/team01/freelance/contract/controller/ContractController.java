@@ -10,6 +10,7 @@ import com.team01.freelance.contract.model.Contract;
 import com.team01.freelance.contract.dto.FreelancerPerformanceDTO;
 import com.team01.freelance.contract.dto.StalledContractDTO;
 import com.team01.freelance.contract.service.ContractService;
+import com.team01.freelance.user.dto.UserContractSummaryDTO;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -52,6 +53,59 @@ public class ContractController {
     public ResponseEntity<Contract> getActiveContractForUser(@PathVariable Long userId) {
         try {
             return ResponseEntity.ok(contractService.getActiveContractForUser(userId));
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @GetMapping("/user/{userId}/summary")
+    public ResponseEntity<UserContractSummaryDTO> getUserContractSummary(@PathVariable Long userId) {
+        try {
+            return ResponseEntity.ok(contractService.getUserContractSummary(userId));
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @GetMapping("/user/{userId}/active-count")
+    public ResponseEntity<Integer> getActiveContractCountForUser(@PathVariable Long userId) {
+        try {
+            return ResponseEntity.ok(contractService.getActiveContractCountForUser(userId));
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @GetMapping("/user/{userId}/completed-count")
+    public ResponseEntity<Long> getCompletedContractCountForUser(@PathVariable Long userId) {
+        try {
+            return ResponseEntity.ok(contractService.getCompletedContractCountForUser(userId));
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @GetMapping("/job/{jobId}/active-count")
+    public ResponseEntity<Integer> getActiveContractCountForJob(@PathVariable Long jobId) {
+        try {
+            return ResponseEntity.ok(contractService.getActiveContractCountForJob(jobId));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @GetMapping("/proposal/{proposalId}/active")
+    public ResponseEntity<Contract> getActiveContractForProposal(@PathVariable Long proposalId) {
+        try {
+            return ResponseEntity.ok(contractService.getActiveContractForProposal(proposalId));
         } catch (EntityNotFoundException e) {
             return ResponseEntity.notFound().build();
         } catch (IllegalArgumentException e) {
