@@ -27,6 +27,7 @@ import com.team01.freelance.contract.repository.ContractRepository;
 import com.team01.freelance.job.model.Job;
 import com.team01.freelance.job.repository.JobRepository;
 import com.team01.freelance.wallet.repository.PayoutRepository;
+import com.team01.freelance.proposal.dto.JobProposalSummaryDTO;
 import com.team01.freelance.proposal.dto.ProposalAnalyticsDTO;
 import com.team01.freelance.proposal.dto.ProposalDetailsDTO;
 import com.team01.freelance.proposal.model.MilestoneStatus;
@@ -533,5 +534,30 @@ public class ProposalService {
         if (startDate.isAfter(endDate)) {
             throw new IllegalArgumentException("startDate must be on or before endDate");
         }
+    }
+
+    public JobProposalSummaryDTO getJobProposalSummary(Long jobId, LocalDate startDate, LocalDate endDate) {
+        jobRepository.findById(jobId)
+                .orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + jobId));
+
+        LocalDateTime queryStart = startDate == null ? null : startDate.atStartOfDay();
+        LocalDateTime queryEndExclusive = endDate == null ? null : endDate.plusDays(1).atStartOfDay();
+        if (startDate != null && endDate != null) {
+            validateDateRange(startDate, endDate);
+        }
+
+        List<Object[]> rows = proposalRepository.getJobProposalSummary(jobId, queryStart, queryEndExclusive);
+        Object[] row = rows.isEmpty() ? new Object[]{0L, 0L, 0.0, 0.0, 0.0} : rows.get(0);
+        return new JobProposalSummaryDTO(
+                row[0] != null ? ((Number) row[0]).longValue() : 0L,
+                row[1] != null ? ((Number) row[1]).longValue() : 0L,
+                row[2] != null ? ((Number) row[2]).doubleValue() : 0.0,
+                row[3] != null ? ((Number) row[3]).doubleValue() : 0.0,
+                row[4] != null ? ((Number) row[4]).doubleValue() : 0.0
+        );
+    }
+
+    public int getActiveProposalCountForJob(Long jobId) {
+        return proposalRepository.countActiveProposalsByJobId(jobId);
     }
 }

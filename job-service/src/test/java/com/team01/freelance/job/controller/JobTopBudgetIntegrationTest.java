@@ -4,6 +4,7 @@ import com.team01.freelance.job.model.Job;
 import com.team01.freelance.job.model.JobCategory;
 import com.team01.freelance.job.model.JobStatus;
 import com.team01.freelance.job.repository.JobRepository;
+import com.team01.freelance.job.feign.dto.ProposalJobSummaryResponse;
 import com.team01.freelance.job.support.AbstractIntegrationTest;
 import com.team01.freelance.user.model.User;
 import com.team01.freelance.user.model.UserRole;
@@ -18,6 +19,9 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
 
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -60,6 +64,13 @@ class JobTopBudgetIntegrationTest extends AbstractIntegrationTest {
         insertProposal(high.getId());
         insertProposal(high.getId());
         insertProposal(mid.getId());
+
+        ProposalJobSummaryResponse highSummary = new ProposalJobSummaryResponse();
+        highSummary.setTotalProposals(2L);
+        ProposalJobSummaryResponse midSummary = new ProposalJobSummaryResponse();
+        midSummary.setTotalProposals(1L);
+        when(proposalServiceClient.getJobProposalSummary(eq(high.getId()), isNull(), isNull())).thenReturn(highSummary);
+        when(proposalServiceClient.getJobProposalSummary(eq(mid.getId()), isNull(), isNull())).thenReturn(midSummary);
 
         mockMvc.perform(get("/api/jobs/reports/top-budget").param("limit", "2"))
                 .andExpect(status().isOk())

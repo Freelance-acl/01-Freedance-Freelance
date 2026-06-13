@@ -1,12 +1,19 @@
 package com.team01.freelance.job.service;
 
 import com.team01.freelance.common.observer.EventSubject;
+import com.team01.freelance.contracts.events.ProposalAcceptedEvent;
+import com.team01.freelance.contracts.events.ProposalCancelledEvent;
+import com.team01.freelance.contracts.events.ProposalCompletedEvent;
+import com.team01.freelance.contracts.events.ProposalWithdrawnEvent;
 import com.team01.freelance.job.dto.JobDashboardDTO;
 import com.team01.freelance.job.dto.JobProposalSummaryDTO;
-import com.team01.freelance.job.client.ContractLookupClient;
-import com.team01.freelance.job.client.ContractSummary;
+import com.team01.freelance.job.feign.ContractServiceClient;
+import com.team01.freelance.job.feign.ProposalServiceClient;
+import com.team01.freelance.job.feign.dto.ContractResponse;
+import com.team01.freelance.job.feign.dto.ProposalJobSummaryResponse;
 import com.team01.freelance.job.event.JobEventTypes;
 import com.team01.freelance.job.exception.ForbiddenOperationException;
+import com.team01.freelance.job.messaging.JobEventPublisher;
 import com.team01.freelance.job.model.JobAttachmentAlertDTO;
 import com.team01.freelance.job.model.JobAttachment;
 import com.team01.freelance.job.model.JobAttachmentVerificationRequest;
@@ -20,6 +27,7 @@ import com.team01.freelance.job.search.service.JobSearchIndexOperations;
 import com.team01.freelance.user.model.User;
 import com.team01.freelance.user.model.UserRole;
 import com.team01.freelance.user.repository.UserRepository;
+import feign.FeignException;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -41,6 +49,7 @@ import java.util.LinkedHashMap;
 import java.util.Objects;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
 @Service
@@ -53,7 +62,13 @@ public class JobService {
     private UserRepository userRepository;
 
     @Autowired
-    private ContractLookupClient contractLookupClient;
+    private ContractServiceClient contractServiceClient;
+
+    @Autowired
+    private ProposalServiceClient proposalServiceClient;
+
+    @Autowired
+    private JobEventPublisher jobEventPublisher;
 
     @Autowired
     private JobAttachmentRepository jobAttachmentRepository;
@@ -142,6 +157,7 @@ public class JobService {
     })
     public Job updateJob(Long id, Job jobDetails) {
         return jobRepository.findById(id).map(existingJob -> {
+                JobStatus previousStatus = existingJob.getStatus();
                 if (jobDetails.getTitle() != null) existingJob.setTitle(jobDetails.getTitle());
                 if (jobDetails.getDescription() != null) existingJob.setDescription(jobDetails.getDescription());
                 if (jobDetails.getCategory() != null) existingJob.setCategory(jobDetails.getCategory());
@@ -158,6 +174,9 @@ public class JobService {
             Job savedJob = jobRepository.save(existingJob);
             jobSearchIndexOperations.index(savedJob);
             publishJobEvent("JOB_UPDATED", savedJob.getId(), jobEventDetails(savedJob));
+            if (jobDetails.getStatus() != null && previousStatus != savedJob.getStatus()) {
+                jobEventPublisher.publishJobStatusChanged(savedJob.getId(), previousStatus, savedJob.getStatus());
+            }
             return savedJob;
         }).orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + id));
     }
@@ -246,33 +265,71 @@ public class JobService {
             throw new IllegalArgumentException("startDate must be on or before endDate");
         }
 
-        // Verify job exists
-        if (!jobRepository.existsById(jobId)) {
-            throw new EntityNotFoundException("Job not found with id: " + jobId);
-        }
+        Job job = jobRepository.findById(jobId)
+                .orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + jobId));
 
-        // Convert LocalDate to LocalDateTime for database query
-        // Use half-open interval: [startDate, endDate+1) for inclusive end date
-        LocalDateTime queryStart = startDate.atStartOfDay();
-        LocalDateTime queryEndExclusive = endDate.plusDays(1).atStartOfDay();
-
-        List<Object[]> rows = jobRepository.getProposalSummary(jobId, queryStart, queryEndExclusive);
-        if (rows.isEmpty()) {
-            throw new EntityNotFoundException("Job not found with id: " + jobId);
-        }
-        return toJobProposalSummaryDTO(rows.get(0));
-    }
-
-    private JobProposalSummaryDTO toJobProposalSummaryDTO(Object[] row) {
+        ProposalJobSummaryResponse summary = fetchProposalSummary(jobId, startDate, endDate);
         return JobProposalSummaryDTO.builder()
-                .jobId(row[0] != null ? ((Number) row[0]).longValue() : null)
-                .title(row[1] != null ? row[1].toString() : null)
-                .totalProposals(row[2] != null ? ((Number) row[2]).longValue() : 0L)
-                .averageBidAmount(row[3] != null ? ((Number) row[3]).doubleValue() : 0.0)
-                .lowestBid(row[4] != null ? ((Number) row[4]).doubleValue() : 0.0)
-                .highestBid(row[5] != null ? ((Number) row[5]).doubleValue() : 0.0)
+                .jobId(jobId)
+                .title(job.getTitle())
+                .totalProposals(summary.getTotalProposals() != null ? summary.getTotalProposals() : 0L)
+                .averageBidAmount(summary.getAverageBidAmount() != null ? summary.getAverageBidAmount() : 0.0)
+                .lowestBid(summary.getLowestBid() != null ? summary.getLowestBid() : 0.0)
+                .highestBid(summary.getHighestBid() != null ? summary.getHighestBid() : 0.0)
                 .build();
     }
+
+    private ProposalJobSummaryResponse fetchProposalSummary(Long jobId, LocalDate startDate, LocalDate endDate) {
+        try {
+            ProposalJobSummaryResponse summary = proposalServiceClient.getJobProposalSummary(jobId, startDate, endDate);
+            if (summary == null) {
+                throw new IllegalStateException("Proposal service returned an empty response for job: " + jobId);
+            }
+            return summary;
+        } catch (FeignException.NotFound e) {
+            throw new EntityNotFoundException("Job not found with id: " + jobId);
+        } catch (FeignException e) {
+            throw new IllegalStateException("Failed to fetch proposal summary for job: " + jobId, e);
+        }
+    }
+
+    private ProposalJobSummaryResponse fetchAllTimeProposalSummary(Long jobId) {
+        try {
+            ProposalJobSummaryResponse summary = proposalServiceClient.getJobProposalSummary(jobId, null, null);
+            if (summary == null) {
+                throw new IllegalStateException("Proposal service returned an empty response for job: " + jobId);
+            }
+            return summary;
+        } catch (FeignException e) {
+            throw new IllegalStateException("Failed to fetch proposal summary for job: " + jobId, e);
+        }
+    }
+
+    private int fetchActiveContractCount(Long jobId) {
+        try {
+            Integer count = contractServiceClient.getActiveContractCountForJob(jobId);
+            return count != null ? count : 0;
+        } catch (FeignException.BadRequest e) {
+            throw new IllegalArgumentException("Invalid job id for active contract lookup: " + jobId);
+        } catch (FeignException e) {
+            throw new IllegalStateException("Failed to fetch active contract count for job: " + jobId, e);
+        }
+    }
+
+    private ContractResponse fetchContract(Long contractId) {
+        try {
+            ContractResponse contract = contractServiceClient.getContractById(contractId);
+            if (contract == null) {
+                throw new IllegalStateException("Contract service returned an empty response for id: " + contractId);
+            }
+            return contract;
+        } catch (FeignException.NotFound e) {
+            throw new EntityNotFoundException("Contract not found with id: " + contractId);
+        } catch (FeignException e) {
+            throw new IllegalStateException("Failed to fetch contract: " + contractId, e);
+        }
+    }
+
     @Transactional(readOnly = true)
     public List<JobAttachmentAlertDTO> getJobsWithExpiredAttachments() {
         LocalDate today = LocalDate.now();
@@ -321,7 +378,7 @@ public class JobService {
             throw new IllegalArgumentException("Rating must be between 1 and 5");
         }
 
-        ContractSummary contract = contractLookupClient.getContractById(ratingRequest.getContractId());
+        ContractResponse contract = fetchContract(ratingRequest.getContractId());
 
         if (contract.getJobId() == null || !jobId.equals(contract.getJobId())) {
             throw new IllegalArgumentException("Contract must reference the job being rated");
@@ -345,6 +402,12 @@ public class JobService {
             "rating", ratingRequest.getRating(),
             "ratingCount", savedJob.getTotalRatings()
         ));
+        jobEventPublisher.publishJobRated(
+                savedJob.getId(),
+                ratingRequest.getContractId(),
+                ratingRequest.getRating(),
+                contract.getClientId()
+        );
         return savedJob;
     }
 
@@ -479,21 +542,17 @@ public class JobService {
             return job;
         }
 
-        int updated = jobRepository.closeJobIfEligible(jobId);
-        if (updated == 0) {
-            Job current = jobRepository.findById(jobId).orElseThrow();
-            if (current.getStatus() == JobStatus.CLOSED) {
-                return current;
-            }
+        if (fetchActiveContractCount(jobId) > 0) {
             throw new IllegalArgumentException("Cannot close job with an active contract");
         }
 
-        jobRepository.rejectSubmittedProposalsByJobId(jobId);
-
-        Job closedJob = jobRepository.findById(jobId)
-                .orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + jobId));
+        JobStatus previousStatus = job.getStatus();
+        job.setStatus(JobStatus.CLOSED);
+        Job closedJob = jobRepository.save(job);
         jobSearchIndexOperations.index(closedJob);
         publishJobClosedEvent(closedJob);
+        jobEventPublisher.publishJobClosed(closedJob);
+        jobEventPublisher.publishJobStatusChanged(closedJob.getId(), previousStatus, JobStatus.CLOSED);
         return closedJob;
     }
 
@@ -518,20 +577,90 @@ public class JobService {
 
     @Cacheable(value = "S2-F12", key = "#id")
     public JobDashboardDTO getCachedJobDashboard(Long id) {
-        List<Object[]> rows = jobRepository.getJobDashboard(id);
+        List<Object[]> rows = jobRepository.getJobDashboardBase(id);
         if (rows == null || rows.isEmpty()) {
             throw new EntityNotFoundException("Job not found with id: " + id);
         }
+        ProposalJobSummaryResponse summary = fetchAllTimeProposalSummary(id);
         Object[] row = rows.get(0);
         return JobDashboardDTO.builder()
                 .jobId(row[0] != null ? ((Number) row[0]).longValue() : null)
                 .title(row[1] != null ? row[1].toString() : null)
                 .rating(row[2] != null ? ((Number) row[2]).doubleValue() : 0.0)
-                .totalProposals(row[3] != null ? ((Number) row[3]).longValue() : 0L)
-                .acceptedProposals(row[4] != null ? ((Number) row[4]).longValue() : 0L)
-                .averageBidAmount(row[5] != null ? ((Number) row[5]).doubleValue() : 0.0)
-                .activeAttachments(row[6] != null ? ((Number) row[6]).longValue() : 0L)
+                .totalProposals(summary.getTotalProposals() != null ? summary.getTotalProposals() : 0L)
+                .acceptedProposals(summary.getAcceptedProposals() != null ? summary.getAcceptedProposals() : 0L)
+                .averageBidAmount(summary.getAverageBidAmount() != null ? summary.getAverageBidAmount() : 0.0)
+                .activeAttachments(row[3] != null ? ((Number) row[3]).longValue() : 0L)
                 .build();
+    }
+
+    @Transactional
+    @Caching(evict = {
+            @CacheEvict(value = "job-by-id", key = "#event.jobId()"),
+            @CacheEvict(value = "S2-F1", allEntries = true),
+            @CacheEvict(value = "S2-F3", allEntries = true),
+            @CacheEvict(value = "S2-F12", key = "#event.jobId()")
+    })
+    public void handleProposalAccepted(ProposalAcceptedEvent event) {
+        Job job = jobRepository.findById(event.jobId())
+                .orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + event.jobId()));
+        JobStatus previousStatus = job.getStatus();
+        jobRepository.markJobInProgress(event.jobId());
+        jobEventPublisher.publishJobStatusChanged(event.jobId(), previousStatus, JobStatus.IN_PROGRESS);
+        jobSearchIndexOperations.index(jobRepository.findById(event.jobId()).orElse(job));
+    }
+
+    @Transactional
+    @Caching(evict = {
+            @CacheEvict(value = "job-by-id", key = "#event.jobId()"),
+            @CacheEvict(value = "S2-F1", allEntries = true),
+            @CacheEvict(value = "S2-F12", key = "#event.jobId()")
+    })
+    public void handleProposalCompleted(ProposalCompletedEvent event) {
+        Job job = jobRepository.findById(event.jobId())
+                .orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + event.jobId()));
+        JobStatus previousStatus = job.getStatus();
+        jobRepository.markJobClosed(event.jobId());
+        jobEventPublisher.publishJobStatusChanged(event.jobId(), previousStatus, JobStatus.CLOSED);
+        jobSearchIndexOperations.index(jobRepository.findById(event.jobId()).orElse(job));
+    }
+
+    @Transactional
+    @Caching(evict = {
+            @CacheEvict(value = "job-by-id", key = "#event.jobId()"),
+            @CacheEvict(value = "S2-F1", allEntries = true),
+            @CacheEvict(value = "S2-F12", key = "#event.jobId()")
+    })
+    public void handleProposalCancelled(ProposalCancelledEvent event) {
+        Job job = jobRepository.findById(event.jobId())
+                .orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + event.jobId()));
+        if (job.getStatus() != JobStatus.IN_PROGRESS) {
+            return;
+        }
+        int updated = jobRepository.reopenIfInProgress(event.jobId());
+        if (updated > 0) {
+            jobEventPublisher.publishJobStatusChanged(event.jobId(), JobStatus.IN_PROGRESS, JobStatus.OPEN);
+            jobSearchIndexOperations.index(jobRepository.findById(event.jobId()).orElse(job));
+        }
+    }
+
+    @Transactional
+    @Caching(evict = {
+            @CacheEvict(value = "job-by-id", key = "#event.jobId()"),
+            @CacheEvict(value = "S2-F1", allEntries = true),
+            @CacheEvict(value = "S2-F12", key = "#event.jobId()")
+    })
+    public void handleProposalWithdrawn(ProposalWithdrawnEvent event) {
+        Job job = jobRepository.findById(event.jobId())
+                .orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + event.jobId()));
+        Integer activeCount = proposalServiceClient.getActiveProposalCountForJob(event.jobId());
+        if (activeCount != null && activeCount == 0) {
+            int updated = jobRepository.reopenIfInProgress(event.jobId());
+            if (updated > 0) {
+                jobEventPublisher.publishJobStatusChanged(event.jobId(), JobStatus.IN_PROGRESS, JobStatus.OPEN);
+                jobSearchIndexOperations.index(jobRepository.findById(event.jobId()).orElse(job));
+            }
+        }
     }
 
     /**
@@ -543,8 +672,12 @@ public class JobService {
      */
     @Cacheable(value = "S2-F6", key = "#limit", unless = "#result == null or #result.isEmpty()")
     public List<TopBudgetJobDTO> getTopBudgetJobs(int limit) {
-        return jobRepository.findTopBudgetJobs(limit).stream()
-                .map(d -> new TopBudgetJobDTO(d.getJobId(), d.getTitle(), d.getBudgetMax(), d.getTotalProposals()))
+        return jobRepository.findByOrderByBudgetMaxDesc(PageRequest.of(0, limit)).stream()
+                .map(job -> {
+                    ProposalJobSummaryResponse summary = fetchAllTimeProposalSummary(job.getId());
+                    Long totalProposals = summary.getTotalProposals() != null ? summary.getTotalProposals() : 0L;
+                    return new TopBudgetJobDTO(job.getId(), job.getTitle(), job.getBudgetMax(), totalProposals);
+                })
                 .toList();
     }
 

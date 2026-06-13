@@ -4,6 +4,8 @@ import com.team01.freelance.job.model.Job;
 import com.team01.freelance.job.model.JobCategory;
 import com.team01.freelance.job.model.JobStatus;
 import com.team01.freelance.job.repository.JobRepository;
+import com.team01.freelance.job.feign.ProposalServiceClient;
+import com.team01.freelance.job.feign.dto.ProposalJobSummaryResponse;
 import com.team01.freelance.job.support.AbstractIntegrationTest;
 import com.team01.freelance.user.model.User;
 import com.team01.freelance.user.model.UserRole;
@@ -22,6 +24,9 @@ import org.springframework.web.context.WebApplicationContext;
 import java.sql.Date;
 import java.time.LocalDate;
 
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -60,9 +65,14 @@ class JobDashboardIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void dashboard_returnsAggregatedMetrics() throws Exception {
-        insertProposal(300.0, "SUBMITTED");
-        insertProposal(500.0, "ACCEPTED");
         insertActiveAttachment();
+
+        ProposalJobSummaryResponse summary = new ProposalJobSummaryResponse();
+        summary.setTotalProposals(2L);
+        summary.setAcceptedProposals(1L);
+        summary.setAverageBidAmount(400.0);
+        when(proposalServiceClient.getJobProposalSummary(eq(job.getId()), isNull(), isNull()))
+                .thenReturn(summary);
 
         mockMvc.perform(get("/api/jobs/{id}/dashboard", job.getId()))
                 .andExpect(status().isOk())
@@ -76,6 +86,13 @@ class JobDashboardIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void dashboard_noProposals_returnsZeroAggregates() throws Exception {
+        ProposalJobSummaryResponse summary = new ProposalJobSummaryResponse();
+        summary.setTotalProposals(0L);
+        summary.setAcceptedProposals(0L);
+        summary.setAverageBidAmount(0.0);
+        when(proposalServiceClient.getJobProposalSummary(eq(job.getId()), isNull(), isNull()))
+                .thenReturn(summary);
+
         mockMvc.perform(get("/api/jobs/{id}/dashboard", job.getId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.jobId").value(job.getId().intValue()))

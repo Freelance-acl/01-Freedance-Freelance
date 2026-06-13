@@ -5,6 +5,8 @@ import com.team01.freelance.job.model.JobCategory;
 import com.team01.freelance.job.model.JobStatus;
 import com.team01.freelance.job.repository.JobRepository;
 import com.team01.freelance.job.support.AbstractIntegrationTest;
+import com.team01.freelance.job.feign.ProposalServiceClient;
+import com.team01.freelance.job.feign.dto.ProposalJobSummaryResponse;
 import com.team01.freelance.user.model.User;
 import com.team01.freelance.user.model.UserRole;
 import com.team01.freelance.user.model.UserStatus;
@@ -21,6 +23,8 @@ import org.springframework.web.context.WebApplicationContext;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -31,6 +35,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Transactional
 @WithMockUser(roles = "ADMIN")
 class JobProposalSummaryIntegrationTest extends AbstractIntegrationTest {
+
+    @Autowired
+    private ProposalServiceClient proposalServiceClient;
 
     private MockMvc mockMvc;
 
@@ -59,9 +66,16 @@ class JobProposalSummaryIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void proposalSummary_aggregatesProposalsInDateRange() throws Exception {
-        insertProposal(200.0, LocalDateTime.of(2026, 3, 5, 10, 0));
-        insertProposal(400.0, LocalDateTime.of(2026, 3, 15, 10, 0));
-        insertProposal(900.0, LocalDateTime.of(2026, 4, 1, 10, 0));
+        ProposalJobSummaryResponse summary = new ProposalJobSummaryResponse();
+        summary.setTotalProposals(2L);
+        summary.setAverageBidAmount(300.0);
+        summary.setLowestBid(200.0);
+        summary.setHighestBid(400.0);
+        when(proposalServiceClient.getJobProposalSummary(
+                eq(job.getId()),
+                eq(java.time.LocalDate.of(2026, 3, 1)),
+                eq(java.time.LocalDate.of(2026, 3, 31))))
+                .thenReturn(summary);
 
         mockMvc.perform(get("/api/jobs/{id}/proposal-summary", job.getId())
                         .param("startDate", "2026-03-01")

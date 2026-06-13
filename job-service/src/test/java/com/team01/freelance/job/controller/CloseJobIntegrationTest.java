@@ -1,5 +1,6 @@
 package com.team01.freelance.job.controller;
 
+import com.team01.freelance.job.feign.ContractServiceClient;
 import com.team01.freelance.job.model.Job;
 import com.team01.freelance.job.model.JobCategory;
 import com.team01.freelance.job.model.JobStatus;
@@ -19,10 +20,9 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.web.context.WebApplicationContext;
 
-import java.sql.Timestamp;
-import java.time.LocalDateTime;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -55,9 +55,6 @@ class CloseJobIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private UserRepository userRepository;
 
-    @Autowired
-    private JdbcTemplate jdbcTemplate;
-
     private User client;
     private User freelancer;
 
@@ -70,23 +67,15 @@ class CloseJobIntegrationTest extends AbstractIntegrationTest {
         freelancer = saveUser("Freelancer", "freelancer-" + suffix + "@test.dev", UserRole.FREELANCER);
     }
 
-    /**
-     * Spec scenarios (a)–(d): active contract blocks close; after completion close succeeds and proposals rejected.
-     */
     @Test
     void closeJob_withActiveContract_returns400_thenSucceedsAfterCompletion() throws Exception {
         Job job = saveOpenJob();
-        Long contractId = insertContract(job.getId(), "ACTIVE");
-        insertProposal(job.getId(), "SUBMITTED");
-        insertProposal(job.getId(), "SUBMITTED");
+        when(contractServiceClient.getActiveContractCountForJob(eq(job.getId()))).thenReturn(1, 0);
 
         mockMvc.perform(put(CLOSE_URL, job.getId())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(CLOSE_BODY))
                 .andExpect(status().isBadRequest());
-
-        jdbcTemplate.update("UPDATE contracts SET status = ? WHERE id = ?", "COMPLETED", contractId);
-        assertEquals(0, countActiveContracts(job.getId()));
 
         mockMvc.perform(put(CLOSE_URL, job.getId())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -95,8 +84,6 @@ class CloseJobIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.status").value("CLOSED"));
 
         assertEquals(JobStatus.CLOSED, jobRepository.findById(job.getId()).orElseThrow().getStatus());
-        assertEquals(0, countProposalsByStatus(job.getId(), "SUBMITTED"));
-        assertEquals(2, countProposalsByStatus(job.getId(), "REJECTED"));
     }
 
     @Test
@@ -138,40 +125,5 @@ class CloseJobIntegrationTest extends AbstractIntegrationTest {
         job.setBudgetMin(100.0);
         job.setBudgetMax(500.0);
         return jobRepository.save(job);
-    }
-
-    private Long insertContract(Long jobId, String status) {
-        LocalDateTime now = LocalDateTime.now();
-        jdbcTemplate.update("""
-                INSERT INTO contracts (job_id, freelancer_id, client_id, proposal_id, agreed_amount, status,
-                                       start_date, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                jobId, freelancer.getId(), client.getId(), 1L, 250.0, status,
-                Timestamp.valueOf(now), Timestamp.valueOf(now));
-        return jdbcTemplate.queryForObject("SELECT MAX(id) FROM contracts WHERE job_id = ?", Long.class, jobId);
-    }
-
-    private void insertProposal(Long jobId, String status) {
-        jdbcTemplate.update("""
-                INSERT INTO proposals (job_id, freelancer_id, cover_letter, bid_amount, estimated_days, status,
-                                       submitted_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-                """,
-                jobId, freelancer.getId(), "Interested", 200.0, 7, status, Timestamp.valueOf(LocalDateTime.now()));
-    }
-
-    private int countProposalsByStatus(Long jobId, String status) {
-        Integer count = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM proposals WHERE job_id = ? AND status = ?",
-                Integer.class, jobId, status);
-        return count != null ? count : 0;
-    }
-
-    private int countActiveContracts(Long jobId) {
-        Integer count = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM contracts WHERE job_id = ? AND status = 'ACTIVE'",
-                Integer.class, jobId);
-        return count != null ? count : 0;
     }
 }
