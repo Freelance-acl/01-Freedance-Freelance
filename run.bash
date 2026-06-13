@@ -160,6 +160,14 @@ echo
 echo "  All routes except /api/auth/** require a JWT."
 echo "  Get one from /api/auth/login, then pass:  Authorization: Bearer <token>"
 echo
+echo "  HEALTH CHECK (public, no token — quickest way to confirm the stack is up):"
+echo "    curl ${GW}/health                 # gateway -> user-service, returns: OK"
+echo "    curl ${GW}/api/users/health       # user-service"
+echo "    curl ${GW}/api/jobs/health        # job-service"
+echo "    curl ${GW}/api/proposals/health   # proposal-service"
+echo "    curl ${GW}/api/contracts/health   # contract-service"
+echo "    curl ${GW}/api/payouts/health     # wallet-service"
+echo
 echo "  PUBLIC (no token needed):"
 echo "    POST  ${GW}/api/auth/register"
 echo "    POST  ${GW}/api/auth/login"

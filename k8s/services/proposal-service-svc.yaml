@@ -8,5 +8,5 @@ spec:
   selector:
     app: proposal-service
   ports:
-    - port: 8082
-      targetPort: 8082
+    - port: 8080
+      targetPort: 8080

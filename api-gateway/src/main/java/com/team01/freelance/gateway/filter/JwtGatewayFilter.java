@@ -36,8 +36,10 @@ public class JwtGatewayFilter implements GlobalFilter, Ordered {
         }
         final String finalCorrelationId = correlationId;
 
-        // Auth and health endpoints pass through without JWT
-        if (path.startsWith("/api/auth/") || path.equals("/health")) {
+        // Auth and health endpoints pass through without JWT.
+        // Any path ending in /health is public (matches each service's PublicEndpoints rule):
+        // /health (gateway shortcut) plus /api/users/health, /api/jobs/health, etc.
+        if (path.startsWith("/api/auth/") || path.endsWith("/health")) {
             return chain.filter(exchange.mutate()
                     .request(r -> r.header(CORRELATION_ID_HEADER, finalCorrelationId))
                     .build());

@@ -31,7 +31,9 @@ spring:
               predicates:
                 - Path=/health
               filters:
-                - RewritePath=/health, /actuator/health
+                # user-service's public HealthController returns "OK" without auth
+                # (PublicEndpoints treats any path ending in /health as public).
+                - RewritePath=/health, /api/users/health
 
 server:
   port: ${SERVER_PORT:8080}
