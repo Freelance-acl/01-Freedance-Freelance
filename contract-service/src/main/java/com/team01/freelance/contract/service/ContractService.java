@@ -10,6 +10,9 @@ import com.team01.freelance.contract.dto.ContractMilestoneDTO;
 import com.team01.freelance.contract.dto.ContractMilestoneTrackRequest;
 import com.team01.freelance.contract.dto.FreelancerPerformanceDTO;
 import com.team01.freelance.contract.dto.StalledContractDTO;
+import com.team01.freelance.contract.feign.JobServiceClient;
+import com.team01.freelance.contract.feign.UserServiceClient;
+import com.team01.freelance.contract.messaging.ContractEventPublisher;
 import com.team01.freelance.contract.milestone.ContractMilestoneEvent;
 import com.team01.freelance.contract.milestone.ContractMilestoneStatus;
 import com.team01.freelance.contract.milestone.ContractMilestoneTimelineRepository;
@@ -17,6 +20,14 @@ import com.team01.freelance.contract.model.Contract;
 import com.team01.freelance.contract.model.ContractStatus;
 import com.team01.freelance.contract.observer.EntityObserver;
 import com.team01.freelance.contract.repository.ContractRepository;
+import com.team01.freelance.contracts.events.ProposalAcceptedEvent;
+import com.team01.freelance.contracts.events.ProposalCancelledEvent;
+import com.team01.freelance.contracts.events.ProposalCompletedEvent;
+import com.team01.freelance.contracts.events.UserDeactivatedEvent;
+import com.team01.freelance.job.model.Job;
+import com.team01.freelance.user.model.User;
+import com.team01.freelance.user.dto.UserContractSummaryDTO;
+import feign.FeignException;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
@@ -28,6 +39,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import javax.sql.DataSource;
 
+import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -61,10 +73,62 @@ public class ContractService {
     @Autowired
     private ContractAnalyticsCacheService contractAnalyticsCacheService;
 
+    @Autowired(required = false)
+    private UserServiceClient userServiceClient;
+
+    @Autowired(required = false)
+    private JobServiceClient jobServiceClient;
+
+    @Autowired(required = false)
+    private ContractEventPublisher contractEventPublisher;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public List<Contract> getAllContracts() {
         return contractRepository.findAll();
+    }
+
+    public UserContractSummaryDTO getUserContractSummary(Long userId) {
+        validateUserExists(userId, "User");
+        long totalContracts = contractRepository.countContractsForUser(userId);
+        long completedContracts = contractRepository.countCompletedContractsForUser(userId);
+        long terminatedContracts = contractRepository.countTerminatedContractsForUser(userId);
+        double totalEarnings = contractRepository.sumCompletedContractEarningsForUser(userId);
+        double averageContractValue = totalContracts == 0 ? 0.0 : totalEarnings / totalContracts;
+        return UserContractSummaryDTO.builder()
+                .userId(userId)
+                .name(resolveFreelancerName(userId))
+                .totalContracts(totalContracts)
+                .completedContracts(completedContracts)
+                .terminatedContracts(terminatedContracts)
+                .totalEarnings(totalEarnings)
+                .averageContractValue(averageContractValue)
+                .build();
+    }
+
+    public int getActiveContractCountForUser(Long userId) {
+        validateUserExists(userId, "User");
+        return contractRepository.countActiveContractsForUser(userId);
+    }
+
+    public long getCompletedContractCountForUser(Long userId) {
+        validateUserExists(userId, "User");
+        return contractRepository.countCompletedContractsForUser(userId);
+    }
+
+    public int getActiveContractCountForJob(Long jobId) {
+        if (jobId == null) {
+            throw new IllegalArgumentException("jobId is required");
+        }
+        return contractRepository.countActiveContractsForJob(jobId);
+    }
+
+    public Contract getActiveContractForProposal(Long proposalId) {
+        if (proposalId == null) {
+            throw new IllegalArgumentException("proposalId is required");
+        }
+        return contractRepository.findActiveContractByProposalId(proposalId)
+                .orElseThrow(() -> new EntityNotFoundException("Active contract not found for proposal id: " + proposalId));
     }
 
     public ContractAnalyticsDTO getContractAnalytics(java.time.LocalDate startDate, java.time.LocalDate endDate) {
@@ -88,9 +152,7 @@ public class ContractService {
         if (userId == null) {
             throw new IllegalArgumentException("userId is required");
         }
-        if (!contractRepository.userExists(userId)) {
-            throw new EntityNotFoundException("User not found with id: " + userId);
-        }
+        validateUserExists(userId, "User");
 
         return contractRepository.findMostRecentActiveContractForUser(userId)
                 .orElseThrow(() -> new EntityNotFoundException("No active contract found for user id: " + userId));
@@ -176,14 +238,20 @@ public class ContractService {
             normalizedStatus = ContractStatus.fromString(status).name();
         }
 
-        List<Object[]> rows = contractRepository.searchContracts(minAmount, maxAmount, normalizedStatus);
-        return rows.stream().map(row -> ContractSummaryDTO.builder()
-                .contractId(toLong(row[0]))
-                .freelancerName(row[1] == null ? null : row[1].toString())
-                .jobTitle(row[2] == null ? null : row[2].toString())
-                .agreedAmount(toDouble(row[3]))
-                .status(row[4] == null ? null : row[4].toString())
-                .durationDays(calculateDurationDays(row[5], row[6]))
+        Map<Long, String> freelancerNames = new LinkedHashMap<>();
+        Map<Long, String> jobTitles = new LinkedHashMap<>();
+        return contractRepository.searchContracts(minAmount, maxAmount, normalizedStatus).stream()
+                .map(contract -> ContractSummaryDTO.builder()
+                .contractId(contract.getId())
+                .freelancerName(freelancerNames.computeIfAbsent(
+                        contract.getFreelancerId(),
+                        this::resolveFreelancerName))
+                .jobTitle(jobTitles.computeIfAbsent(
+                        contract.getJobId(),
+                        this::resolveJobTitle))
+                .agreedAmount(contract.getAgreedAmount())
+                .status(contract.getStatus() == null ? null : contract.getStatus().name())
+                .durationDays(calculateDurationDays(contract.getStartDate(), effectiveEndDate(contract)))
                 .build()).toList();
     }
 
@@ -238,9 +306,7 @@ public class ContractService {
         if (endDate.isBefore(startDate)) {
             throw new IllegalArgumentException("endDate must be on or after startDate");
         }
-        if (!contractRepository.freelancerExists(freelancerId)) {
-            throw new EntityNotFoundException("Freelancer not found with id: " + freelancerId);
-        }
+        validateUserExists(freelancerId, "Freelancer");
 
         LocalDateTime start = startDate.atStartOfDay();
         LocalDateTime endExclusive = endDate.plusDays(1).atStartOfDay();
@@ -284,15 +350,7 @@ public class ContractService {
             return findStalledContractsInMemory(maxProgress, stalledDays);
         }
         try {
-            List<Object[]> rows = contractRepository.findStalledContracts(maxProgress, stalledDays);
-            return rows.stream().map(row -> new StalledContractDTO(
-                    toLong(row[0]),
-                    row[1] == null ? null : row[1].toString(),
-                    row[2] == null ? null : row[2].toString(),
-                    toDouble(row[3]),
-                    toDouble(row[4]),
-                    toLong(row[5])
-            )).toList();
+            return enrichStalledContracts(contractRepository.findStalledContracts(maxProgress, stalledDays));
         } catch (DataAccessException ex) {
             return findStalledContractsInMemory(maxProgress, stalledDays);
         }
@@ -510,27 +568,14 @@ public class ContractService {
 
     private List<StalledContractDTO> findStalledContractsInMemory(Double maxProgress, Integer stalledDays) {
         LocalDateTime activityCutoff = LocalDateTime.now().minusDays(stalledDays);
-        return contractRepository.findByStatus(ContractStatus.ACTIVE).stream()
+        List<Contract> candidates = contractRepository.findByStatus(ContractStatus.ACTIVE).stream()
                 .filter(contract -> readMetadataDouble(contract, "progressPercentage") <= maxProgress)
                 .filter(contract -> {
                     LocalDateTime lastActivity = resolveLastActivity(contract);
                     return lastActivity != null && lastActivity.isBefore(activityCutoff);
                 })
-                .map(contract -> {
-                    LocalDateTime lastActivity = resolveLastActivity(contract);
-                    long daysSince = lastActivity == null
-                            ? 0L
-                            : ChronoUnit.DAYS.between(lastActivity, LocalDateTime.now());
-                    return StalledContractDTO.builder()
-                            .contractId(contract.getId())
-                            .freelancerName("Freelancer " + contract.getFreelancerId())
-                            .jobTitle("Job " + contract.getJobId())
-                            .agreedAmount(contract.getAgreedAmount())
-                            .progressPercentage(readMetadataDouble(contract, "progressPercentage"))
-                            .daysSinceLastActivity(daysSince)
-                            .build();
-                })
                 .toList();
+        return enrichStalledContracts(candidates);
     }
 
     @Transactional
@@ -574,6 +619,170 @@ public class ContractService {
                 .toList();
     }
 
+    @Transactional
+    public Contract handleProposalAccepted(ProposalAcceptedEvent event) {
+        if (event == null || event.proposalId() == null || event.jobId() == null || event.freelancerId() == null) {
+            throw new IllegalArgumentException("proposal.accepted event is missing required fields");
+        }
+        Optional<Contract> existing = contractRepository.findByProposalId(event.proposalId());
+        if (existing.isPresent()) {
+            return existing.get();
+        }
+
+        Job job = fetchJob(event.jobId());
+        Contract contract = new Contract();
+        contract.setProposalId(event.proposalId());
+        contract.setJobId(event.jobId());
+        contract.setFreelancerId(event.freelancerId());
+        contract.setClientId(job.getClientId());
+        contract.setAgreedAmount(toDouble(event.bidAmount()));
+        contract.setStatus(ContractStatus.ACTIVE);
+        contract.setStartDate(LocalDateTime.now());
+        Contract created = contractRepository.saveAndFlush(contract);
+        publishContractCreated(created);
+        return created;
+    }
+
+    @Transactional
+    public Contract handleProposalCompleted(ProposalCompletedEvent event) {
+        if (event == null || event.proposalId() == null) {
+            throw new IllegalArgumentException("proposal.completed event is missing proposalId");
+        }
+        Contract contract = contractRepository.findActiveContractByProposalId(event.proposalId())
+                .or(() -> event.contractId() == null ? Optional.empty() : contractRepository.findById(event.contractId()))
+                .orElseThrow(() -> new EntityNotFoundException("Active contract not found for proposal id: " + event.proposalId()));
+        ContractStatus oldStatus = contract.getStatus();
+        contract.setStatus(ContractStatus.COMPLETED);
+        contract.setEndDate(LocalDateTime.now());
+        Contract updated = contractRepository.saveAndFlush(contract);
+        publishContractStatusChanged(updated.getId(), oldStatus, updated.getStatus());
+        return updated;
+    }
+
+    @Transactional
+    public Optional<Contract> handleProposalCancelled(ProposalCancelledEvent event) {
+        if (event == null || event.proposalId() == null) {
+            throw new IllegalArgumentException("proposal.cancelled event is missing proposalId");
+        }
+        Optional<Contract> existing = contractRepository.findByProposalId(event.proposalId());
+        if (existing.isEmpty()) {
+            return Optional.empty();
+        }
+        Contract contract = existing.get();
+        contract.setStatus(ContractStatus.TERMINATED);
+        if (contract.getEndDate() == null) {
+            contract.setEndDate(LocalDateTime.now());
+        }
+        Contract updated = contractRepository.saveAndFlush(contract);
+        if (contractEventPublisher != null) {
+            contractEventPublisher.publishContractCancelled(updated);
+        }
+        return Optional.of(updated);
+    }
+
+    public void handleUserDeactivated(UserDeactivatedEvent event) {
+        if (event == null || event.userId() == null) {
+            throw new IllegalArgumentException("user.deactivated event is missing userId");
+        }
+        notifyObservers("USER_DEACTIVATED", Map.of("contractId", -1L, "userId", event.userId()));
+    }
+
+    private List<StalledContractDTO> enrichStalledContracts(List<Contract> contracts) {
+        Map<Long, String> freelancerNames = new LinkedHashMap<>();
+        Map<Long, String> jobTitles = new LinkedHashMap<>();
+        return contracts.stream()
+                .map(contract -> {
+                    LocalDateTime lastActivity = resolveLastActivity(contract);
+                    long daysSince = lastActivity == null
+                            ? 0L
+                            : ChronoUnit.DAYS.between(lastActivity, LocalDateTime.now());
+                    return StalledContractDTO.builder()
+                            .contractId(contract.getId())
+                            .freelancerName(freelancerNames.computeIfAbsent(
+                                    contract.getFreelancerId(),
+                                    this::resolveFreelancerName))
+                            .jobTitle(jobTitles.computeIfAbsent(
+                                    contract.getJobId(),
+                                    this::resolveJobTitle))
+                            .agreedAmount(contract.getAgreedAmount())
+                            .progressPercentage(readMetadataDouble(contract, "progressPercentage"))
+                            .daysSinceLastActivity(daysSince)
+                            .build();
+                })
+                .toList();
+    }
+
+    private void validateUserExists(Long userId, String label) {
+        if (userId == null) {
+            throw new IllegalArgumentException(label + " id is required");
+        }
+        if (userServiceClient == null || !usesPostgresDatabase()) {
+            return;
+        }
+        try {
+            userServiceClient.getUser(userId);
+        } catch (FeignException.NotFound e) {
+            throw new EntityNotFoundException(label + " not found with id: " + userId);
+        }
+    }
+
+    private String resolveFreelancerName(Long freelancerId) {
+        if (freelancerId == null) {
+            return "Unknown Freelancer";
+        }
+        if (userServiceClient == null || !usesPostgresDatabase()) {
+            return "Unknown Freelancer";
+        }
+        try {
+            User user = userServiceClient.getUser(freelancerId);
+            return user == null || user.getName() == null ? "Unknown Freelancer" : user.getName();
+        } catch (FeignException.NotFound e) {
+            return "Unknown Freelancer";
+        }
+    }
+
+    private String resolveJobTitle(Long jobId) {
+        if (jobId == null) {
+            return "Unknown Job";
+        }
+        if (jobServiceClient == null || !usesPostgresDatabase()) {
+            return "Unknown Job";
+        }
+        try {
+            Job job = jobServiceClient.getJob(jobId);
+            return job == null || job.getTitle() == null ? "Unknown Job" : job.getTitle();
+        } catch (FeignException.NotFound e) {
+            return "Unknown Job";
+        }
+    }
+
+    private Job fetchJob(Long jobId) {
+        if (jobServiceClient == null) {
+            throw new IllegalStateException("job-service client is not configured");
+        }
+        try {
+            return jobServiceClient.getJob(jobId);
+        } catch (FeignException.NotFound e) {
+            throw new EntityNotFoundException("Job not found with id: " + jobId);
+        }
+    }
+
+    private LocalDateTime effectiveEndDate(Contract contract) {
+        return contract.getEndDate() == null ? LocalDateTime.now() : contract.getEndDate();
+    }
+
+    private void publishContractCreated(Contract contract) {
+        if (contractEventPublisher != null) {
+            contractEventPublisher.publishContractCreated(contract);
+        }
+    }
+
+    private void publishContractStatusChanged(Long contractId, ContractStatus oldStatus, ContractStatus newStatus) {
+        if (contractEventPublisher != null) {
+            contractEventPublisher.publishContractStatusChanged(contractId, oldStatus, newStatus);
+        }
+    }
+
     private LocalDateTime resolveLastActivity(Contract contract) {
         if (contract.getMetadata() != null && contract.getMetadata().get("lastActivityDate") != null) {
             LocalDateTime parsed = toLocalDateTime(contract.getMetadata().get("lastActivityDate"));
@@ -600,6 +809,9 @@ public class ContractService {
     }
 
     private boolean usesPostgresDatabase() {
+        if (dataSource == null) {
+            return false;
+        }
         try (var connection = dataSource.getConnection()) {
             return "PostgreSQL".equalsIgnoreCase(connection.getMetaData().getDatabaseProductName());
         } catch (Exception ex) {
@@ -619,6 +831,10 @@ public class ContractService {
             return 0.0;
         }
         return ((Number) value).doubleValue();
+    }
+
+    private double toDouble(BigDecimal value) {
+        return value == null ? 0.0 : value.doubleValue();
     }
 
     private long calculateDurationDays(Object startValue, Object endValue) {
