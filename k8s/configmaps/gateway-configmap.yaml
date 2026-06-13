@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gateway-configmap
+  namespace: freelance
+data:
+  USER_SERVICE_HOST: "user-service"
+  JOB_SERVICE_HOST: "job-service"
+  PROPOSAL_SERVICE_HOST: "proposal-service"
+  CONTRACT_SERVICE_HOST: "contract-service"
+  WALLET_SERVICE_HOST: "wallet-service"
+  SERVER_PORT: "8080"

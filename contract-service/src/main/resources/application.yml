@@ -2,7 +2,7 @@ spring:
   application:
     name: contract-service
   datasource:
-    url: ${SPRING_DATASOURCE_URL:${DB_URL:jdbc:postgresql://localhost:5432/freelancedb}}
+    url: ${SPRING_DATASOURCE_URL:${DB_URL:jdbc:postgresql://localhost:5432/freelancedb-contracts}}
     username: ${SPRING_DATASOURCE_USERNAME:${DB_USER:postgres}}
     password: ${SPRING_DATASOURCE_PASSWORD:${DB_PASS:postgres}}
   jpa:
@@ -22,24 +22,51 @@ spring:
       port: ${SPRING_DATA_REDIS_PORT:${REDIS_PORT:6379}}
       password: ${SPRING_DATA_REDIS_PASSWORD:${REDIS_PASSWORD:redispass}}
   cassandra:
-    contact-points: ${SPRING_CASSANDRA_CONTACT_POINTS:${CASSANDRA_CONTACT_POINTS:localhost}}
-    port: ${SPRING_CASSANDRA_PORT:${CASSANDRA_PORT:9042}}
+    contact-points: ${SPRING_CASSANDRA_CONTACT_POINTS:localhost:9042}
     local-datacenter: ${SPRING_CASSANDRA_LOCAL_DATACENTER:datacenter1}
     keyspace-name: ${SPRING_CASSANDRA_KEYSPACE_NAME:freelanceks}
     schema-action: CREATE_IF_NOT_EXISTS
+  rabbitmq:
+    host: ${SPRING_RABBITMQ_HOST:rabbitmq}
+    port: ${SPRING_RABBITMQ_PORT:5672}
+    username: ${SPRING_RABBITMQ_USERNAME:guest}
+    password: ${SPRING_RABBITMQ_PASSWORD:guest}
+    listener:
+      simple:
+        acknowledge-mode: auto
+        default-requeue-rejected: false
+        retry:
+          enabled: true
+          initial-interval: 1000
+          max-attempts: 3
 
 server:
   port: ${SERVER_PORT:8080}
+
+management:
+  server:
+    port: 8081
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
 
 jwt:
   secret: ${JWT_SECRET}
   expiration: 86400000
 
----
-spring:
-  config:
-    activate:
-      on-profile: dev
-  devtools:
-    restart:
-      poll-interval: 500ms
+feign:
+  user-service:
+    url: http://user-service:8080
+  job-service:
+    url: http://job-service:8080
+  proposal-service:
+    url: http://proposal-service:8080
+  contract-service:
+    url: http://contract-service:8080
+  wallet-service:
+    url: http://wallet-service:8080

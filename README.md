@@ -42,11 +42,12 @@ Each service uses `src/main/resources/application.yml` with `spring.datasource`,
 
 ## Prerequisites
 
+- **16 GB RAM minimum** (host). Per the Lab 9 install guide's "Recommended" tier, `setup.bash`/`run.bash` start minikube with **6144 MB / 4 CPUs** by default (4 = the most Docker Desktop typically exposes). Override on larger machines with `MINIKUBE_MEMORY` / `MINIKUBE_CPUS` (MB / cores), e.g. `MINIKUBE_MEMORY=8192 MINIKUBE_CPUS=4 ./setup.bash`.
 - Java 25+
 - **Maven uses `JAVA_HOME` for compilation.** If `./mvnw.cmd` fails with **release version 25 not supported**, run **`. .\scripts\use-jdk25.ps1`** once per session on PowerShell (or set `JAVA_HOME` permanently to your JDK 25 install, e.g. `C:\Program Files\Java\jdk-25`).
 - Maven (included as `./mvnw` or `./mvnw.cmd`)
-- Docker & Docker Compose
-- PostgreSQL (runs in Docker container)
+- Docker, plus minikube + kubectl (Kubernetes deployment)
+- PostgreSQL (runs in-cluster as StatefulSets)
 
 ---
 

@@ -1,10 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# setup.bash — first-time setup only.
+# Builds source, creates the minikube cluster, builds Docker images, and
+# deploys infrastructure (databases, message broker, monitoring).
+#
+# After this succeeds, run:  ./run.bash
+#
+# To rebuild a service and redeploy after code changes:  ./run.bash --rebuild [service]
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT"
 
-# This project targets Java 25. Auto-detect JDK when JAVA_HOME is unset (macOS, Linux, Git Bash on Windows).
+# ──────────────────────────────────────────────────────────────
+# Java 25 detection
+# ──────────────────────────────────────────────────────────────
 prefer_java25() {
   java_bin() {
     if [ -x "${1}/bin/java" ]; then
@@ -35,14 +44,11 @@ prefer_java25() {
     try_java_home "$JAVA_HOME" && return 0
   fi
 
-  # Use java/javac from PATH when they are a real JDK (Maven needs both if JAVA_HOME is unset).
   if command -v java >/dev/null 2>&1 && command -v javac >/dev/null 2>&1; then
-    if java -version >/dev/null 2>&1; then
-      java_path="$(command -v java)"
-      java_dir="$(cd "$(dirname "$java_path")" && pwd)"
-      if [ "$(basename "$java_dir")" = "bin" ]; then
-        try_java_home "$(dirname "$java_dir")" && return 0
-      fi
+    java_path="$(command -v java)"
+    java_dir="$(cd "$(dirname "$java_path")" && pwd)"
+    if [ "$(basename "$java_dir")" = "bin" ]; then
+      try_java_home "$(dirname "$java_dir")" && return 0
     fi
   fi
 
@@ -68,50 +74,122 @@ prefer_java25() {
   fi
 
   echo "[setup] Java 25 not found. Set JAVA_HOME to your JDK 25 install." >&2
-  echo "[setup] macOS: brew install openjdk" >&2
-  echo "[setup] Windows: install JDK 25 and set JAVA_HOME (or use Git Bash + run this script)." >&2
   exit 1
 }
 
 prefer_java25
 
-# Use repo-managed hooks (each clone runs setup once)
+# ──────────────────────────────────────────────────────────────
+# Git hooks + .env
+# ──────────────────────────────────────────────────────────────
 git config core.hooksPath .githooks
 
-# Copy .env.example to .env if .env doesn't exist
 if [ ! -f "$ROOT/.env" ]; then
   if [ -f "$ROOT/.env.example" ]; then
     cp "$ROOT/.env.example" "$ROOT/.env"
     echo "[setup] Created .env from .env.example"
-  else
-    echo "[setup] Warning: .env.example not found, skipping .env creation." >&2
   fi
 else
   echo "[setup] .env already exists, skipping."
 fi
 
+# ──────────────────────────────────────────────────────────────
+# Maven build
+# ──────────────────────────────────────────────────────────────
 if [ -f "$ROOT/mvnw" ]; then
-  if [ -x "$ROOT/mvnw" ]; then
-    MVNW=("./mvnw")
-  else
-    chmod +x "$ROOT/mvnw" 2>/dev/null || true
-    if [ -x "$ROOT/mvnw" ]; then
-      MVNW=("./mvnw")
-    else
-      MVNW=(bash "./mvnw")
-    fi
-  fi
+  chmod +x "$ROOT/mvnw" 2>/dev/null || true
+  MVNW=(bash "./mvnw")
+  [ -x "$ROOT/mvnw" ] && MVNW=("./mvnw")
 elif [ -f "$ROOT/mvnw.cmd" ]; then
   MVNW=("./mvnw.cmd")
 else
-  echo "setup: neither ./mvnw nor ./mvnw.cmd was found." >&2
+  echo "[setup] Neither ./mvnw nor ./mvnw.cmd found." >&2
   exit 1
 fi
 
-echo "[setup] Clean install..."
-"${MVNW[@]}" clean install
+echo "[setup] Maven clean install (verifies the build compiles)..."
+"${MVNW[@]}" clean install -DskipTests -q
 
-echo "[setup] Packaging services (skip tests)..."
-"${MVNW[@]}" package -DskipTests
+# ──────────────────────────────────────────────────────────────
+# Minikube
+# ──────────────────────────────────────────────────────────────
+# Minimum supported host: 16 GB RAM. Per the Lab 9 install guide, the
+# "Recommended" tier for 16 GB hosts is 6144 MB. CPUs default to 4 (the most
+# Docker Desktop typically exposes). Override with MINIKUBE_MEMORY / MINIKUBE_CPUS.
+MINIKUBE_MEMORY="${MINIKUBE_MEMORY:-6144}"
+MINIKUBE_CPUS="${MINIKUBE_CPUS:-4}"
+echo "[setup] Starting minikube (${MINIKUBE_MEMORY} MB RAM, ${MINIKUBE_CPUS} CPUs)..."
+minikube start --memory="${MINIKUBE_MEMORY}" --cpus="${MINIKUBE_CPUS}" --driver=docker 2>/dev/null \
+  || minikube start --memory="${MINIKUBE_MEMORY}" --cpus="${MINIKUBE_CPUS}"
 
-echo "[setup] Done."
+echo "[setup] Pointing Docker CLI to minikube's Docker daemon..."
+eval "$(minikube docker-env)"
+
+# ──────────────────────────────────────────────────────────────
+# Docker images — build all 6 modules into minikube's daemon
+# ──────────────────────────────────────────────────────────────
+MODULES=(user-service job-service proposal-service contract-service wallet-service api-gateway)
+
+echo "[setup] Building Docker images..."
+for mod in "${MODULES[@]}"; do
+  echo "[setup]   -> freelance/${mod}:latest"
+  docker build \
+    -f docker/Dockerfile.service \
+    --build-arg MODULE="$mod" \
+    -t "freelance/${mod}:latest" \
+    --quiet \
+    .
+done
+echo "[setup] All images built."
+
+# ──────────────────────────────────────────────────────────────
+# Infrastructure — namespaces, secrets, storage, databases, monitoring
+# (does NOT deploy app services — that is run.bash)
+# ──────────────────────────────────────────────────────────────
+echo "[setup] Applying infrastructure manifests..."
+kubectl apply -f k8s/namespaces/
+kubectl apply -f k8s/secrets/
+kubectl apply -f k8s/pvcs/
+kubectl apply -f k8s/statefulsets/
+
+echo "[setup] Waiting for databases and message broker to be ready..."
+for db in user-postgres job-postgres proposal-postgres contract-postgres wallet-postgres rabbitmq; do
+  echo "[setup]   waiting for $db..."
+  kubectl wait --for=condition=ready pod -l app="$db" -n freelance --timeout=120s \
+    || echo "[setup]   WARNING: $db not ready yet — it may still be starting"
+done
+
+kubectl apply -f k8s/configmaps/
+
+echo "[setup] Applying monitoring stack..."
+kubectl apply -f k8s/monitoring/loki/
+kubectl apply -f k8s/monitoring/prometheus/
+kubectl apply -f k8s/monitoring/grafana/
+kubectl delete configmap grafana-dashboards-files -n monitoring --ignore-not-found
+kubectl create configmap grafana-dashboards-files \
+  --from-file=k8s/monitoring/grafana/dashboards/ \
+  -n monitoring
+
+echo "[setup] Waiting for monitoring to be ready..."
+kubectl wait --for=condition=available deployment --all -n monitoring --timeout=120s \
+  || echo "[setup]   WARNING: some monitoring pods not ready yet"
+
+# ──────────────────────────────────────────────────────────────
+# Done
+# ──────────────────────────────────────────────────────────────
+MINIKUBE_IP="$(minikube ip)"
+echo
+echo "[setup] ✓ Infrastructure ready."
+echo
+echo "  Next step — deploy and start the application services:"
+echo "    ./run.bash"
+echo
+echo "  To rebuild a service after code changes:"
+echo "    ./run.bash --rebuild user-service"
+echo "    ./run.bash --rebuild               # rebuilds all"
+echo
+echo "  Grafana      -> http://${MINIKUBE_IP}:30030  (admin / admin)"
+echo "  RabbitMQ UI  -> kubectl port-forward svc/rabbitmq 15672:15672 -n freelance"
+echo "                  then open http://localhost:15672  (guest / guest)"
+echo
+echo "[setup] To stop everything: ./stop.bash"

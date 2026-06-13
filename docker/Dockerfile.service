@@ -10,11 +10,13 @@ WORKDIR /workspace
 
 COPY pom.xml mvnw ./
 COPY .mvn .mvn
+COPY contracts contracts
 COPY user-service user-service
 COPY job-service job-service
 COPY proposal-service proposal-service
 COPY contract-service contract-service
 COPY wallet-service wallet-service
+COPY api-gateway api-gateway
 
 RUN sed -i 's/\r$//' mvnw && chmod +x mvnw \
     && ./mvnw -B -ntp install -DskipTests

@@ -36,3 +36,9 @@ build/
 .vscode/
 
 .env
+
+### k8s sample ###
+k8s_sample
+
+### openfeign_sample ###
+openfeign_sample
