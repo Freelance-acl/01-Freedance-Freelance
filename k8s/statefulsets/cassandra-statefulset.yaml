@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: cassandra
+  namespace: freelance
+spec:
+  serviceName: cassandra-headless
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cassandra
+  template:
+    metadata:
+      labels:
+        app: cassandra
+    spec:
+      containers:
+        - name: cassandra
+          image: cassandra:4
+          ports:
+            - containerPort: 9042
+          env:
+            - name: MAX_HEAP_SIZE
+              value: "512M"
+            - name: HEAP_NEWSIZE
+              value: "100M"
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/cassandra
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "100m"
+            limits:
+              memory: "1536Mi"
+              cpu: "1000m"
+          readinessProbe:
+            tcpSocket:
+              port: 9042
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 5
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: 2Gi

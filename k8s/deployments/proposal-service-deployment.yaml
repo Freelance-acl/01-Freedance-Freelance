@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: proposal-service
+  namespace: freelance
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: proposal-service
+  template:
+    metadata:
+      labels:
+        app: proposal-service
+    spec:
+      containers:
+        - name: proposal-service
+          image: freelance/proposal-service:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: proposal-service-configmap
+            - secretRef:
+                name: proposal-postgres-secret
+          env:
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: jwt-secret
+                  key: JWT_SECRET
+          resources:
+            requests:
+              memory: "384Mi"
+              cpu: "100m"
+            limits:
+              memory: "768Mi"
+              cpu: "1000m"
+          readinessProbe:
+            tcpSocket:
+              port: 8081
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            failureThreshold: 6
+          livenessProbe:
+            tcpSocket:
+              port: 8081
+            initialDelaySeconds: 150
+            periodSeconds: 15
+            failureThreshold: 6

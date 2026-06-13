@@ -2,9 +2,9 @@ spring:
   application:
     name: proposal-service
   datasource:
-    url: ${SPRING_DATASOURCE_URL:${DB_URL:jdbc:postgresql://localhost:5432/freelancedb}}
+    url: ${SPRING_DATASOURCE_URL:${DB_URL:jdbc:postgresql://localhost:5432/freelancedb-proposals}}
     username: ${SPRING_DATASOURCE_USERNAME:${DB_USER:postgres}}
-    password: ${SPRING_DATASOURCE_PASSWORD:${DB_PASS:postgres}}
+    password: ${POSTGRES_PASSWORD:${SPRING_DATASOURCE_PASSWORD:postgres}}
   jpa:
     hibernate:
       ddl-auto: update
@@ -25,10 +25,47 @@ spring:
       uri: ${SPRING_DATA_NEO4J_URI:${NEO4J_URI:bolt://localhost:7687}}
       username: ${SPRING_DATA_NEO4J_USERNAME:${NEO4J_USERNAME:neo4j}}
       password: ${SPRING_DATA_NEO4J_PASSWORD:${NEO4J_PASSWORD:neo4jpass}}
+  rabbitmq:
+    host: rabbitmq
+    port: 5672
+    username: guest
+    password: guest
+    listener:
+      simple:
+        acknowledge-mode: auto
+        default-requeue-rejected: false
+        retry:
+          enabled: true
+          initial-interval: 1000
+          max-attempts: 3
 
 server:
   port: ${SERVER_PORT:8080}
 
+management:
+  server:
+    port: 8081
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
 jwt:
   secret: ${JWT_SECRET:dGhpcy1pcy1hLXRlc3Qtc2VjcmV0LWtleS1mb3ItbTJhdC1sZWFzdC0zMmJ5dGVz}
   expiration: ${JWT_EXPIRATION:86400000}
+
+feign:
+  user-service:
+    url: http://user-service:8080
+  job-service:
+    url: http://job-service:8080
+  proposal-service:
+    url: http://proposal-service:8080
+  contract-service:
+    url: http://contract-service:8080
+  wallet-service:
+    url: http://wallet-service:8080

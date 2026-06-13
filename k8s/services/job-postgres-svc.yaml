@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: job-postgres-headless
+  namespace: freelance
+spec:
+  clusterIP: None
+  selector:
+    app: job-postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: job-postgres
+  namespace: freelance
+spec:
+  type: ClusterIP
+  selector:
+    app: job-postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
