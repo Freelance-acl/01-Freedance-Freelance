@@ -10,6 +10,7 @@ import java.time.LocalDateTime;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.context.WebApplicationContext;
 
@@ -20,9 +21,11 @@ import com.team01.freelance.job.model.Job;
 import com.team01.freelance.job.model.JobCategory;
 import com.team01.freelance.job.model.JobStatus;
 import com.team01.freelance.job.repository.JobRepository;
+import com.team01.freelance.proposal.messaging.ProposalEventPublisher;
 import com.team01.freelance.proposal.model.Proposal;
 import com.team01.freelance.proposal.model.ProposalStatus;
 import com.team01.freelance.proposal.repository.ProposalRepository;
+import com.team01.freelance.proposal.service.ProposalService;
 import com.team01.freelance.proposal.support.AbstractIntegrationTest;
 import com.team01.freelance.user.model.User;
 import com.team01.freelance.user.model.UserRole;
@@ -57,12 +60,19 @@ class ProposalCompleteIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private PayoutRepository payoutRepository;
 
+    @Autowired
+    private ProposalService proposalService;
+
+    private ProposalEventPublisher proposalEventPublisher;
+
     private User client;
     private User freelancer;
 
     @BeforeEach
     void setUp() {
         mockMvc = buildMockMvc(webApplicationContext);
+        proposalEventPublisher = org.mockito.Mockito.mock(ProposalEventPublisher.class);
+        ReflectionTestUtils.setField(proposalService, "proposalEventPublisher", proposalEventPublisher);
 
         payoutRepository.deleteAll();
         contractRepository.deleteAll();
@@ -81,17 +91,16 @@ class ProposalCompleteIntegrationTest extends AbstractIntegrationTest {
 
         mockMvc.perform(put("/api/proposals/{id}/complete", setup.proposal().getId()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("ACCEPTED"));
+                .andExpect(jsonPath("$.status").value("COMPLETING"));
 
         Contract contract = contractRepository.findByProposalId(setup.proposal().getId()).orElseThrow();
-        assertThat(contract.getStatus()).isEqualTo(ContractStatus.COMPLETED);
-        assertThat(contract.getEndDate()).isNotNull();
-        assertThat(jobRepository.findById(setup.job().getId()).orElseThrow().getStatus()).isEqualTo(JobStatus.CLOSED);
-
-        Payout payout = payoutRepository.findByContractIdAndStatus(
-                contract.getId(), PayoutStatus.PENDING).orElseThrow();
-        assertThat(payout.getAmount()).isEqualTo(2000.0);
-        assertThat(payout.getFreelancerId()).isEqualTo(freelancer.getId());
+        assertThat(contract.getStatus()).isEqualTo(ContractStatus.ACTIVE);
+        assertThat(jobRepository.findById(setup.job().getId()).orElseThrow().getStatus()).isEqualTo(JobStatus.IN_PROGRESS);
+        assertThat(payoutRepository.findByContractIdAndStatus(contract.getId(), PayoutStatus.PENDING)).isEmpty();
+        org.mockito.Mockito.verify(proposalEventPublisher)
+                .publishProposalCompleted(
+                        org.mockito.Mockito.any(Proposal.class),
+                        org.mockito.Mockito.argThat(publishedContract -> publishedContract.getId().equals(contract.getId())));
     }
 
     @Test
@@ -114,6 +123,20 @@ class ProposalCompleteIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isBadRequest());
 
         assertThat(payoutRepository.count()).isZero();
+    }
+
+    @Test
+    void scenarioC_preCheckFailureWithoutActiveContractReturns400AndPublishesNoEvent() throws Exception {
+        Job job = saveJob(JobStatus.IN_PROGRESS);
+        Proposal proposal = saveProposal(job.getId(), freelancer.getId(), ProposalStatus.ACCEPTED, 2000.0);
+
+        mockMvc.perform(put("/api/proposals/{id}/complete", proposal.getId()))
+                .andExpect(status().isBadRequest());
+
+        assertThat(proposalRepository.findById(proposal.getId()).orElseThrow().getStatus())
+                .isEqualTo(ProposalStatus.ACCEPTED);
+        assertThat(payoutRepository.count()).isZero();
+        org.mockito.Mockito.verifyNoInteractions(proposalEventPublisher);
     }
 
     private AcceptedWorkSetup saveAcceptedWork(double agreedAmount) {

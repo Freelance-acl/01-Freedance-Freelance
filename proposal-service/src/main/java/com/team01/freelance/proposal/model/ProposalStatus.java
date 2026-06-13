@@ -7,7 +7,12 @@ public enum ProposalStatus {
     SHORTLISTED,
     ACCEPTED,
     REJECTED,
-    WITHDRAWN;
+    WITHDRAWN,
+    COMPLETING,
+    PAYMENT_PENDING,
+    PAID,
+    PAYMENT_FAILED,
+    REFUNDED;
 
     @JsonCreator
     public static ProposalStatus fromString(String value) {
@@ -16,7 +21,6 @@ public enum ProposalStatus {
                 return status;
             }
         }
-        throw new IllegalArgumentException("Invalid ProposalStatus: " + value + ". Valid options are: SUBMITTED, SHORTLISTED, ACCEPTED, REJECTED, WITHDRAWN");
+        throw new IllegalArgumentException("Invalid ProposalStatus: " + value);
     }
 }
-
