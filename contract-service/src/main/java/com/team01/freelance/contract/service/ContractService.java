@@ -727,31 +727,27 @@ public class ContractService {
     }
 
     private String resolveFreelancerName(Long freelancerId) {
-        if (freelancerId == null) {
-            return "Unknown Freelancer";
-        }
-        if (userServiceClient == null || !usesPostgresDatabase()) {
+        if (freelancerId == null || userServiceClient == null) {
             return "Unknown Freelancer";
         }
         try {
             User user = userServiceClient.getUser(freelancerId);
             return user == null || user.getName() == null ? "Unknown Freelancer" : user.getName();
-        } catch (FeignException.NotFound e) {
+        } catch (Exception e) {
+            // §2.4: never crash the caller on a downstream failure — fall back gracefully.
             return "Unknown Freelancer";
         }
     }
 
     private String resolveJobTitle(Long jobId) {
-        if (jobId == null) {
-            return "Unknown Job";
-        }
-        if (jobServiceClient == null || !usesPostgresDatabase()) {
+        if (jobId == null || jobServiceClient == null) {
             return "Unknown Job";
         }
         try {
             Job job = jobServiceClient.getJob(jobId);
             return job == null || job.getTitle() == null ? "Unknown Job" : job.getTitle();
-        } catch (FeignException.NotFound e) {
+        } catch (Exception e) {
+            // §2.4: never crash the caller on a downstream failure — fall back gracefully.
             return "Unknown Job";
         }
     }
