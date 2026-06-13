@@ -23,6 +23,17 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# Stop the background gateway port-forward started by run.bash, if any.
+PF_PID_FILE="$ROOT/.gateway-portforward.pid"
+if [ -f "$PF_PID_FILE" ]; then
+  PF_PID="$(cat "$PF_PID_FILE" 2>/dev/null || true)"
+  if [ -n "${PF_PID:-}" ] && kill -0 "$PF_PID" 2>/dev/null; then
+    echo "[stop] Stopping gateway port-forward (PID $PF_PID)..."
+    kill "$PF_PID" 2>/dev/null || true
+  fi
+  rm -f "$PF_PID_FILE"
+fi
+
 if $HARD; then
   echo "[stop] Hard teardown — deleting namespaces freelance and monitoring..."
   echo "[stop] WARNING: all PVCs and data will be permanently deleted."

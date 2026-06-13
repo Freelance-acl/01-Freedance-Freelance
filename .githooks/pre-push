@@ -1,5 +1,8 @@
 #!/bin/sh
 # Branch naming and mvn test checks for milestone feature work.
+# Milestone 3 branch format: <type>/M3/<scope>/<descriptor>/<studentId>
+#   e.g. feat/M3/wallet/S5-F12/13000892
+# Commit message format (see commit-msg hook): <type>(<scope>): <subject> (<studentId>)
 
 set -e
 ROOT=$(git rev-parse --show-toplevel)
@@ -43,14 +46,20 @@ validate_branch() {
   fi
 
   nf=$(printf '%s' "$b" | awk -F/ '{print NF}')
-  if [ "$nf" -ne 4 ]; then
-    echo "pre-push: branch must be <type>/<scope>/<descriptor>/<studentId>, got: $b" >&2
+  if [ "$nf" -ne 5 ]; then
+    echo "pre-push: branch must be <type>/M3/<scope>/<descriptor>/<studentId>, got: $b" >&2
     return 1
   fi
 
-  scope=$(printf '%s' "$b" | cut -d/ -f2)
-  descriptor=$(printf '%s' "$b" | cut -d/ -f3)
-  id=$(printf '%s' "$b" | cut -d/ -f4)
+  milestone=$(printf '%s' "$b" | cut -d/ -f2)
+  scope=$(printf '%s' "$b" | cut -d/ -f3)
+  descriptor=$(printf '%s' "$b" | cut -d/ -f4)
+  id=$(printf '%s' "$b" | cut -d/ -f5)
+
+  if [ "$milestone" != "M3" ]; then
+    echo "pre-push: milestone segment must be 'M3' (e.g. feat/M3/wallet/S5-F12/13000892), got: $milestone" >&2
+    return 1
+  fi
 
   if ! printf '%s' "$scope" | grep -Eq "^($ALLOWED_SCOPES|$ALLOWED_SERVICE_SCOPES)$"; then
     echo "pre-push: invalid branch scope; expected one of user, job, proposal, contract, wallet, m1, cc, infra (service-name aliases accepted); got: $scope" >&2

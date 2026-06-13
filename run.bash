@@ -108,14 +108,54 @@ if ! kubectl wait --for=condition=available deployment --all -n freelance --time
 fi
 
 # ──────────────────────────────────────────────────────────────
+# Local access — background port-forward so ONE terminal is enough.
+# With the Docker driver (Windows/macOS) the minikube IP is not directly
+# reachable from the host, so we forward the gateway to localhost. The forward
+# runs detached; run.bash returns control to the same terminal you launched it from.
+# Disable with NO_FORWARD=1 ./run.bash ; change the port with GATEWAY_LOCAL_PORT=9000.
+# ──────────────────────────────────────────────────────────────
+PF_PORT="${GATEWAY_LOCAL_PORT:-8080}"
+PF_PID_FILE="$ROOT/.gateway-portforward.pid"
+
+# Stop any port-forward a previous run.bash started (pods may have changed).
+if [ -f "$PF_PID_FILE" ]; then
+  OLD_PID="$(cat "$PF_PID_FILE" 2>/dev/null || true)"
+  if [ -n "${OLD_PID:-}" ] && kill -0 "$OLD_PID" 2>/dev/null; then
+    kill "$OLD_PID" 2>/dev/null || true
+  fi
+  rm -f "$PF_PID_FILE"
+fi
+
+if [ "${NO_FORWARD:-0}" != "1" ]; then
+  echo "[run] Starting background gateway access on http://localhost:${PF_PORT} ..."
+  nohup kubectl port-forward -n freelance svc/api-gateway "${PF_PORT}:8080" \
+    > "$ROOT/.gateway-portforward.log" 2>&1 &
+  PF_PID=$!
+  disown "$PF_PID" 2>/dev/null || true
+  echo "$PF_PID" > "$PF_PID_FILE"
+  sleep 2
+  if kill -0 "$PF_PID" 2>/dev/null; then
+    echo "[run] Gateway reachable at http://localhost:${PF_PORT} (port-forward PID $PF_PID)."
+  else
+    echo "[run] WARNING: port-forward did not stay up — see .gateway-portforward.log."
+    echo "[run]          You can still reach the gateway via:  minikube service api-gateway -n freelance --url"
+  fi
+fi
+
+# ──────────────────────────────────────────────────────────────
 # Summary
 # ──────────────────────────────────────────────────────────────
 MINIKUBE_IP="$(minikube ip)"
-GW="http://${MINIKUBE_IP}:30080"
+GW="http://localhost:${PF_PORT}"
 echo
 echo "================================================================"
-echo "  API Gateway -> ${GW}"
+echo "  API Gateway -> ${GW}   (background port-forward; one terminal is enough)"
 echo "================================================================"
+echo
+echo "  You do NOT need a second terminal — run.bash forwarded the gateway to"
+echo "  ${GW} and returned control here. Just curl it from this shell."
+echo "  Alternative (no forward):  minikube service api-gateway -n freelance --url"
+echo "  Stop the forward:          ./stop.bash   (or: kill \$(cat .gateway-portforward.pid))"
 echo
 echo "  All routes except /api/auth/** require a JWT."
 echo "  Get one from /api/auth/login, then pass:  Authorization: Bearer <token>"

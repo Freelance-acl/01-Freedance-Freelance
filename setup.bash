@@ -1,15 +1,60 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# setup.bash — first-time setup only.
-# Builds source, creates the minikube cluster, builds Docker images, and
-# deploys infrastructure (databases, message broker, monitoring).
+# setup.bash — ONE-TIME first-time setup.
+# Assumes each teammate has already installed Kubernetes tooling (Docker Desktop,
+# minikube, kubectl). This script VERIFIES that tooling is present (and tells you
+# what to install if not), then handles everything after that:
+#   git hooks -> .env -> Maven build -> minikube cluster -> Docker images -> infra.
 #
 # After this succeeds, run:  ./run.bash
 #
-# To rebuild a service and redeploy after code changes:  ./run.bash --rebuild [service]
+# To rebuild a service and redeploy after code changes:  ./run.bash [service]
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT"
+
+# ──────────────────────────────────────────────────────────────
+# Prerequisite tooling check.
+# Kubernetes (Docker + minikube + kubectl) is assumed already installed on each
+# machine. We verify it is present and point to the installer if not, then this
+# script handles the rest. (It does not auto-install system packages — that is
+# intentionally left to each OS's package manager / Docker Desktop installer.)
+# ──────────────────────────────────────────────────────────────
+check_prerequisites() {
+  local missing=0
+  echo "[setup] Checking required tooling..."
+
+  if ! command -v docker >/dev/null 2>&1; then
+    echo "[setup]   MISSING docker — install Docker Desktop: https://www.docker.com/products/docker-desktop/" >&2
+    missing=1
+  elif ! docker info >/dev/null 2>&1; then
+    echo "[setup]   docker found but its daemon is not running — start Docker Desktop, then re-run." >&2
+    missing=1
+  else
+    echo "[setup]   ok: docker"
+  fi
+
+  if ! command -v minikube >/dev/null 2>&1; then
+    echo "[setup]   MISSING minikube — install: https://minikube.sigs.k8s.io/docs/start/" >&2
+    missing=1
+  else
+    echo "[setup]   ok: minikube"
+  fi
+
+  if ! command -v kubectl >/dev/null 2>&1; then
+    echo "[setup]   MISSING kubectl — install: https://kubernetes.io/docs/tasks/tools/" >&2
+    missing=1
+  else
+    echo "[setup]   ok: kubectl"
+  fi
+
+  if [ "$missing" -ne 0 ]; then
+    echo "[setup] Install the missing tool(s) above, then re-run ./setup.bash." >&2
+    exit 1
+  fi
+}
+
+check_prerequisites
 
 # ──────────────────────────────────────────────────────────────
 # Java 25 detection
@@ -185,8 +230,8 @@ echo "  Next step — deploy and start the application services:"
 echo "    ./run.bash"
 echo
 echo "  To rebuild a service after code changes:"
-echo "    ./run.bash --rebuild user-service"
-echo "    ./run.bash --rebuild               # rebuilds all"
+echo "    ./run.bash user-service            # rebuild just one service + redeploy"
+echo "    ./run.bash                         # rebuild all services + redeploy"
 echo
 echo "  Grafana      -> http://${MINIKUBE_IP}:30030  (admin / admin)"
 echo "  RabbitMQ UI  -> kubectl port-forward svc/rabbitmq 15672:15672 -n freelance"

@@ -37,6 +37,10 @@ build/
 
 .env
 
+### run.bash background gateway port-forward ###
+.gateway-portforward.pid
+.gateway-portforward.log
+
 ### k8s sample ###
 k8s_sample
 
