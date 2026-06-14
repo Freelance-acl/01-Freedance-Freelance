@@ -2,13 +2,18 @@ package com.team01.freelance.contract.controller;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.team01.freelance.contract.feign.JobServiceClient;
+import com.team01.freelance.contract.feign.UserServiceClient;
 import com.team01.freelance.contract.model.ContractStatus;
 import com.team01.freelance.contract.support.AbstractIntegrationTest;
+import com.team01.freelance.job.model.Job;
+import com.team01.freelance.user.model.User;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
@@ -18,6 +23,7 @@ import java.util.Map;
 
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -33,6 +39,14 @@ class ContractF3IntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    // M3: S4-F3 enriches names via Feign (no cross-DB JOIN). Mock the clients so the
+    // enrichment path is exercised without a live user-service/job-service.
+    @MockitoBean
+    private UserServiceClient userServiceClient;
+
+    @MockitoBean
+    private JobServiceClient jobServiceClient;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -56,6 +70,13 @@ class ContractF3IntegrationTest extends AbstractIntegrationTest {
                 LocalDateTime.of(2026, 3, 1, 9, 0), LocalDateTime.of(2026, 3, 3, 9, 0),
                 LocalDateTime.of(2026, 3, 5, 9, 0),
                 null);
+
+        User freelancerB = new User();
+        freelancerB.setName("Freelancer B");
+        when(userServiceClient.getUser(702L)).thenReturn(freelancerB);
+        Job largeJob = new Job();
+        largeJob.setTitle("Large Job");
+        when(jobServiceClient.getJob(802L)).thenReturn(largeJob);
 
         mockMvc.perform(get("/api/contracts/search")
                         .param("minAmount", "2000")
