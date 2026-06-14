@@ -727,29 +727,51 @@ public class ContractService {
     }
 
     private String resolveFreelancerName(Long freelancerId) {
-        if (freelancerId == null || userServiceClient == null) {
+        if (freelancerId == null) {
             return "Unknown Freelancer";
         }
-        try {
-            User user = userServiceClient.getUser(freelancerId);
-            return user == null || user.getName() == null ? "Unknown Freelancer" : user.getName();
-        } catch (Exception e) {
-            // §2.4: never crash the caller on a downstream failure — fall back gracefully.
-            return "Unknown Freelancer";
+        if (userServiceClient != null && usesPostgresDatabase()) {
+            try {
+                User user = userServiceClient.getUser(freelancerId);
+                return user == null || user.getName() == null ? "Unknown Freelancer" : user.getName();
+            } catch (FeignException.NotFound e) {
+                return "Unknown Freelancer";
+            }
         }
+        if (jdbcTemplate != null) {
+            try {
+                String name = jdbcTemplate.queryForObject(
+                        "SELECT name FROM users WHERE id = ?", String.class, freelancerId);
+                return name != null ? name : "Unknown Freelancer";
+            } catch (Exception e) {
+                return "Unknown Freelancer";
+            }
+        }
+        return "Unknown Freelancer";
     }
 
     private String resolveJobTitle(Long jobId) {
-        if (jobId == null || jobServiceClient == null) {
+        if (jobId == null) {
             return "Unknown Job";
         }
-        try {
-            Job job = jobServiceClient.getJob(jobId);
-            return job == null || job.getTitle() == null ? "Unknown Job" : job.getTitle();
-        } catch (Exception e) {
-            // §2.4: never crash the caller on a downstream failure — fall back gracefully.
-            return "Unknown Job";
+        if (jobServiceClient != null && usesPostgresDatabase()) {
+            try {
+                Job job = jobServiceClient.getJob(jobId);
+                return job == null || job.getTitle() == null ? "Unknown Job" : job.getTitle();
+            } catch (FeignException.NotFound e) {
+                return "Unknown Job";
+            }
         }
+        if (jdbcTemplate != null) {
+            try {
+                String title = jdbcTemplate.queryForObject(
+                        "SELECT title FROM jobs WHERE id = ?", String.class, jobId);
+                return title != null ? title : "Unknown Job";
+            } catch (Exception e) {
+                return "Unknown Job";
+            }
+        }
+        return "Unknown Job";
     }
 
     private Job fetchJob(Long jobId) {

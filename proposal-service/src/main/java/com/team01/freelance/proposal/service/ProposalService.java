@@ -29,6 +29,8 @@ import com.team01.freelance.job.repository.JobRepository;
 import com.team01.freelance.wallet.repository.PayoutRepository;
 import com.team01.freelance.proposal.dto.ProposalAnalyticsDTO;
 import com.team01.freelance.proposal.dto.ProposalDetailsDTO;
+import com.team01.freelance.proposal.feign.ContractServiceClient;
+import com.team01.freelance.proposal.messaging.ProposalEventPublisher;
 import com.team01.freelance.proposal.model.MilestoneStatus;
 import com.team01.freelance.proposal.model.Proposal;
 import com.team01.freelance.proposal.model.ProposalMilestone;
@@ -37,6 +39,7 @@ import com.team01.freelance.proposal.repository.ProposalAnalyticsProjection;
 import com.team01.freelance.proposal.repository.ProposalRepository;
 import com.team01.freelance.user.repository.UserRepository;
 
+import feign.FeignException;
 import jakarta.persistence.EntityNotFoundException;
 
 @Service
@@ -79,6 +82,12 @@ public class ProposalService {
 
     @Autowired
     private ProposalAnalyticsCacheService proposalAnalyticsCacheService;
+
+    @Autowired(required = false)
+    private ContractServiceClient contractServiceClient;
+
+    @Autowired(required = false)
+    private ProposalEventPublisher proposalEventPublisher;
 
     public List<Proposal> getAllProposals() {
         return proposalRepository.findAll();
@@ -431,28 +440,26 @@ public class ProposalService {
             throw new IllegalArgumentException("Only ACCEPTED proposals can be completed");
         }
 
-        Contract contract = contractRepository.findByProposalId(id)
+        Contract contract = getActiveContractForCompletion(id);
+        proposal.setStatus(ProposalStatus.COMPLETING);
+        Proposal saved = proposalRepository.saveAndFlush(proposal);
+        if (proposalEventPublisher != null) {
+            proposalEventPublisher.publishProposalCompleted(saved, contract);
+        }
+        return proposal;
+    }
+
+    private Contract getActiveContractForCompletion(Long proposalId) {
+        if (contractServiceClient != null && usesPostgresDatabase()) {
+            try {
+                return contractServiceClient.getActiveContract(proposalId);
+            } catch (FeignException.NotFound e) {
+                throw new IllegalArgumentException("No ACTIVE contract found for proposal");
+            }
+        }
+        return contractRepository.findByProposalId(proposalId)
                 .filter(existing -> existing.getStatus() == ContractStatus.ACTIVE)
                 .orElseThrow(() -> new IllegalArgumentException("No ACTIVE contract found for proposal"));
-
-        LocalDateTime now = LocalDateTime.now();
-        int contractsUpdated = contractRepository.completeActiveContract(contract.getId(), now);
-        if (contractsUpdated != 1) {
-            throw new IllegalStateException("Contract is no longer active or was already completed");
-        }
-        int jobsUpdated = jobRepository.markJobClosed(contract.getJobId());
-        if (jobsUpdated != 1) {
-            throw new IllegalStateException("Job could not be closed");
-        }
-        payoutRepository.insertPendingPayout(
-                contract.getId(),
-                contract.getFreelancerId(),
-                contract.getAgreedAmount(),
-                now
-        );
-
-        proposal.setProposalMilestones(new ArrayList<>());
-        return proposal;
     }
 
     public boolean deleteProposalById(Long id) {

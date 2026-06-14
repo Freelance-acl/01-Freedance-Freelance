@@ -1,5 +1,6 @@
 package com.team01.freelance.proposal.feign;
 
+import com.team01.freelance.contract.model.Contract;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -9,5 +10,5 @@ public interface ContractServiceClient {
 
     // S3-F4: pre-check — does an active contract exist for this proposal?
     @GetMapping("/api/contracts/proposal/{proposalId}/active")
-    boolean hasActiveContract(@PathVariable Long proposalId);
+    Contract getActiveContract(@PathVariable Long proposalId);
 }
