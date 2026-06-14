@@ -2,8 +2,12 @@ package com.team01.freelance.job.service;
 
 import com.team01.freelance.common.observer.EventSubject;
 import com.team01.freelance.job.dto.JobProposalSummaryDTO;
-import com.team01.freelance.job.client.ContractLookupClient;
-import com.team01.freelance.job.client.ContractSummary;
+import com.team01.freelance.job.feign.ContractServiceClient;
+import com.team01.freelance.job.feign.ProposalServiceClient;
+import com.team01.freelance.job.feign.dto.ContractResponse;
+import com.team01.freelance.job.feign.dto.ProposalJobSummaryByJobResponse;
+import com.team01.freelance.job.feign.dto.ProposalJobSummaryResponse;
+import com.team01.freelance.job.messaging.JobEventPublisher;
 import com.team01.freelance.job.event.JobEventTypes;
 import com.team01.freelance.job.exception.ForbiddenOperationException;
 import com.team01.freelance.job.dto.TopBudgetJobDTO;
@@ -20,7 +24,10 @@ import com.team01.freelance.job.search.service.JobSearchIndexOperations;
 import com.team01.freelance.user.model.User;
 import com.team01.freelance.user.model.UserRole;
 import com.team01.freelance.user.repository.UserRepository;
-import jakarta.persistence.EntityNotFoundException;
+import org.springframework.data.domain.PageRequest;
+import feign.FeignException;
+import feign.Request;
+import feign.RequestTemplate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
@@ -37,6 +44,9 @@ import java.util.HashMap;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import jakarta.persistence.EntityNotFoundException;
+
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -55,7 +65,13 @@ class JobServiceTest {
     private UserRepository userRepository;
 
     @Mock
-    private ContractLookupClient contractLookupClient;
+    private ContractServiceClient contractServiceClient;
+
+    @Mock
+    private ProposalServiceClient proposalServiceClient;
+
+    @Mock
+    private JobEventPublisher jobEventPublisher;
 
     @Mock
     private JobAttachmentRepository jobAttachmentRepository;
@@ -163,78 +179,55 @@ class JobServiceTest {
 
     @Test
     void getJobProposalSummaryReturnsProposalsInDateRange() {
-        // Arrange
         Long jobId = 1L;
         LocalDate startDate = LocalDate.of(2026, 3, 1);
         LocalDate endDate = LocalDate.of(2026, 3, 31);
-        LocalDateTime queryStart = startDate.atStartOfDay();
-        LocalDateTime queryEndExclusive = endDate.plusDays(1).atStartOfDay();
 
-        JobProposalSummaryDTO expectedDTO = new JobProposalSummaryDTO(
-                jobId,
-                "Web Development",
-                5L,
-                800.0,
-                500.0,
-                1200.0
-        );
+        Job job = new Job();
+        job.setId(jobId);
+        job.setTitle("Web Development");
 
-        when(jobRepository.existsById(jobId)).thenReturn(true);
-        when(jobRepository.getProposalSummary(jobId, queryStart, queryEndExclusive))
-                .thenReturn(Collections.singletonList(new Object[]{
-                        expectedDTO.getJobId(),
-                        expectedDTO.getTitle(),
-                        expectedDTO.getTotalProposals(),
-                        expectedDTO.getAverageBidAmount(),
-                        expectedDTO.getLowestBid(),
-                        expectedDTO.getHighestBid()
-                }));
+        ProposalJobSummaryResponse summary = new ProposalJobSummaryResponse();
+        summary.setTotalProposals(5L);
+        summary.setAverageBidAmount(800.0);
+        summary.setLowestBid(500.0);
+        summary.setHighestBid(1200.0);
 
-        // Act
+        when(jobRepository.findById(jobId)).thenReturn(Optional.of(job));
+        when(proposalServiceClient.getJobProposalSummary(jobId, startDate, endDate)).thenReturn(summary);
+
         JobProposalSummaryDTO result = jobService.getJobProposalSummary(jobId, startDate, endDate);
 
-        // Assert
         assertNotNull(result);
+        assertEquals("Web Development", result.getTitle());
         assertEquals(5L, result.getTotalProposals());
         assertEquals(800.0, result.getAverageBidAmount());
         assertEquals(500.0, result.getLowestBid());
         assertEquals(1200.0, result.getHighestBid());
-        verify(jobRepository).getProposalSummary(jobId, queryStart, queryEndExclusive);
+        verify(proposalServiceClient).getJobProposalSummary(jobId, startDate, endDate);
     }
 
     @Test
     void getJobProposalSummaryReturnsZeroProposalsWhenNoneExist() {
-        // Arrange
         Long jobId = 1L;
         LocalDate startDate = LocalDate.of(2026, 1, 1);
         LocalDate endDate = LocalDate.of(2026, 1, 31);
-        LocalDateTime queryStart = startDate.atStartOfDay();
-        LocalDateTime queryEndExclusive = endDate.plusDays(1).atStartOfDay();
 
-        JobProposalSummaryDTO expectedDTO = new JobProposalSummaryDTO(
-                jobId,
-                "Web Development",
-                0L,
-                0.0,
-                0.0,
-                0.0
-        );
+        Job job = new Job();
+        job.setId(jobId);
+        job.setTitle("Web Development");
 
-        when(jobRepository.existsById(jobId)).thenReturn(true);
-        when(jobRepository.getProposalSummary(jobId, queryStart, queryEndExclusive))
-                .thenReturn(Collections.singletonList(new Object[]{
-                        expectedDTO.getJobId(),
-                        expectedDTO.getTitle(),
-                        expectedDTO.getTotalProposals(),
-                        expectedDTO.getAverageBidAmount(),
-                        expectedDTO.getLowestBid(),
-                        expectedDTO.getHighestBid()
-                }));
+        ProposalJobSummaryResponse summary = new ProposalJobSummaryResponse();
+        summary.setTotalProposals(0L);
+        summary.setAverageBidAmount(0.0);
+        summary.setLowestBid(0.0);
+        summary.setHighestBid(0.0);
 
-        // Act
+        when(jobRepository.findById(jobId)).thenReturn(Optional.of(job));
+        when(proposalServiceClient.getJobProposalSummary(jobId, startDate, endDate)).thenReturn(summary);
+
         JobProposalSummaryDTO result = jobService.getJobProposalSummary(jobId, startDate, endDate);
 
-        // Assert
         assertNotNull(result);
         assertEquals(0L, result.getTotalProposals());
         assertEquals(0.0, result.getAverageBidAmount());
@@ -244,93 +237,71 @@ class JobServiceTest {
 
     @Test
     void getJobProposalSummaryThrowsIfJobNotFound() {
-        // Arrange
         Long jobId = 999L;
         LocalDate startDate = LocalDate.of(2026, 3, 1);
         LocalDate endDate = LocalDate.of(2026, 3, 31);
 
-        when(jobRepository.existsById(jobId)).thenReturn(false);
+        when(jobRepository.findById(jobId)).thenReturn(Optional.empty());
 
-        // Act & Assert
         assertThrows(EntityNotFoundException.class, () ->
                 jobService.getJobProposalSummary(jobId, startDate, endDate));
-        verify(jobRepository, never()).getProposalSummary(any(), any(), any());
+        verify(proposalServiceClient, never()).getJobProposalSummary(any(), any(), any());
     }
 
     @Test
     void getJobProposalSummaryThrowsIfStartDateAfterEndDate() {
-        // Arrange
         Long jobId = 1L;
         LocalDate startDate = LocalDate.of(2026, 3, 31);
         LocalDate endDate = LocalDate.of(2026, 3, 1);
 
-        when(jobRepository.existsById(jobId)).thenReturn(true);
-
-        // Act & Assert
         assertThrows(IllegalArgumentException.class, () ->
                 jobService.getJobProposalSummary(jobId, startDate, endDate));
-        verify(jobRepository, never()).getProposalSummary(any(), any(), any());
+        verify(proposalServiceClient, never()).getJobProposalSummary(any(), any(), any());
     }
 
     @Test
     void getJobProposalSummaryThrowsIfStartDateIsNull() {
-        // Arrange
         Long jobId = 1L;
         LocalDate endDate = LocalDate.of(2026, 3, 31);
 
-        // Act & Assert
         assertThrows(IllegalArgumentException.class, () ->
                 jobService.getJobProposalSummary(jobId, null, endDate));
-        verify(jobRepository, never()).existsById(any());
+        verify(jobRepository, never()).findById(any());
     }
 
     @Test
     void getJobProposalSummaryThrowsIfEndDateIsNull() {
-        // Arrange
         Long jobId = 1L;
         LocalDate startDate = LocalDate.of(2026, 3, 1);
 
-        // Act & Assert
         assertThrows(IllegalArgumentException.class, () ->
                 jobService.getJobProposalSummary(jobId, startDate, null));
-        verify(jobRepository, never()).existsById(any());
+        verify(jobRepository, never()).findById(any());
     }
 
     @Test
     void getJobProposalSummaryAcceptsSameDateRange() {
-        // Arrange
         Long jobId = 1L;
         LocalDate sameDate = LocalDate.of(2026, 3, 15);
-        LocalDateTime queryStart = sameDate.atStartOfDay();
-        LocalDateTime queryEndExclusive = sameDate.plusDays(1).atStartOfDay();
 
-        JobProposalSummaryDTO expectedDTO = new JobProposalSummaryDTO(
-                jobId,
-                "Web Development",
-                2L,
-                750.0,
-                700.0,
-                800.0
-        );
+        Job job = new Job();
+        job.setId(jobId);
+        job.setTitle("Web Development");
 
-        when(jobRepository.existsById(jobId)).thenReturn(true);
-        when(jobRepository.getProposalSummary(jobId, queryStart, queryEndExclusive))
-                .thenReturn(Collections.singletonList(new Object[]{
-                        expectedDTO.getJobId(),
-                        expectedDTO.getTitle(),
-                        expectedDTO.getTotalProposals(),
-                        expectedDTO.getAverageBidAmount(),
-                        expectedDTO.getLowestBid(),
-                        expectedDTO.getHighestBid()
-                }));
+        ProposalJobSummaryResponse summary = new ProposalJobSummaryResponse();
+        summary.setTotalProposals(2L);
+        summary.setAverageBidAmount(750.0);
+        summary.setLowestBid(700.0);
+        summary.setHighestBid(800.0);
 
-        // Act
+        when(jobRepository.findById(jobId)).thenReturn(Optional.of(job));
+        when(proposalServiceClient.getJobProposalSummary(jobId, sameDate, sameDate)).thenReturn(summary);
+
         JobProposalSummaryDTO result = jobService.getJobProposalSummary(jobId, sameDate, sameDate);
 
-        // Assert
         assertNotNull(result);
         assertEquals(2L, result.getTotalProposals());
-        verify(jobRepository).getProposalSummary(jobId, queryStart, queryEndExclusive);
+        verify(proposalServiceClient).getJobProposalSummary(jobId, sameDate, sameDate);
     }
 
     @Test
@@ -394,18 +365,20 @@ class JobServiceTest {
         secondRequest.setContractId(2L);
         secondRequest.setRating(3.0);
 
-        ContractSummary firstContract = new ContractSummary();
+        ContractResponse firstContract = new ContractResponse();
         firstContract.setJobId(jobId);
+        firstContract.setClientId(10L);
         firstContract.setStatus("COMPLETED");
 
-        ContractSummary secondContract = new ContractSummary();
+        ContractResponse secondContract = new ContractResponse();
         secondContract.setJobId(jobId);
+        secondContract.setClientId(10L);
         secondContract.setStatus("COMPLETED");
 
         when(jobRepository.findById(jobId)).thenReturn(Optional.of(existingJob));
         when(jobRepository.save(any(Job.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(contractLookupClient.getContractById(1L)).thenReturn(firstContract);
-        when(contractLookupClient.getContractById(2L)).thenReturn(secondContract);
+        when(contractServiceClient.getContractById(1L)).thenReturn(firstContract);
+        when(contractServiceClient.getContractById(2L)).thenReturn(secondContract);
 
         Job firstResult = jobService.rateJob(jobId, firstRequest);
 
@@ -418,8 +391,8 @@ class JobServiceTest {
         assertNotNull(secondResult);
         assertEquals(4.0, secondResult.getRating(), 0.0001);
         assertEquals(2, secondResult.getTotalRatings());
-        verify(contractLookupClient).getContractById(1L);
-        verify(contractLookupClient).getContractById(2L);
+        verify(contractServiceClient).getContractById(1L);
+        verify(contractServiceClient).getContractById(2L);
         verify(jobRepository, times(2)).save(existingJob);
         verify(jobSearchIndexOperations, times(2)).index(existingJob);
     }
@@ -437,7 +410,7 @@ class JobServiceTest {
         when(jobRepository.findById(jobId)).thenReturn(Optional.of(existingJob));
 
         assertThrows(IllegalArgumentException.class, () -> jobService.rateJob(jobId, request));
-        verify(contractLookupClient, never()).getContractById(anyLong());
+        verify(contractServiceClient, never()).getContractById(anyLong());
         verify(jobRepository, never()).save(any(Job.class));
     }
 
@@ -451,12 +424,12 @@ class JobServiceTest {
         request.setContractId(1L);
         request.setRating(5.0);
 
-        ContractSummary contract = new ContractSummary();
+        ContractResponse contract = new ContractResponse();
         contract.setJobId(jobId);
         contract.setStatus("ACTIVE");
 
         when(jobRepository.findById(jobId)).thenReturn(Optional.of(existingJob));
-        when(contractLookupClient.getContractById(1L)).thenReturn(contract);
+        when(contractServiceClient.getContractById(1L)).thenReturn(contract);
 
         assertThrows(IllegalArgumentException.class, () -> jobService.rateJob(jobId, request));
         verify(jobRepository, never()).save(any(Job.class));
@@ -472,12 +445,12 @@ class JobServiceTest {
         request.setContractId(1L);
         request.setRating(5.0);
 
-        ContractSummary contract = new ContractSummary();
+        ContractResponse contract = new ContractResponse();
         contract.setJobId(2L);
         contract.setStatus("COMPLETED");
 
         when(jobRepository.findById(jobId)).thenReturn(Optional.of(existingJob));
-        when(contractLookupClient.getContractById(1L)).thenReturn(contract);
+        when(contractServiceClient.getContractById(1L)).thenReturn(contract);
 
         assertThrows(IllegalArgumentException.class, () -> jobService.rateJob(jobId, request));
         verify(jobRepository, never()).save(any(Job.class));
@@ -494,7 +467,7 @@ class JobServiceTest {
         request.setRating(5.0);
 
         when(jobRepository.findById(jobId)).thenReturn(Optional.of(existingJob));
-        when(contractLookupClient.getContractById(1L)).thenThrow(new EntityNotFoundException("Contract not found with id: 1"));
+        when(contractServiceClient.getContractById(1L)).thenThrow(notFoundFeignException());
 
         assertThrows(EntityNotFoundException.class, () -> jobService.rateJob(jobId, request));
         verify(jobRepository, never()).save(any(Job.class));
@@ -692,42 +665,42 @@ class JobServiceTest {
     }
 
     @Test
-    void closeJob_usesAtomicUpdateAndRejectsProposals() {
+    void closeJob_closesWhenNoActiveContracts() {
         Long jobId = 1L;
         Job openJob = new Job();
         openJob.setId(jobId);
+        openJob.setClientId(5L);
         openJob.setStatus(JobStatus.OPEN);
 
-        Job closedJob = new Job();
-        closedJob.setId(jobId);
-        closedJob.setStatus(JobStatus.CLOSED);
-
-        when(jobRepository.findById(jobId)).thenReturn(Optional.of(openJob), Optional.of(closedJob));
-        when(jobRepository.closeJobIfEligible(jobId)).thenReturn(1);
+        when(jobRepository.findById(jobId)).thenReturn(Optional.of(openJob));
+        when(contractServiceClient.getActiveContractCountForJob(jobId)).thenReturn(0);
+        when(jobRepository.save(openJob)).thenAnswer(invocation -> invocation.getArgument(0));
 
         Job result = jobService.closeJob(jobId);
 
         assertEquals(JobStatus.CLOSED, result.getStatus());
-        verify(jobRepository).closeJobIfEligible(jobId);
-        verify(jobRepository).rejectSubmittedProposalsByJobId(jobId);
+        verify(contractServiceClient).getActiveContractCountForJob(jobId);
+        verify(jobRepository).save(openJob);
         verify(jobEventSubject).notifyObservers(eq("JOB_CLOSED"), any(Map.class));
-        verify(jobRepository, never()).save(any(Job.class));
-        verify(jobSearchIndexOperations).index(closedJob);
+        verify(jobEventPublisher).publishJobClosed(openJob);
+        verify(jobEventPublisher).publishJobStatusChanged(jobId, JobStatus.OPEN, JobStatus.CLOSED);
+        verify(jobSearchIndexOperations).index(openJob);
     }
 
     @Test
-    void closeJob_throwsWhenAtomicUpdateBlocked() {
+    void closeJob_throwsWhenActiveContractExists() {
         Long jobId = 1L;
         Job openJob = new Job();
         openJob.setId(jobId);
         openJob.setStatus(JobStatus.OPEN);
 
         when(jobRepository.findById(jobId)).thenReturn(Optional.of(openJob));
-        when(jobRepository.closeJobIfEligible(jobId)).thenReturn(0);
+        when(contractServiceClient.getActiveContractCountForJob(jobId)).thenReturn(1);
 
         assertThrows(IllegalArgumentException.class, () -> jobService.closeJob(jobId));
-        verify(jobRepository, never()).rejectSubmittedProposalsByJobId(anyLong());
+        verify(jobRepository, never()).save(any(Job.class));
         verify(jobEventSubject, never()).notifyObservers(anyString(), any());
+        verify(jobEventPublisher, never()).publishJobClosed(any(Job.class));
     }
 
     @Test
@@ -775,18 +748,28 @@ class JobServiceTest {
 
     @Test
     void getTopBudgetJobs_returnsRepositoryResults() {
-        TopBudgetJobDTO dto = new TopBudgetJobDTO(1L, "Job A", 5000.0, 2L);
-        when(jobRepository.findTopBudgetJobs(2)).thenReturn(List.of(dto));
+        Job job = new Job();
+        job.setId(1L);
+        job.setTitle("Job A");
+        job.setBudgetMax(5000.0);
+        ProposalJobSummaryByJobResponse summary = new ProposalJobSummaryByJobResponse();
+        summary.setJobId(1L);
+        summary.setTotalProposals(2L);
+
+        when(jobRepository.findByOrderByBudgetMaxDesc(PageRequest.of(0, 2)))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(job)));
+        when(proposalServiceClient.getJobProposalSummaries(List.of(1L))).thenReturn(List.of(summary));
 
         List<TopBudgetJobDTO> result = jobService.getTopBudgetJobs(2);
 
         assertEquals(1, result.size());
-        assertNotSame(dto, result.getFirst());
         assertEquals(1L, result.getFirst().getJobId());
         assertEquals("Job A", result.getFirst().getTitle());
         assertEquals(5000.0, result.getFirst().getBudgetMax());
         assertEquals(2L, result.getFirst().getTotalProposals());
-        verify(jobRepository).findTopBudgetJobs(2);
+        verify(jobRepository).findByOrderByBudgetMaxDesc(PageRequest.of(0, 2));
+        verify(proposalServiceClient).getJobProposalSummaries(List.of(1L));
+        verify(proposalServiceClient, never()).getJobProposalSummary(any(), any(), any());
     }
 
     @Test
@@ -801,9 +784,22 @@ class JobServiceTest {
         Job result = jobService.closeJob(jobId);
 
         assertEquals(JobStatus.CLOSED, result.getStatus());
-        verify(jobRepository, never()).closeJobIfEligible(anyLong());
+        verify(jobRepository, never()).save(any(Job.class));
         verify(jobSearchIndexOperations, never()).index(any(Job.class));
         verify(jobEventSubject, never()).notifyObservers(anyString(), any());
+        verify(jobEventPublisher, never()).publishJobClosed(any(Job.class));
+    }
+
+    private FeignException.NotFound notFoundFeignException() {
+        Request request = Request.create(
+                Request.HttpMethod.GET,
+                "/api/contracts/1",
+                Collections.emptyMap(),
+                null,
+                StandardCharsets.UTF_8,
+                new RequestTemplate()
+        );
+        return new FeignException.NotFound("not found", request, null, Collections.emptyMap());
     }
 
     private Job createJobWithAttachments(Long id, String title, JobStatus status, JobAttachment... attachments) {

@@ -2,6 +2,8 @@ package com.team01.freelance.proposal.controller;
 
 import com.team01.freelance.proposal.dto.FeeEstimateDTO;
 import com.team01.freelance.proposal.dto.FeeEstimateRequest;
+import com.team01.freelance.proposal.dto.JobProposalSummaryByJobDTO;
+import com.team01.freelance.proposal.dto.JobProposalSummaryDTO;
 import com.team01.freelance.proposal.dto.JobRecommendationDTO;
 import com.team01.freelance.proposal.dto.ProposalAnalyticsDashboardDTO;
 import com.team01.freelance.proposal.dto.ProposalDetailsDTO;
@@ -107,6 +109,31 @@ public class ProposalController {
             return ResponseEntity.status(401).build();
         }
         return ResponseEntity.ok(proposalRecommendationService.getRecommendations(freelancerId, limit, request));
+    }
+
+    @GetMapping("/jobs/summaries")
+    public ResponseEntity<List<JobProposalSummaryByJobDTO>> getJobProposalSummaries(
+            @RequestParam("jobIds") List<Long> jobIds) {
+        return ResponseEntity.ok(proposalService.getJobProposalSummaries(jobIds));
+    }
+
+    @GetMapping("/job/{jobId}/summary")
+    public ResponseEntity<JobProposalSummaryDTO> getJobProposalSummary(
+            @PathVariable Long jobId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        try {
+            return ResponseEntity.ok(proposalService.getJobProposalSummary(jobId, startDate, endDate));
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @GetMapping("/job/{jobId}/active-count")
+    public ResponseEntity<Integer> getActiveProposalCountForJob(@PathVariable Long jobId) {
+        return ResponseEntity.ok(proposalService.getActiveProposalCountForJob(jobId));
     }
 
     @GetMapping("/{id}")

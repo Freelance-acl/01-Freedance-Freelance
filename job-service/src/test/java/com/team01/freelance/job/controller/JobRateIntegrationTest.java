@@ -1,7 +1,7 @@
 package com.team01.freelance.job.controller;
 
-import com.team01.freelance.job.client.ContractLookupClient;
-import com.team01.freelance.job.client.ContractSummary;
+import com.team01.freelance.job.feign.ContractServiceClient;
+import com.team01.freelance.job.feign.dto.ContractResponse;
 import com.team01.freelance.job.model.Job;
 import com.team01.freelance.job.model.JobCategory;
 import com.team01.freelance.job.model.JobStatus;
@@ -12,20 +12,15 @@ import com.team01.freelance.user.model.UserRole;
 import com.team01.freelance.user.model.UserStatus;
 import com.team01.freelance.user.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
-import org.springframework.security.test.context.support.WithMockUser;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
 
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -35,12 +30,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * [S2-F9] Integration tests for {@code POST /api/jobs/{id}/rate}.
  */
 @Transactional
-@Import(JobRateIntegrationTest.ContractLookupTestConfig.class)
 @WithMockUser(roles = "ADMIN")
 class JobRateIntegrationTest extends AbstractIntegrationTest {
-
-    @Autowired
-    private ContractLookupClient contractLookupClient;
 
     private MockMvc mockMvc;
 
@@ -64,10 +55,11 @@ class JobRateIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void rateJob_updatesRunningAverageFromCompletedContract() throws Exception {
-        ContractSummary contract = new ContractSummary();
+        ContractResponse contract = new ContractResponse();
         contract.setJobId(job.getId());
+        contract.setClientId(42L);
         contract.setStatus("COMPLETED");
-        when(contractLookupClient.getContractById(eq(99L))).thenReturn(contract);
+        when(contractServiceClient.getContractById(eq(99L))).thenReturn(contract);
 
         mockMvc.perform(post("/api/jobs/{id}/rate", job.getId())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -75,15 +67,6 @@ class JobRateIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.rating").value(5.0))
                 .andExpect(jsonPath("$.totalRatings").value(1));
-    }
-
-    @TestConfiguration
-    static class ContractLookupTestConfig {
-        @Bean
-        @Primary
-        ContractLookupClient contractLookupClient() {
-            return mock(ContractLookupClient.class);
-        }
     }
 
     private User saveUser(String name, UserRole role) {
