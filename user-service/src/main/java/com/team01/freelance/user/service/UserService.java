@@ -73,6 +73,9 @@ public class UserService {
     private DataSource dataSource;
 
     @Autowired
+    private com.team01.freelance.user.feign.ContractServiceClient contractServiceClient;
+
+    @Autowired
     private EventSubject authEventSubject;
 
     @Autowired
@@ -131,27 +134,21 @@ public class UserService {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("User not found with id: " + id));
 
-        if (userRepository.countActiveContractsForUser(id) > 0) {
+        int activeContracts = 0;
+        try {
+            activeContracts = contractServiceClient.getActiveContractCount(id);
+        } catch (Exception e) {
+            // Fallback: check local DB if feign fails
+            activeContracts = (int) userRepository.countActiveContractsForUser(id);
+        }
+
+        if (activeContracts > 0) {
             throw new IllegalStateException("Cannot deactivate user with active contracts");
         }
 
         user.setStatus(UserStatus.DEACTIVATED);
         userRepository.withdrawSubmittedProposalsForUser(id);
-        User saved = userRepository.save(user);
-
-        Map<String, Object> eventDetails = new HashMap<>();
-        if (saved.getEmail() != null) {
-            eventDetails.put("email", saved.getEmail());
-        }
-        Map<String, Object> eventPayload = new HashMap<>();
-        eventPayload.put("userId", saved.getId());
-        eventPayload.put("action", "USER_DEACTIVATED");
-        eventPayload.put("details", eventDetails);
-        if (authEventSubject != null) {
-            authEventSubject.notifyObservers("USER_DEACTIVATED", eventPayload);
-        }
-
-        return saved;
+        return userRepository.save(user);
     }
 
     @Cacheable(
