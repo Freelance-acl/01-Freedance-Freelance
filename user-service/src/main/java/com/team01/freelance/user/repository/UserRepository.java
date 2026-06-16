@@ -1,6 +1,5 @@
 package com.team01.freelance.user.repository;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -37,6 +36,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
             @Param("email") String email,
             @Param("role") UserRole role
     );
+
+    List<User> findByRole(UserRole role);
 
     @Query(value = """
         SELECT
@@ -94,22 +95,4 @@ public interface UserRepository extends JpaRepository<User, Long> {
             WHERE jsonb_extract_path_text(preferences, :key) = :value
             """, nativeQuery = true)
     List<User> findByPreference(@Param("key") String key, @Param("value") String value);
-    @Query(value = """
-            SELECT u.id,
-                   u.name,
-                   COALESCE(SUM(c.agreed_amount), 0) AS total_earnings,
-                   COUNT(c.id) AS contract_count
-            FROM users u
-            JOIN contracts c ON c.freelancer_id = u.id
-            WHERE c.status = 'COMPLETED'
-              AND c.end_date >= :startDate
-              AND c.end_date <= :endDate
-            GROUP BY u.id, u.name
-            ORDER BY total_earnings DESC, u.id ASC
-            LIMIT :limit
-            """, nativeQuery = true)
-    List<Object[]> findTopFreelancersByEarnings(
-            @Param("startDate") LocalDateTime startDate,
-            @Param("endDate") LocalDateTime endDate,
-            @Param("limit") int limit);
 }
