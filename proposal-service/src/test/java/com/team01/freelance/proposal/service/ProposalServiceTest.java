@@ -4,11 +4,13 @@ import com.team01.freelance.contract.model.Contract;
 import com.team01.freelance.contract.model.ContractStatus;
 import com.team01.freelance.common.observer.EventSubject;
 import com.team01.freelance.contract.repository.ContractRepository;
+import com.team01.freelance.contracts.events.PaymentFailedEvent;
 import com.team01.freelance.proposal.dto.FeeEstimateDTO;
 import com.team01.freelance.job.model.Job;
 import com.team01.freelance.proposal.dto.ProposalDetailsDTO;
 import com.team01.freelance.proposal.model.MilestoneStatus;
 import com.team01.freelance.proposal.dto.ProposalAnalyticsDTO;
+import com.team01.freelance.proposal.messaging.ProposalEventPublisher;
 import com.team01.freelance.proposal.model.Proposal;
 import com.team01.freelance.proposal.model.ProposalMilestone;
 import com.team01.freelance.proposal.model.ProposalStatus;
@@ -66,6 +68,8 @@ class ProposalServiceTest {
     private PayoutRepository payoutRepository;
     @Mock
     private DataSource dataSource;
+    @Mock
+    private ProposalEventPublisher proposalEventPublisher;
 
     @InjectMocks
     private ProposalService proposalService;
@@ -123,6 +127,25 @@ class ProposalServiceTest {
                 LocalDateTime.of(2026, 1, 1, 0, 0),
                 LocalDateTime.of(2026, 1, 2, 0, 0),
                 null);
+    }
+
+    @Test
+    void scenarioB_paymentFailureMarksProposalFailedAndPublishesCancellation() {
+        Proposal proposal = new Proposal();
+        proposal.setId(44L);
+        proposal.setJobId(12L);
+        proposal.setFreelancerId(9L);
+        proposal.setStatus(ProposalStatus.PAYMENT_PENDING);
+
+        when(proposalRepository.findById(44L)).thenReturn(Optional.of(proposal));
+        when(proposalRepository.saveAndFlush(proposal)).thenReturn(proposal);
+
+        Proposal result = proposalService.handlePaymentFailed(
+                new PaymentFailedEvent(77L, 44L, 55L, "unsupported payout method"));
+
+        assertThat(result.getStatus()).isEqualTo(ProposalStatus.PAYMENT_FAILED);
+        verify(proposalRepository).saveAndFlush(proposal);
+        verify(proposalEventPublisher).publishProposalCancelled(proposal);
     }
 
     @Test

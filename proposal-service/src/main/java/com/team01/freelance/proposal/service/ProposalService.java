@@ -24,6 +24,10 @@ import com.team01.freelance.common.observer.EventSubject;
 import com.team01.freelance.contract.model.Contract;
 import com.team01.freelance.contract.model.ContractStatus;
 import com.team01.freelance.contract.repository.ContractRepository;
+import com.team01.freelance.contracts.events.PaymentCompletedEvent;
+import com.team01.freelance.contracts.events.PaymentFailedEvent;
+import com.team01.freelance.contracts.events.PaymentInitiatedEvent;
+import com.team01.freelance.contracts.events.PaymentRefundedEvent;
 import com.team01.freelance.job.model.Job;
 import com.team01.freelance.job.repository.JobRepository;
 import com.team01.freelance.wallet.repository.PayoutRepository;
@@ -578,6 +582,53 @@ public class ProposalService {
                 .toList();
     }
 
+    @Transactional
+    public Proposal handlePaymentInitiated(PaymentInitiatedEvent event) {
+        Proposal proposal = findProposalFromPaymentEvent(event == null ? null : event.proposalId());
+        if (proposal.getStatus() == ProposalStatus.PAYMENT_PENDING
+                || proposal.getStatus() == ProposalStatus.PAID
+                || proposal.getStatus() == ProposalStatus.REFUNDED) {
+            return proposal;
+        }
+        proposal.setStatus(ProposalStatus.PAYMENT_PENDING);
+        return proposalRepository.saveAndFlush(proposal);
+    }
+
+    @Transactional
+    public Proposal handlePaymentCompleted(PaymentCompletedEvent event) {
+        Proposal proposal = findProposalFromPaymentEvent(event == null ? null : event.proposalId());
+        if (proposal.getStatus() == ProposalStatus.PAID) {
+            return proposal;
+        }
+        proposal.setStatus(ProposalStatus.PAID);
+        return proposalRepository.saveAndFlush(proposal);
+    }
+
+    @Transactional
+    public Proposal handlePaymentFailed(PaymentFailedEvent event) {
+        Proposal proposal = findProposalFromPaymentEvent(event == null ? null : event.proposalId());
+        if (proposal.getStatus() == ProposalStatus.PAYMENT_FAILED
+                || proposal.getStatus() == ProposalStatus.REFUNDED) {
+            return proposal;
+        }
+        proposal.setStatus(ProposalStatus.PAYMENT_FAILED);
+        Proposal saved = proposalRepository.saveAndFlush(proposal);
+        if (proposalEventPublisher != null) {
+            proposalEventPublisher.publishProposalCancelled(saved);
+        }
+        return saved;
+    }
+
+    @Transactional
+    public Proposal handlePaymentRefunded(PaymentRefundedEvent event) {
+        Proposal proposal = findProposalFromPaymentEvent(event == null ? null : event.proposalId());
+        if (proposal.getStatus() == ProposalStatus.REFUNDED) {
+            return proposal;
+        }
+        proposal.setStatus(ProposalStatus.REFUNDED);
+        return proposalRepository.saveAndFlush(proposal);
+    }
+
     private JobProposalSummaryByJobDTO toJobProposalSummaryByJobDTO(Object[] row) {
         return new JobProposalSummaryByJobDTO(
                 row[0] != null ? ((Number) row[0]).longValue() : null,
@@ -587,5 +638,13 @@ public class ProposalService {
                 row[4] != null ? ((Number) row[4]).doubleValue() : 0.0,
                 row[5] != null ? ((Number) row[5]).doubleValue() : 0.0
         );
+    }
+
+    private Proposal findProposalFromPaymentEvent(Long proposalId) {
+        if (proposalId == null) {
+            throw new IllegalArgumentException("payment event is missing proposalId");
+        }
+        return proposalRepository.findById(proposalId)
+                .orElseThrow(() -> new EntityNotFoundException("Proposal not found with id: " + proposalId));
     }
 }

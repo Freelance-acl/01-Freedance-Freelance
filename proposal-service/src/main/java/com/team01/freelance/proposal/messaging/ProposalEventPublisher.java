@@ -1,6 +1,7 @@
 package com.team01.freelance.proposal.messaging;
 
 import com.team01.freelance.contract.model.Contract;
+import com.team01.freelance.contracts.events.ProposalCancelledEvent;
 import com.team01.freelance.contracts.events.ProposalCompletedEvent;
 import com.team01.freelance.proposal.config.RabbitMQConfig;
 import com.team01.freelance.proposal.model.Proposal;
@@ -28,6 +29,20 @@ public class ProposalEventPublisher {
         rabbitTemplate.convertAndSend(
                 RabbitMQConfig.PROPOSAL_EXCHANGE,
                 ProposalCompletedEvent.ROUTING_KEY,
+                event
+        );
+    }
+
+    public void publishProposalCancelled(Proposal proposal) {
+        ProposalCancelledEvent event = new ProposalCancelledEvent(
+                proposal.getId(),
+                proposal.getJobId(),
+                proposal.getFreelancerId(),
+                "payment_failed"
+        );
+        rabbitTemplate.convertAndSend(
+                RabbitMQConfig.PROPOSAL_EXCHANGE,
+                ProposalCancelledEvent.ROUTING_KEY,
                 event
         );
     }
