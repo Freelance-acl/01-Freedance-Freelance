@@ -2,6 +2,8 @@ package com.team01.freelance.user.controller;
 
 import com.team01.freelance.user.cache.UserCacheKey;
 import com.team01.freelance.user.cache.UserCacheNames;
+import com.team01.freelance.user.dto.UserContractSummaryDTO;
+import com.team01.freelance.user.feign.ContractServiceClient;
 import com.team01.freelance.user.model.ProficiencyLevel;
 import com.team01.freelance.user.model.User;
 import com.team01.freelance.user.model.UserRole;
@@ -18,6 +20,7 @@ import org.springframework.cache.CacheManager;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
@@ -30,6 +33,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -55,6 +59,9 @@ class Cc3UserCachingIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @MockitoBean
+    private ContractServiceClient contractServiceClient;
+
     private User freelancer;
     private User client;
     private UserSkill skill;
@@ -67,6 +74,8 @@ class Cc3UserCachingIntegrationTest extends AbstractIntegrationTest {
         skill = saveSkill(freelancer);
         insertCompletedContract(freelancer.getId(), client.getId(), 3000.0,
                 LocalDateTime.of(2026, 3, 10, 12, 0));
+        when(contractServiceClient.getUserContractSummary(freelancer.getId()))
+                .thenReturn(contractSummary(freelancer, 1L));
     }
 
     @Test
@@ -200,5 +209,17 @@ class Cc3UserCachingIntegrationTest extends AbstractIntegrationTest {
                 Timestamp.valueOf(endDate.minusDays(5)),
                 Timestamp.valueOf(endDate),
                 Timestamp.valueOf(endDate));
+    }
+
+    private UserContractSummaryDTO contractSummary(User user, Long completedContracts) {
+        return UserContractSummaryDTO.builder()
+                .userId(user.getId())
+                .name(user.getName())
+                .totalContracts(completedContracts)
+                .completedContracts(completedContracts)
+                .terminatedContracts(0L)
+                .totalEarnings(0.0)
+                .averageContractValue(0.0)
+                .build();
     }
 }

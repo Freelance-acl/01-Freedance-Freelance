@@ -1,5 +1,7 @@
 package com.team01.freelance.user.controller;
 
+import com.team01.freelance.user.dto.UserContractSummaryDTO;
+import com.team01.freelance.user.feign.ContractServiceClient;
 import com.team01.freelance.user.model.User;
 import com.team01.freelance.user.model.UserRole;
 import com.team01.freelance.user.model.UserStatus;
@@ -9,16 +11,16 @@ import org.junit.jupiter.api.BeforeEach;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
 
-import java.sql.Timestamp;
-import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -38,8 +40,8 @@ class UserLanguagePreferencesIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private UserRepository userRepository;
 
-    @Autowired
-    private JdbcTemplate jdbcTemplate;
+    @MockitoBean
+    private ContractServiceClient contractServiceClient;
 
     @BeforeEach
     void setUp() {
@@ -50,8 +52,11 @@ class UserLanguagePreferencesIntegrationTest extends AbstractIntegrationTest {
     void languageFilter_returnsUsersWithMinimumCompletedContracts() throws Exception {
         User qualified = saveUserWithLanguage("Qualified", "ar");
         User notEnough = saveUserWithLanguage("Not Enough", "ar");
-        insertCompletedContracts(qualified.getId(), 2);
-        insertCompletedContracts(notEnough.getId(), 1);
+        User otherLanguage = saveUserWithLanguage("Other Language", "en");
+        when(contractServiceClient.getUserContractSummary(qualified.getId()))
+                .thenReturn(contractSummary(qualified, 2L));
+        when(contractServiceClient.getUserContractSummary(notEnough.getId()))
+                .thenReturn(contractSummary(notEnough, 1L));
 
         mockMvc.perform(get("/api/users/preferences/language")
                         .param("lang", "ar")
@@ -59,6 +64,9 @@ class UserLanguagePreferencesIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].name").value("Qualified"));
+
+        verify(contractServiceClient).getUserContractSummary(qualified.getId());
+        verify(contractServiceClient).getUserContractSummary(notEnough.getId());
     }
 
     private User saveUserWithLanguage(String name, String language) {
@@ -73,16 +81,15 @@ class UserLanguagePreferencesIntegrationTest extends AbstractIntegrationTest {
         return userRepository.save(user);
     }
 
-    private void insertCompletedContracts(Long freelancerId, int count) {
-        for (int i = 0; i < count; i++) {
-            jdbcTemplate.update("""
-                    INSERT INTO contracts (job_id, freelancer_id, client_id, proposal_id, agreed_amount,
-                                           status, start_date, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    10L + i, freelancerId, 20L, 30L + i, 1000.0, "COMPLETED",
-                    Timestamp.valueOf(LocalDateTime.now()),
-                    Timestamp.valueOf(LocalDateTime.now()));
-        }
+    private UserContractSummaryDTO contractSummary(User user, Long completedContracts) {
+        return UserContractSummaryDTO.builder()
+                .userId(user.getId())
+                .name(user.getName())
+                .totalContracts(completedContracts)
+                .completedContracts(completedContracts)
+                .terminatedContracts(0L)
+                .totalEarnings(0.0)
+                .averageContractValue(0.0)
+                .build();
     }
 }
