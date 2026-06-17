@@ -487,24 +487,6 @@ public class UserService {
         }
     }
 
-        Object[] row = (Object[]) result;
-
-        Long totalContracts = row[0] != null ? ((Number) row[0]).longValue() : 0L;
-        Long completedContracts = row[1] != null ? ((Number) row[1]).longValue() : 0L;
-        Long terminatedContracts = row[2] != null ? ((Number) row[2]).longValue() : 0L;
-        Double totalEarnings = row[3] != null ? ((Number) row[3]).doubleValue() : 0.0;
-        Double averageContractValue = row[4] != null ? ((Number) row[4]).doubleValue() : 0.0;
-
-        return UserContractSummaryDTO.builder()
-                .userId(user.getId())
-                .name(user.getName())
-                .totalContracts(totalContracts)
-                .completedContracts(completedContracts)
-                .terminatedContracts(terminatedContracts)
-                .totalEarnings(totalEarnings)
-                .averageContractValue(averageContractValue)
-                .build();
-    }
     private static UserContractSummaryDTO zeroContractSummary(User user) {
         return UserContractSummaryDTO.builder()
                 .userId(user.getId())
