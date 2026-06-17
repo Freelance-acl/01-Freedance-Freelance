@@ -51,24 +51,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Object getUserContractSummary(@Param("userId") Long userId);
 
     @Query(value = """
-        SELECT u.*
-        FROM users u
-        LEFT JOIN contracts c
-            ON (c.freelancer_id = u.id OR c.client_id = u.id)
-            AND c.status = 'COMPLETED'
-        WHERE LOWER(u.preferences ->> 'language') = LOWER(:lang)
-        GROUP BY u.id
-        HAVING COUNT(c.id) >= :minContracts
-        """, nativeQuery = true)
-    List<User> findUsersByLanguageAndMinimumCompletedContracts(
-            @Param("lang") String lang,
-            @Param("minContracts") Long minContracts
-    );
-
-
-
-
-    @Query(value = """
             SELECT COUNT(*)
             FROM contracts
             WHERE status = 'ACTIVE'
