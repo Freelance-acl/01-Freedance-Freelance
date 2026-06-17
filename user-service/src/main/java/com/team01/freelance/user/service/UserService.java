@@ -148,7 +148,21 @@ public class UserService {
 
         user.setStatus(UserStatus.DEACTIVATED);
         userRepository.withdrawSubmittedProposalsForUser(id);
-        return userRepository.save(user);
+        User saved = userRepository.save(user);
+
+        Map<String, Object> eventDetails = new HashMap<>();
+        if (saved.getEmail() != null) {
+            eventDetails.put("email", saved.getEmail());
+        }
+        Map<String, Object> eventPayload = new HashMap<>();
+        eventPayload.put("userId", saved.getId());
+        eventPayload.put("action", "USER_DEACTIVATED");
+        eventPayload.put("details", eventDetails);
+        if (authEventSubject != null) {
+            authEventSubject.notifyObservers("USER_DEACTIVATED", eventPayload);
+        }
+
+        return saved;
     }
 
     @Cacheable(
