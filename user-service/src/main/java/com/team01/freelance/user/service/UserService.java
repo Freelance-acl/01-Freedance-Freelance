@@ -89,9 +89,6 @@ public class UserService {
     private ObjectMapper objectMapper;
 
     @Autowired
-    private com.team01.freelance.user.feign.ContractServiceClient contractServiceClient;
-
-    @Autowired
     private MongoDocumentAdapter mongoDocumentAdapter;
 
     @Autowired
