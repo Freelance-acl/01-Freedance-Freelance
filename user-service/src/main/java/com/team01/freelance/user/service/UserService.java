@@ -11,6 +11,7 @@ import com.team01.freelance.user.dto.UserContractSummaryDTO;
 import com.team01.freelance.user.dto.UserProfileDTO;
 import com.team01.freelance.user.dto.UserProfileSkillDTO;
 import com.team01.freelance.user.event.AuthEvent;
+import com.team01.freelance.user.feign.ContractServiceClient;
 import com.team01.freelance.user.model.User;
 import com.team01.freelance.user.model.UserRole;
 import com.team01.freelance.user.model.UserSkill;
@@ -88,7 +89,13 @@ public class UserService {
     private ObjectMapper objectMapper;
 
     @Autowired
+    private com.team01.freelance.user.feign.ContractServiceClient contractServiceClient;
+
+    @Autowired
     private MongoDocumentAdapter mongoDocumentAdapter;
+
+    @Autowired
+    private ContractServiceClient contractServiceClient;
 
     public List<User> getAllUsers() {
         return userRepository.findAll();
@@ -424,26 +431,22 @@ public class UserService {
         Long minimumContracts = minContracts != null ? minContracts : 0L;
         String language = lang.trim();
 
-        if (!usesPostgresDatabase()) {
-            return userRepository.findAll().stream()
-                    .filter(user -> user.getPreferences() != null
-                            && language.equalsIgnoreCase(String.valueOf(user.getPreferences().get("language"))))
-                    .filter(user -> completedContractCount(user.getId()) >= minimumContracts)
-                    .toList();
-        }
-
-        return userRepository.findUsersByLanguageAndMinimumCompletedContracts(language, minimumContracts);
+        return userRepository.findAll().stream()
+                .filter(user -> user.getPreferences() != null
+                        && language.equalsIgnoreCase(String.valueOf(user.getPreferences().get("language"))))
+                .filter(user -> minimumContracts <= 0 || completedContractCountFromContractService(user.getId()) >= minimumContracts)
+                .toList();
     }
 
-    
-    private long completedContractCount(Long userId) {
-        Object result = userRepository.getUserContractSummary(userId);
-        if (result == null) {
+    private long completedContractCountFromContractService(Long userId) {
+        try {
+            UserContractSummaryDTO summary = contractServiceClient.getUserContractSummary(userId);
+            return summary != null && summary.getCompletedContracts() != null
+                    ? summary.getCompletedContracts()
+                    : 0L;
+        } catch (RuntimeException ex) {
             return 0L;
         }
-
-        Object[] row = (Object[]) result;
-        return row[1] != null ? ((Number) row[1]).longValue() : 0L;
     }
 
     private boolean usesPostgresDatabase() {
@@ -455,36 +458,35 @@ public class UserService {
     }
 
     @Cacheable(
-        value = UserCacheNames.S1_F3,
-        key = "T(com.team01.freelance.user.cache.UserCacheKey).hash(#id)",
-        unless = "#result == null")
+            value = UserCacheNames.S1_F3,
+            key = "T(com.team01.freelance.user.cache.UserCacheKey).hash(#id)",
+            unless = "#result == null")
     public UserContractSummaryDTO getUserContractSummary(Long id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("User not found with id: " + id));
 
-        Object result = userRepository.getUserContractSummary(id);
-        if (result == null) {
-            return zeroContractSummary(user);
+        try {
+            return contractServiceClient.getUserContractSummary(id);
+        } catch (Exception e) {
+            // Fallback to local database query if contract-service is unavailable
+            Object result = userRepository.getUserContractSummary(id);
+            if (result == null) {
+                return zeroContractSummary(user);
+            }
+
+            Object[] row = (Object[]) result;
+            return UserContractSummaryDTO.builder()
+                    .userId(user.getId())
+                    .name(user.getName())
+                    .totalContracts(row[0] != null ? ((Number) row[0]).longValue() : 0L)
+                    .completedContracts(row[1] != null ? ((Number) row[1]).longValue() : 0L)
+                    .terminatedContracts(row[2] != null ? ((Number) row[2]).longValue() : 0L)
+                    .totalEarnings(row[3] != null ? ((Number) row[3]).doubleValue() : 0.0)
+                    .averageContractValue(row[4] != null ? ((Number) row[4]).doubleValue() : 0.0)
+                    .build();
         }
-
-        Object[] row = (Object[]) result;
-
-        Long totalContracts = row[0] != null ? ((Number) row[0]).longValue() : 0L;
-        Long completedContracts = row[1] != null ? ((Number) row[1]).longValue() : 0L;
-        Long terminatedContracts = row[2] != null ? ((Number) row[2]).longValue() : 0L;
-        Double totalEarnings = row[3] != null ? ((Number) row[3]).doubleValue() : 0.0;
-        Double averageContractValue = row[4] != null ? ((Number) row[4]).doubleValue() : 0.0;
-
-        return UserContractSummaryDTO.builder()
-                .userId(user.getId())
-                .name(user.getName())
-                .totalContracts(totalContracts)
-                .completedContracts(completedContracts)
-                .terminatedContracts(terminatedContracts)
-                .totalEarnings(totalEarnings)
-                .averageContractValue(averageContractValue)
-                .build();
     }
+
     private static UserContractSummaryDTO zeroContractSummary(User user) {
         return UserContractSummaryDTO.builder()
                 .userId(user.getId())

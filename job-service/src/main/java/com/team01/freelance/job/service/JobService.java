@@ -40,6 +40,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import javax.sql.DataSource;
 
@@ -441,12 +443,12 @@ public class JobService {
             "rating", ratingRequest.getRating(),
             "ratingCount", savedJob.getTotalRatings()
         ));
-        jobEventPublisher.publishJobRated(
+        publishAfterCommit(() -> jobEventPublisher.publishJobRated(
                 savedJob.getId(),
                 ratingRequest.getContractId(),
                 ratingRequest.getRating(),
                 contract.getClientId()
-        );
+        ));
         return savedJob;
     }
 
@@ -747,6 +749,19 @@ public class JobService {
         payload.put("timestamp", LocalDateTime.now());
         payload.put("action", eventType);
         jobEventSubject.notifyObservers(eventType, payload);
+    }
+
+    private void publishAfterCommit(Runnable publisher) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            publisher.run();
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                publisher.run();
+            }
+        });
     }
 
     private Map<String, Object> jobEventDetails(Job job) {
