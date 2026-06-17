@@ -2,8 +2,9 @@ package com.team01.freelance.user.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team01.freelance.common.observer.EventSubject;
-import com.team01.freelance.user.cache.UserCacheNames;
 import com.team01.freelance.user.adapter.MongoDocumentAdapter;
+import com.team01.freelance.user.adapter.ObjectArrayDtoAdapter;
+import com.team01.freelance.user.cache.UserCacheNames;
 import com.team01.freelance.user.dto.TopFreelancerDTO;
 import com.team01.freelance.user.dto.UserActivityEventDTO;
 import com.team01.freelance.user.dto.UserActivityFeedDTO;
@@ -11,6 +12,7 @@ import com.team01.freelance.user.dto.UserContractSummaryDTO;
 import com.team01.freelance.user.dto.UserProfileDTO;
 import com.team01.freelance.user.dto.UserProfileSkillDTO;
 import com.team01.freelance.user.event.AuthEvent;
+import com.team01.freelance.user.feign.ContractServiceClient;
 import com.team01.freelance.user.model.User;
 import com.team01.freelance.user.model.UserRole;
 import com.team01.freelance.user.model.UserSkill;
@@ -29,7 +31,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import com.team01.freelance.user.dto.UserContractSummaryDTO;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -42,14 +43,6 @@ import java.time.LocalTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.HashMap;
-import org.springframework.transaction.annotation.Transactional;
-import com.team01.freelance.user.dto.UserContractSummaryDTO;
-import com.team01.freelance.user.dto.UserProfileDTO;
-import com.team01.freelance.user.dto.UserProfileSkillDTO;
-import com.team01.freelance.user.model.UserSkill;
-import com.team01.freelance.user.repository.UserSkillRepository;
-import com.team01.freelance.user.adapter.ObjectArrayDtoAdapter;
 import java.util.Optional;
 
 @Service
@@ -73,7 +66,7 @@ public class UserService {
     private DataSource dataSource;
 
     @Autowired
-    private com.team01.freelance.user.feign.ContractServiceClient contractServiceClient;
+    private ContractServiceClient contractServiceClient;
 
     @Autowired
     private EventSubject authEventSubject;
@@ -134,12 +127,12 @@ public class UserService {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("User not found with id: " + id));
 
-        int activeContracts = 0;
+        long activeContracts = 0;
         try {
             activeContracts = contractServiceClient.getActiveContractCount(id);
         } catch (Exception e) {
             // Fallback: check local DB if feign fails
-            activeContracts = (int) userRepository.countActiveContractsForUser(id);
+            activeContracts = userRepository.countActiveContractsForUser(id);
         }
 
         if (activeContracts > 0) {
