@@ -65,8 +65,6 @@ public class UserService {
     @Autowired
     private DataSource dataSource;
 
-    @Autowired
-    private ContractServiceClient contractServiceClient;
 
     @Autowired
     private EventSubject authEventSubject;
