@@ -1,6 +1,7 @@
 package com.team01.freelance.wallet.service;
 
 import com.team01.freelance.contract.repository.ContractRepository;
+import com.team01.freelance.contracts.events.ProposalCompletedEvent;
 import com.team01.freelance.user.repository.UserRepository;
 import com.team01.freelance.wallet.dto.AppliedPromoCodeDTO;
 import com.team01.freelance.wallet.dto.CategoryRevenueDTO;
@@ -11,6 +12,7 @@ import com.team01.freelance.wallet.dto.RevenueReportDTO;
 import com.team01.freelance.wallet.model.Payout;
 import com.team01.freelance.wallet.model.PayoutPromo;
 import com.team01.freelance.wallet.model.PayoutStatus;
+import com.team01.freelance.wallet.messaging.PaymentEventPublisher;
 import com.team01.freelance.wallet.dto.MilestoneReversalRequest;
 import com.team01.freelance.wallet.dto.ProcessPayoutRequest;
 import com.team01.freelance.common.observer.EventSubject;
@@ -34,6 +36,8 @@ import org.springframework.cache.annotation.Caching;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -73,6 +77,9 @@ public class PayoutService {
 
     @Autowired
     private EventSubject payoutEventSubject;
+
+    @Autowired(required = false)
+    private PaymentEventPublisher paymentEventPublisher;
 
     private final List<EntityObserver> observers = new ArrayList<>();
 
@@ -495,6 +502,32 @@ public class PayoutService {
         return saved;
     }
 
+    @Transactional
+    public Payout handleProposalCompleted(ProposalCompletedEvent event) {
+        if (event == null || event.contractId() == null || event.freelancerId() == null || event.agreedAmount() == null) {
+            throw new IllegalArgumentException("proposal.completed event is missing payout fields");
+        }
+        Optional<Payout> existing = payoutRepository.findByContractIdAndStatus(event.contractId(), PayoutStatus.PENDING);
+        if (existing.isPresent()) {
+            return existing.get();
+        }
+
+        payoutRepository.insertPendingPayout(
+                event.contractId(),
+                event.freelancerId(),
+                event.agreedAmount().doubleValue(),
+                LocalDateTime.now()
+        );
+        Payout payout = payoutRepository.findByContractIdAndStatus(event.contractId(), PayoutStatus.PENDING)
+                .orElseThrow(() -> new EntityNotFoundException("Pending payout was not created for contract: " + event.contractId()));
+        publishAfterCommit(() -> {
+            if (paymentEventPublisher != null) {
+                paymentEventPublisher.publishPaymentInitiated(payout, event.proposalId());
+            }
+        });
+        return payout;
+    }
+
     private static Map<String, Object> buildAuditPayload(
             Long payoutId,
             Payout payout,
@@ -603,7 +636,41 @@ public class PayoutService {
             log.warn("Audit event failed for {} on contract {}: {}", action, contractId, e.getMessage());
         }
 
+        Long proposalId = findProposalIdForContract(contractId);
+        publishAfterCommit(() -> {
+            if (paymentEventPublisher == null || proposalId == null) {
+                return;
+            }
+            if (saved.getStatus() == PayoutStatus.FAILED) {
+                paymentEventPublisher.publishPaymentFailed(saved, proposalId, "simulated payout failure");
+            } else if (saved.getStatus() == PayoutStatus.COMPLETED) {
+                paymentEventPublisher.publishPaymentCompleted(saved, proposalId);
+            }
+        });
+
         return saved;
+    }
+
+    private Long findProposalIdForContract(Long contractId) {
+        if (contractId == null) {
+            return null;
+        }
+        return contractRepository.findById(contractId)
+                .map(contract -> contract.getProposalId())
+                .orElse(null);
+    }
+
+    private void publishAfterCommit(Runnable publisher) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            publisher.run();
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                publisher.run();
+            }
+        });
     }
 
     // S5-F5
