@@ -1,5 +1,6 @@
 package com.team01.freelance.user.repository;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -94,4 +95,38 @@ public interface UserRepository extends JpaRepository<User, Long> {
             @Param("startDate") LocalDateTime startDate,
             @Param("endDate") LocalDateTime endDate,
             @Param("limit") int limit);
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(value = """
+            UPDATE users
+            SET completed_contracts = COALESCE(completed_contracts, 0) + 1,
+                total_earnings = COALESCE(total_earnings, 0) + :amount
+            WHERE id = :freelancerId
+            """, nativeQuery = true)
+    int incrementFreelancerStats(
+            @Param("freelancerId") Long freelancerId,
+            @Param("amount") BigDecimal amount
+    );
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(value = """
+            UPDATE users
+            SET completed_contracts =
+                    CASE
+                        WHEN COALESCE(completed_contracts, 0) > 0
+                        THEN COALESCE(completed_contracts, 0) - 1
+                        ELSE 0
+                    END,
+                total_earnings =
+                    CASE
+                        WHEN COALESCE(total_earnings, 0) >= :amount
+                        THEN COALESCE(total_earnings, 0) - :amount
+                        ELSE 0
+                    END
+            WHERE id = :freelancerId
+            """, nativeQuery = true)
+    int decrementFreelancerStats(
+            @Param("freelancerId") Long freelancerId,
+            @Param("amount") BigDecimal amount
+    );
+
 }
