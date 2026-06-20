@@ -13,6 +13,7 @@ import com.team01.freelance.user.dto.UserProfileDTO;
 import com.team01.freelance.user.dto.UserProfileSkillDTO;
 import com.team01.freelance.user.event.AuthEvent;
 import com.team01.freelance.user.feign.ContractServiceClient;
+import com.team01.freelance.user.feign.WalletServiceClient;
 import com.team01.freelance.user.model.User;
 import com.team01.freelance.user.messaging.UserEventPublisher;
 import com.team01.freelance.user.model.UserRole;
@@ -37,10 +38,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 import javax.sql.DataSource;
 import java.math.BigDecimal;
-import java.math.BigInteger;
 import java.time.Duration;
 import java.time.LocalDate;
-import java.time.LocalTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -87,6 +86,9 @@ public class UserService {
 
     @Autowired
     private MongoDocumentAdapter mongoDocumentAdapter;
+
+    @Autowired
+    private WalletServiceClient walletServiceClient;
 
     @Autowired
     private ContractServiceClient contractServiceClient;
@@ -203,12 +205,18 @@ public class UserService {
             throw new IllegalArgumentException("limit must be greater than zero");
         }
 
-        return userRepository.findTopFreelancersByEarnings(
-                        startDate.atStartOfDay(),
-                        endDate.atTime(LocalTime.MAX),
-                        queryLimit)
+        return userRepository.findByRole(UserRole.FREELANCER)
                 .stream()
-                .map(this::toTopFreelancerDTO)
+                .map(user -> toTopFreelancerDTO(user, startDate, endDate))
+                .filter(dto -> dto.getTotalEarnings().compareTo(BigDecimal.ZERO) > 0 || dto.getContractCount() > 0)
+                .sorted((left, right) -> {
+                    int byEarnings = right.getTotalEarnings().compareTo(left.getTotalEarnings());
+                    if (byEarnings != 0) {
+                        return byEarnings;
+                    }
+                    return left.getUserId().compareTo(right.getUserId());
+                })
+                .limit(queryLimit)
                 .toList();
     }
 
@@ -579,44 +587,32 @@ public class UserService {
         return value == null || value.trim().isEmpty();
     }
 
-    private TopFreelancerDTO toTopFreelancerDTO(Object[] row) {
+    private TopFreelancerDTO toTopFreelancerDTO(User user, LocalDate startDate, LocalDate endDate) {
         return TopFreelancerDTO.builder()
-                .userId(toLong(row[0]))
-                .name((String) row[1])
-                .totalEarnings(toBigDecimal(row[2]))
-                .contractCount(toLong(row[3]))
+                .userId(user.getId())
+                .name(user.getName())
+                .totalEarnings(getFreelancerPayoutTotal(user.getId(), startDate, endDate))
+                .contractCount(getCompletedContractCountFromContractService(user.getId()))
                 .build();
     }
 
-    private Long toLong(Object value) {
-        if (value instanceof Long longValue) {
-            return longValue;
+    private BigDecimal getFreelancerPayoutTotal(Long freelancerId, LocalDate startDate, LocalDate endDate) {
+        try {
+            BigDecimal total = walletServiceClient.getFreelancerTotalEarnings(freelancerId, startDate, endDate);
+            return total != null ? total : BigDecimal.ZERO;
+        } catch (RuntimeException ex) {
+            return BigDecimal.ZERO;
         }
-        if (value instanceof Integer integerValue) {
-            return integerValue.longValue();
-        }
-        if (value instanceof BigInteger bigIntegerValue) {
-            return bigIntegerValue.longValue();
-        }
-        if (value instanceof BigDecimal bigDecimalValue) {
-            return bigDecimalValue.longValue();
-        }
-        if (value instanceof Number numberValue) {
-            return numberValue.longValue();
-        }
-        return Long.valueOf(value.toString());
     }
 
-    private BigDecimal toBigDecimal(Object value) {
-        if (value instanceof BigDecimal bigDecimalValue) {
-            return bigDecimalValue;
+    private Long getCompletedContractCountFromContractService(Long freelancerId) {
+        try {
+            UserContractSummaryDTO summary = contractServiceClient.getUserContractSummary(freelancerId);
+            return summary != null && summary.getCompletedContracts() != null
+                    ? summary.getCompletedContracts()
+                    : 0L;
+        } catch (RuntimeException ex) {
+            return 0L;
         }
-        if (value instanceof BigInteger bigIntegerValue) {
-            return new BigDecimal(bigIntegerValue);
-        }
-        if (value instanceof Number numberValue) {
-            return BigDecimal.valueOf(numberValue.doubleValue());
-        }
-        return new BigDecimal(value.toString());
     }
 }

@@ -1,5 +1,8 @@
 package com.team01.freelance.user.controller;
 
+import com.team01.freelance.user.dto.UserContractSummaryDTO;
+import com.team01.freelance.user.feign.ContractServiceClient;
+import com.team01.freelance.user.feign.WalletServiceClient;
 import com.team01.freelance.user.model.User;
 import com.team01.freelance.user.model.UserRole;
 import com.team01.freelance.user.model.UserStatus;
@@ -9,14 +12,16 @@ import org.junit.jupiter.api.BeforeEach;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
 
-import java.sql.Timestamp;
-import java.time.LocalDateTime;
+import java.math.BigDecimal;
+import java.time.LocalDate;
 
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -36,8 +41,11 @@ class UserTopFreelancersIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private UserRepository userRepository;
 
-    @Autowired
-    private JdbcTemplate jdbcTemplate;
+    @MockitoBean
+    private WalletServiceClient walletServiceClient;
+
+    @MockitoBean
+    private ContractServiceClient contractServiceClient;
 
     private User freelancerA;
     private User freelancerB;
@@ -51,9 +59,16 @@ class UserTopFreelancersIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void topFreelancers_returnsOrderedByEarnings() throws Exception {
-        insertCompletedContract(freelancerA.getId(), 3000.0, LocalDateTime.of(2026, 3, 10, 12, 0));
-        insertCompletedContract(freelancerB.getId(), 8000.0, LocalDateTime.of(2026, 3, 12, 12, 0));
-        insertCompletedContract(freelancerA.getId(), 1000.0, LocalDateTime.of(2026, 3, 15, 12, 0));
+        LocalDate startDate = LocalDate.parse("2026-03-01");
+        LocalDate endDate = LocalDate.parse("2026-03-31");
+        when(walletServiceClient.getFreelancerTotalEarnings(freelancerA.getId(), startDate, endDate))
+                .thenReturn(new BigDecimal("4000"));
+        when(walletServiceClient.getFreelancerTotalEarnings(freelancerB.getId(), startDate, endDate))
+                .thenReturn(new BigDecimal("8000"));
+        when(contractServiceClient.getUserContractSummary(freelancerA.getId()))
+                .thenReturn(contractSummary(freelancerA, 2L));
+        when(contractServiceClient.getUserContractSummary(freelancerB.getId()))
+                .thenReturn(contractSummary(freelancerB, 1L));
 
         mockMvc.perform(get("/api/users/reports/top-freelancers")
                         .param("startDate", "2026-03-01")
@@ -69,6 +84,11 @@ class UserTopFreelancersIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$[1].name").value("User A"))
                 .andExpect(jsonPath("$[1].totalEarnings").value(4000.0))
                 .andExpect(jsonPath("$[1].contractCount").value(2));
+
+        verify(walletServiceClient).getFreelancerTotalEarnings(freelancerA.getId(), startDate, endDate);
+        verify(walletServiceClient).getFreelancerTotalEarnings(freelancerB.getId(), startDate, endDate);
+        verify(contractServiceClient).getUserContractSummary(freelancerA.getId());
+        verify(contractServiceClient).getUserContractSummary(freelancerB.getId());
     }
 
     private User saveFreelancer(String name) {
@@ -82,15 +102,15 @@ class UserTopFreelancersIntegrationTest extends AbstractIntegrationTest {
         return userRepository.save(user);
     }
 
-    private void insertCompletedContract(Long freelancerId, double amount, LocalDateTime endDate) {
-        jdbcTemplate.update("""
-                INSERT INTO contracts (job_id, freelancer_id, client_id, proposal_id, agreed_amount,
-                                       status, start_date, end_date, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                1L, freelancerId, 2L, 3L, amount, "COMPLETED",
-                Timestamp.valueOf(endDate.minusDays(5)),
-                Timestamp.valueOf(endDate),
-                Timestamp.valueOf(endDate));
+    private UserContractSummaryDTO contractSummary(User user, Long completedContracts) {
+        return UserContractSummaryDTO.builder()
+                .userId(user.getId())
+                .name(user.getName())
+                .totalContracts(completedContracts)
+                .completedContracts(completedContracts)
+                .terminatedContracts(0L)
+                .totalEarnings(0.0)
+                .averageContractValue(0.0)
+                .build();
     }
 }

@@ -39,6 +39,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
             @Param("role") UserRole role
     );
 
+    List<User> findByRole(UserRole role);
+
     @Query(value = """
         SELECT
             COUNT(c.id) AS total_contracts,
@@ -77,7 +79,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
             WHERE jsonb_extract_path_text(preferences, :key) = :value
             """, nativeQuery = true)
     List<User> findByPreference(@Param("key") String key, @Param("value") String value);
-    @Query(value = """
+
+     @Query(value = """
             SELECT u.id,
                    u.name,
                    COALESCE(SUM(c.agreed_amount), 0) AS total_earnings,
@@ -95,6 +98,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
             @Param("startDate") LocalDateTime startDate,
             @Param("endDate") LocalDateTime endDate,
             @Param("limit") int limit);
+    
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = """
             UPDATE users
