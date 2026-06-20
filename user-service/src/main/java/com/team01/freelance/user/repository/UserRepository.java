@@ -1,5 +1,7 @@
 package com.team01.freelance.user.repository;
 
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -52,24 +54,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Object getUserContractSummary(@Param("userId") Long userId);
 
     @Query(value = """
-        SELECT u.*
-        FROM users u
-        LEFT JOIN contracts c
-            ON (c.freelancer_id = u.id OR c.client_id = u.id)
-            AND c.status = 'COMPLETED'
-        WHERE LOWER(u.preferences ->> 'language') = LOWER(:lang)
-        GROUP BY u.id
-        HAVING COUNT(c.id) >= :minContracts
-        """, nativeQuery = true)
-    List<User> findUsersByLanguageAndMinimumCompletedContracts(
-            @Param("lang") String lang,
-            @Param("minContracts") Long minContracts
-    );
-
-
-
-
-    @Query(value = """
             SELECT COUNT(*)
             FROM contracts
             WHERE status = 'ACTIVE'
@@ -95,4 +79,58 @@ public interface UserRepository extends JpaRepository<User, Long> {
             WHERE jsonb_extract_path_text(preferences, :key) = :value
             """, nativeQuery = true)
     List<User> findByPreference(@Param("key") String key, @Param("value") String value);
+
+     @Query(value = """
+            SELECT u.id,
+                   u.name,
+                   COALESCE(SUM(c.agreed_amount), 0) AS total_earnings,
+                   COUNT(c.id) AS contract_count
+            FROM users u
+            JOIN contracts c ON c.freelancer_id = u.id
+            WHERE c.status = 'COMPLETED'
+              AND c.end_date >= :startDate
+              AND c.end_date <= :endDate
+            GROUP BY u.id, u.name
+            ORDER BY total_earnings DESC, u.id ASC
+            LIMIT :limit
+            """, nativeQuery = true)
+    List<Object[]> findTopFreelancersByEarnings(
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate,
+            @Param("limit") int limit);
+    
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(value = """
+            UPDATE users
+            SET completed_contracts = COALESCE(completed_contracts, 0) + 1,
+                total_earnings = COALESCE(total_earnings, 0) + :amount
+            WHERE id = :freelancerId
+            """, nativeQuery = true)
+    int incrementFreelancerStats(
+            @Param("freelancerId") Long freelancerId,
+            @Param("amount") BigDecimal amount
+    );
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(value = """
+            UPDATE users
+            SET completed_contracts =
+                    CASE
+                        WHEN COALESCE(completed_contracts, 0) > 0
+                        THEN COALESCE(completed_contracts, 0) - 1
+                        ELSE 0
+                    END,
+                total_earnings =
+                    CASE
+                        WHEN COALESCE(total_earnings, 0) >= :amount
+                        THEN COALESCE(total_earnings, 0) - :amount
+                        ELSE 0
+                    END
+            WHERE id = :freelancerId
+            """, nativeQuery = true)
+    int decrementFreelancerStats(
+            @Param("freelancerId") Long freelancerId,
+            @Param("amount") BigDecimal amount
+    );
+
 }

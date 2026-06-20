@@ -5,6 +5,7 @@ import com.team01.freelance.user.dto.AuthResponse;
 import com.team01.freelance.user.dto.LoginRequest;
 import com.team01.freelance.user.dto.RegisterRequest;
 import com.team01.freelance.user.model.User;
+import com.team01.freelance.user.messaging.UserEventPublisher;
 import com.team01.freelance.user.repository.UserRepository;
 import com.team01.freelance.user.model.UserRole;
 
@@ -12,6 +13,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -19,6 +21,9 @@ import java.util.Map;
 
 @Service
 public class AuthService {
+
+    @Autowired(required = false)
+    private UserEventPublisher userEventPublisher;
 
     private static final Logger log = LoggerFactory.getLogger(AuthService.class);
 
@@ -55,6 +60,10 @@ public class AuthService {
         }
         user.setPhone(request.phone());
         user = userRepository.save(user);
+
+        if (userEventPublisher != null) {
+            userEventPublisher.publishUserRegistered(user);
+        }
 
         authEventSubject.notifyObservers("REGISTERED", Map.of(
                 "userId", user.getId(),

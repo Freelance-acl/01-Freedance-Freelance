@@ -38,6 +38,10 @@ import org.springframework.cache.annotation.Caching;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import javax.sql.DataSource;
 
@@ -56,6 +60,8 @@ import org.springframework.data.domain.Pageable;
 @Service
 public class JobService {
 
+    private static final Logger log = LoggerFactory.getLogger(JobService.class);
+    private static final long SLOW_DASHBOARD_THRESHOLD_MS = 1000L;
     private static final int MAX_TOP_BUDGET_LIMIT = 50;
 
     @Autowired
@@ -437,12 +443,12 @@ public class JobService {
             "rating", ratingRequest.getRating(),
             "ratingCount", savedJob.getTotalRatings()
         ));
-        jobEventPublisher.publishJobRated(
+        publishAfterCommit(() -> jobEventPublisher.publishJobRated(
                 savedJob.getId(),
                 ratingRequest.getContractId(),
                 ratingRequest.getRating(),
                 contract.getClientId()
-        );
+        ));
         return savedJob;
     }
 
@@ -612,13 +618,14 @@ public class JobService {
 
     @Cacheable(value = "S2-F12", key = "#id")
     public JobDashboardDTO getCachedJobDashboard(Long id) {
+        long startedAt = System.currentTimeMillis();
         List<Object[]> rows = jobRepository.getJobDashboardBase(id);
         if (rows == null || rows.isEmpty()) {
             throw new EntityNotFoundException("Job not found with id: " + id);
         }
         ProposalJobSummaryResponse summary = fetchAllTimeProposalSummary(id);
         Object[] row = rows.get(0);
-        return JobDashboardDTO.builder()
+        JobDashboardDTO dashboard = JobDashboardDTO.builder()
                 .jobId(row[0] != null ? ((Number) row[0]).longValue() : null)
                 .title(row[1] != null ? row[1].toString() : null)
                 .rating(row[2] != null ? ((Number) row[2]).doubleValue() : 0.0)
@@ -627,6 +634,11 @@ public class JobService {
                 .averageBidAmount(summary.getAverageBidAmount() != null ? summary.getAverageBidAmount() : 0.0)
                 .activeAttachments(row[3] != null ? ((Number) row[3]).longValue() : 0L)
                 .build();
+        long elapsedMs = System.currentTimeMillis() - startedAt;
+        if (elapsedMs > SLOW_DASHBOARD_THRESHOLD_MS) {
+            log.warn("Slow S2-F12 dashboard aggregation took {}ms", elapsedMs);
+        }
+        return dashboard;
     }
 
     @Transactional
@@ -737,6 +749,19 @@ public class JobService {
         payload.put("timestamp", LocalDateTime.now());
         payload.put("action", eventType);
         jobEventSubject.notifyObservers(eventType, payload);
+    }
+
+    private void publishAfterCommit(Runnable publisher) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            publisher.run();
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                publisher.run();
+            }
+        });
     }
 
     private Map<String, Object> jobEventDetails(Job job) {

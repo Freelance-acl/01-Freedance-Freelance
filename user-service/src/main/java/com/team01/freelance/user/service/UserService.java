@@ -2,8 +2,9 @@ package com.team01.freelance.user.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team01.freelance.common.observer.EventSubject;
-import com.team01.freelance.user.cache.UserCacheNames;
 import com.team01.freelance.user.adapter.MongoDocumentAdapter;
+import com.team01.freelance.user.adapter.ObjectArrayDtoAdapter;
+import com.team01.freelance.user.cache.UserCacheNames;
 import com.team01.freelance.user.dto.TopFreelancerDTO;
 import com.team01.freelance.user.dto.UserActivityEventDTO;
 import com.team01.freelance.user.dto.UserActivityFeedDTO;
@@ -14,6 +15,7 @@ import com.team01.freelance.user.event.AuthEvent;
 import com.team01.freelance.user.feign.ContractServiceClient;
 import com.team01.freelance.user.feign.WalletServiceClient;
 import com.team01.freelance.user.model.User;
+import com.team01.freelance.user.messaging.UserEventPublisher;
 import com.team01.freelance.user.model.UserRole;
 import com.team01.freelance.user.model.UserSkill;
 import com.team01.freelance.user.model.UserStatus;
@@ -31,7 +33,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import com.team01.freelance.user.dto.UserContractSummaryDTO;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -42,18 +43,13 @@ import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.HashMap;
-import org.springframework.transaction.annotation.Transactional;
-import com.team01.freelance.user.dto.UserContractSummaryDTO;
-import com.team01.freelance.user.dto.UserProfileDTO;
-import com.team01.freelance.user.dto.UserProfileSkillDTO;
-import com.team01.freelance.user.model.UserSkill;
-import com.team01.freelance.user.repository.UserSkillRepository;
-import com.team01.freelance.user.adapter.ObjectArrayDtoAdapter;
 import java.util.Optional;
 
 @Service
 public class UserService {
+
+    @Autowired(required = false)
+    private UserEventPublisher userEventPublisher;
 
     private static final int DEFAULT_ACTIVITY_PAGE = 0;
     private static final int DEFAULT_ACTIVITY_SIZE = 10;
@@ -71,6 +67,7 @@ public class UserService {
 
     @Autowired
     private DataSource dataSource;
+
 
     @Autowired
     private EventSubject authEventSubject;
@@ -137,13 +134,25 @@ public class UserService {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("User not found with id: " + id));
 
-        if (userRepository.countActiveContractsForUser(id) > 0) {
+        long activeContracts = 0;
+        try {
+            activeContracts = contractServiceClient.getActiveContractCount(id);
+        } catch (Exception e) {
+            // Fallback: check local DB if feign fails
+            activeContracts = userRepository.countActiveContractsForUser(id);
+        }
+
+        if (activeContracts > 0) {
             throw new IllegalStateException("Cannot deactivate user with active contracts");
         }
 
         user.setStatus(UserStatus.DEACTIVATED);
         userRepository.withdrawSubmittedProposalsForUser(id);
         User saved = userRepository.save(user);
+
+        if (userEventPublisher != null) {
+            userEventPublisher.publishUserDeactivated(saved.getId());
+        }
 
         Map<String, Object> eventDetails = new HashMap<>();
         if (saved.getEmail() != null) {
@@ -436,26 +445,22 @@ public class UserService {
         Long minimumContracts = minContracts != null ? minContracts : 0L;
         String language = lang.trim();
 
-        if (!usesPostgresDatabase()) {
-            return userRepository.findAll().stream()
-                    .filter(user -> user.getPreferences() != null
-                            && language.equalsIgnoreCase(String.valueOf(user.getPreferences().get("language"))))
-                    .filter(user -> completedContractCount(user.getId()) >= minimumContracts)
-                    .toList();
-        }
-
-        return userRepository.findUsersByLanguageAndMinimumCompletedContracts(language, minimumContracts);
+        return userRepository.findAll().stream()
+                .filter(user -> user.getPreferences() != null
+                        && language.equalsIgnoreCase(String.valueOf(user.getPreferences().get("language"))))
+                .filter(user -> minimumContracts <= 0 || completedContractCountFromContractService(user.getId()) >= minimumContracts)
+                .toList();
     }
 
-    
-    private long completedContractCount(Long userId) {
-        Object result = userRepository.getUserContractSummary(userId);
-        if (result == null) {
+    private long completedContractCountFromContractService(Long userId) {
+        try {
+            UserContractSummaryDTO summary = contractServiceClient.getUserContractSummary(userId);
+            return summary != null && summary.getCompletedContracts() != null
+                    ? summary.getCompletedContracts()
+                    : 0L;
+        } catch (RuntimeException ex) {
             return 0L;
         }
-
-        Object[] row = (Object[]) result;
-        return row[1] != null ? ((Number) row[1]).longValue() : 0L;
     }
 
     private boolean usesPostgresDatabase() {
@@ -467,36 +472,35 @@ public class UserService {
     }
 
     @Cacheable(
-        value = UserCacheNames.S1_F3,
-        key = "T(com.team01.freelance.user.cache.UserCacheKey).hash(#id)",
-        unless = "#result == null")
+            value = UserCacheNames.S1_F3,
+            key = "T(com.team01.freelance.user.cache.UserCacheKey).hash(#id)",
+            unless = "#result == null")
     public UserContractSummaryDTO getUserContractSummary(Long id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("User not found with id: " + id));
 
-        Object result = userRepository.getUserContractSummary(id);
-        if (result == null) {
-            return zeroContractSummary(user);
+        try {
+            return contractServiceClient.getUserContractSummary(id);
+        } catch (Exception e) {
+            // Fallback to local database query if contract-service is unavailable
+            Object result = userRepository.getUserContractSummary(id);
+            if (result == null) {
+                return zeroContractSummary(user);
+            }
+
+            Object[] row = (Object[]) result;
+            return UserContractSummaryDTO.builder()
+                    .userId(user.getId())
+                    .name(user.getName())
+                    .totalContracts(row[0] != null ? ((Number) row[0]).longValue() : 0L)
+                    .completedContracts(row[1] != null ? ((Number) row[1]).longValue() : 0L)
+                    .terminatedContracts(row[2] != null ? ((Number) row[2]).longValue() : 0L)
+                    .totalEarnings(row[3] != null ? ((Number) row[3]).doubleValue() : 0.0)
+                    .averageContractValue(row[4] != null ? ((Number) row[4]).doubleValue() : 0.0)
+                    .build();
         }
-
-        Object[] row = (Object[]) result;
-
-        Long totalContracts = row[0] != null ? ((Number) row[0]).longValue() : 0L;
-        Long completedContracts = row[1] != null ? ((Number) row[1]).longValue() : 0L;
-        Long terminatedContracts = row[2] != null ? ((Number) row[2]).longValue() : 0L;
-        Double totalEarnings = row[3] != null ? ((Number) row[3]).doubleValue() : 0.0;
-        Double averageContractValue = row[4] != null ? ((Number) row[4]).doubleValue() : 0.0;
-
-        return UserContractSummaryDTO.builder()
-                .userId(user.getId())
-                .name(user.getName())
-                .totalContracts(totalContracts)
-                .completedContracts(completedContracts)
-                .terminatedContracts(terminatedContracts)
-                .totalEarnings(totalEarnings)
-                .averageContractValue(averageContractValue)
-                .build();
     }
+
     private static UserContractSummaryDTO zeroContractSummary(User user) {
         return UserContractSummaryDTO.builder()
                 .userId(user.getId())

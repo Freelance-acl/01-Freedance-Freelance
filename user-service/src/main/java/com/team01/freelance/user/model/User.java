@@ -6,6 +6,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -47,6 +48,12 @@ public class User {
     @JsonAlias({"createdAt", "created_at"})
     private LocalDateTime createdAt;
 
+    @Column(name = "completed_contracts", nullable = false, columnDefinition = "bigint default 0")
+    private Long completedContracts = 0L;
+
+    @Column(name = "total_earnings", nullable = false, precision = 19, scale = 2, columnDefinition = "numeric(19,2) default 0.00")
+    private BigDecimal totalEarnings = BigDecimal.ZERO;
+
     @JsonIgnore
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<UserSkill> userSkills;
@@ -58,6 +65,12 @@ public class User {
         }
         if (createdAt == null) {
             createdAt = LocalDateTime.now();
+        }
+        if (completedContracts == null) {
+            completedContracts = 0L;
+        }
+        if (totalEarnings == null) {
+            totalEarnings = BigDecimal.ZERO;
         }
     }
 
@@ -131,6 +144,22 @@ public class User {
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public Long getCompletedContracts() {
+        return completedContracts;
+    }
+
+    public void setCompletedContracts(Long completedContracts) {
+        this.completedContracts = completedContracts;
+    }
+
+    public BigDecimal getTotalEarnings() {
+        return totalEarnings;
+    }
+
+    public void setTotalEarnings(BigDecimal totalEarnings) {
+        this.totalEarnings = totalEarnings;
     }
 
     public List<UserSkill> getUserSkills() {

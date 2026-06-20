@@ -33,6 +33,11 @@
 
     <dependencies>
         <dependency>
+            <groupId>com.team01.freelance</groupId>
+            <artifactId>contracts</artifactId>
+            <version>0.0.1-SNAPSHOT</version>
+        </dependency>
+        <dependency>
             <groupId>org.springframework.cloud</groupId>
             <artifactId>spring-cloud-starter-openfeign</artifactId>
         </dependency>
@@ -63,6 +68,11 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-json</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
         </dependency>
 
         <!-- Jackson 2.x pinned — Hibernate json_format_mapper requires Jackson 2; Spring Boot 4 defaults to Jackson 3 -->
