@@ -14,6 +14,7 @@ import com.team01.freelance.user.dto.UserProfileSkillDTO;
 import com.team01.freelance.user.event.AuthEvent;
 import com.team01.freelance.user.feign.ContractServiceClient;
 import com.team01.freelance.user.model.User;
+import com.team01.freelance.user.messaging.UserEventPublisher;
 import com.team01.freelance.user.model.UserRole;
 import com.team01.freelance.user.model.UserSkill;
 import com.team01.freelance.user.model.UserStatus;
@@ -47,6 +48,9 @@ import java.util.Optional;
 
 @Service
 public class UserService {
+
+    @Autowired(required = false)
+    private UserEventPublisher userEventPublisher;
 
     private static final int DEFAULT_ACTIVITY_PAGE = 0;
     private static final int DEFAULT_ACTIVITY_SIZE = 10;
@@ -143,6 +147,10 @@ public class UserService {
         user.setStatus(UserStatus.DEACTIVATED);
         userRepository.withdrawSubmittedProposalsForUser(id);
         User saved = userRepository.save(user);
+
+        if (userEventPublisher != null) {
+            userEventPublisher.publishUserDeactivated(saved.getId());
+        }
 
         Map<String, Object> eventDetails = new HashMap<>();
         if (saved.getEmail() != null) {
