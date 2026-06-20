@@ -50,7 +50,10 @@ management:
   endpoints:
     web:
       exposure:
-        include: health
+        include: prometheus,health,info
+  metrics:
+    tags:
+      application: job-service
   endpoint:
     health:
       probes:

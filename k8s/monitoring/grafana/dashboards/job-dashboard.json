@@ -32,14 +32,32 @@
     },
     {
       "id": 3,
-      "title": "JVM Heap Usage",
+      "title": "S2-F12 Dashboard Cache Hit Rate",
       "type": "timeseries",
       "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
       "targets": [
         {
           "datasource": "Prometheus",
-          "expr": "jvm_memory_used_bytes{job=\"job-service\",area=\"heap\"}",
-          "legendFormat": "Heap Used"
+          "expr": "sum(rate(cache_gets_total{job=\"job-service\",cache=\"S2-F12\",result=\"hit\"}[5m])) / clamp_min(sum(rate(cache_gets_total{job=\"job-service\",cache=\"S2-F12\"}[5m])), 1)",
+          "legendFormat": "S2-F12 hit ratio"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "RabbitMQ Job Saga Listener Depth",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "targets": [
+        {
+          "datasource": "Prometheus",
+          "expr": "rabbitmq_queue_messages_ready{queue=\"job.proposal.saga-listener\"}",
+          "legendFormat": "ready"
+        },
+        {
+          "datasource": "Prometheus",
+          "expr": "rabbitmq_queue_messages_unacked{queue=\"job.proposal.saga-listener\"}",
+          "legendFormat": "unacked"
         }
       ]
     },
