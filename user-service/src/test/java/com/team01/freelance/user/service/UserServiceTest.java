@@ -76,8 +76,9 @@ class UserServiceTest {
     @Test
     void deactivateUserThrowsWhenActiveContractExists() {
         User user = new User();
+        user.setId(1L);
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-        when(userRepository.countActiveContractsForUser(1L)).thenReturn(1L);
+        when(contractServiceClient.getActiveContractCount(1L)).thenReturn(1);
 
         assertThrows(IllegalStateException.class, () -> userService.deactivateUser(1L));
 
@@ -88,8 +89,9 @@ class UserServiceTest {
     @Test
     void deactivateUserSetsStatusAndWithdrawsSubmittedProposals() {
         User user = new User();
+        user.setId(1L);
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-        when(userRepository.countActiveContractsForUser(1L)).thenReturn(0L);
+        when(contractServiceClient.getActiveContractCount(1L)).thenReturn(0);
         when(userRepository.save(user)).thenReturn(user);
 
         User result = userService.deactivateUser(1L);
@@ -123,8 +125,9 @@ class UserServiceTest {
     @Test
     void deactivateUserFollowsPdfScenario() {
         User user = new User();
+        user.setId(1L);
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-        when(userRepository.countActiveContractsForUser(1L)).thenReturn(1L, 0L);
+        when(contractServiceClient.getActiveContractCount(1L)).thenReturn(1, 0);
         when(userRepository.save(user)).thenReturn(user);
 
         assertThrows(IllegalStateException.class, () -> userService.deactivateUser(1L));
