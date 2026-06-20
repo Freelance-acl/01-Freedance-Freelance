@@ -24,7 +24,10 @@ public final class Cc1EndpointScanner {
     }
 
     public static List<Endpoint> scan(ApplicationContext context) {
-        RequestMappingHandlerMapping mapping = context.getBean(RequestMappingHandlerMapping.class);
+        RequestMappingHandlerMapping mapping = context.getBean(
+                "requestMappingHandlerMapping",
+                RequestMappingHandlerMapping.class
+        );
         Set<Endpoint> endpoints = new TreeSet<>(
                 Comparator.comparing(Endpoint::path).thenComparing(Endpoint::method));
 
