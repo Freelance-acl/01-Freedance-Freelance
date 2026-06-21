@@ -3,18 +3,12 @@ package com.team01.freelance.wallet.service;
 import com.team01.freelance.contract.repository.ContractRepository;
 import com.team01.freelance.contracts.events.ProposalCompletedEvent;
 import com.team01.freelance.user.repository.UserRepository;
-import com.team01.freelance.wallet.dto.AppliedPromoCodeDTO;
-import com.team01.freelance.wallet.dto.CategoryRevenueDTO;
-import com.team01.freelance.wallet.dto.PayoutDetailsDTO;
-import com.team01.freelance.wallet.dto.PromoCodeUsageDTO;
-import com.team01.freelance.wallet.dto.FreelancerPayoutSummaryDTO;
-import com.team01.freelance.wallet.dto.RevenueReportDTO;
+import com.team01.freelance.wallet.dto.*;
+import com.team01.freelance.wallet.feign.ContractServiceClient;
 import com.team01.freelance.wallet.model.Payout;
 import com.team01.freelance.wallet.model.PayoutPromo;
 import com.team01.freelance.wallet.model.PayoutStatus;
 import com.team01.freelance.wallet.messaging.PaymentEventPublisher;
-import com.team01.freelance.wallet.dto.MilestoneReversalRequest;
-import com.team01.freelance.wallet.dto.ProcessPayoutRequest;
 import com.team01.freelance.common.observer.EventSubject;
 import com.team01.freelance.wallet.observer.EntityObserver;
 import com.team01.freelance.wallet.repository.PayoutAuditEventRepository;
@@ -80,6 +74,9 @@ public class PayoutService {
 
     @Autowired(required = false)
     private PaymentEventPublisher paymentEventPublisher;
+
+    @Autowired
+    private ContractServiceClient contractServiceClient;
 
     private final List<EntityObserver> observers = new ArrayList<>();
 
@@ -565,6 +562,8 @@ public class PayoutService {
      * @throws EntityNotFoundException if the contract is not found
      * @throws IllegalStateException if the contract is not COMPLETED
      * @throws IllegalArgumentException if the payout method is not provided
+     *
+     * M3 Refactor: Idempotency, Feign validation with 3-attempt backoff, and Role-based Auth.
      */
     @Caching(evict = {
             @CacheEvict(value = "payout", allEntries = true),
@@ -576,30 +575,40 @@ public class PayoutService {
             @CacheEvict(value = "S5-F11", allEntries = true)
     })
     @Transactional
-    public Payout processContractPayout(Long contractId, ProcessPayoutRequest request) {
-        if (payoutRepository.countContractById(contractId) == 0) {
-            throw new EntityNotFoundException("Contract not found with id: " + contractId);
+    public Payout processContractPayout(Long contractId, ProcessPayoutRequest request, Long callerId, String callerRole) {
+        Optional<Payout> completedPayout = payoutRepository.findByContractIdAndStatus(contractId, PayoutStatus.COMPLETED);
+        if (completedPayout.isPresent()) {
+            Payout p = completedPayout.get();
+            Map<String, Object> details = p.getTransactionDetails() != null ? new HashMap<>(p.getTransactionDetails()) : new HashMap<>();
+            details.put("_isIdempotent", true);
+            p.setTransactionDetails(details);
+            return p;
+        }
+        Optional<Payout> failedPayout = payoutRepository.findByContractIdAndStatus(contractId, PayoutStatus.FAILED);
+        if (failedPayout.isPresent()) {
+            Payout p = failedPayout.get();
+            Map<String, Object> details = p.getTransactionDetails() != null ? new HashMap<>(p.getTransactionDetails()) : new HashMap<>();
+            details.put("_isIdempotent", true);
+            p.setTransactionDetails(details);
+            return p;
         }
 
-        String contractStatus = payoutRepository.findContractStatusById(contractId);
-        if (!"COMPLETED".equalsIgnoreCase(contractStatus)) {
-            throw new IllegalStateException("Contract " + contractId + " is not COMPLETED");
-        }
+        ContractDTO contract = getContractWithRetry(contractId);
 
         Payout payout = payoutRepository
                 .findByContractIdAndStatusForUpdate(contractId, PayoutStatus.PENDING.name())
-                .orElseThrow(() -> {
-                    if (payoutRepository.existsByContractIdAndStatus(
-                            contractId, PayoutStatus.COMPLETED)) {
-                        return new IllegalStateException(
-                                "Payout already paid for contract: " + contractId);
-                    }
-                    return new EntityNotFoundException(
-                            "No pending payout found for contract: " + contractId);
-                });
+                .orElseThrow(() -> new EntityNotFoundException("No pending payout found for contract: " + contractId));
 
         if (request == null || request.getMethod() == null) {
             throw new IllegalArgumentException("Payout method is required");
+        }
+
+        if (!"COMPLETED".equalsIgnoreCase(contract.getStatus())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Contract is not completed. Status: " + contract.getStatus());
+        }
+
+        if (!"ADMIN".equals(callerRole) && !contract.getClientId().equals(callerId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the contract's client (or an ADMIN) can release this payout");
         }
 
         try {
@@ -609,7 +618,7 @@ public class PayoutService {
             log.warn("Audit event failed for CREATED on contract {}: {}", contractId, e.getMessage());
         }
 
-        Double agreedAmount = payoutRepository.findAgreedAmountByContractId(contractId);
+        Double agreedAmount = contract.getAgreedAmount();
         double platformFee = agreedAmount != null ? agreedAmount * 0.10 : payout.getAmount() * 0.10;
 
         payout.setMethod(request.getMethod());
@@ -636,7 +645,7 @@ public class PayoutService {
             log.warn("Audit event failed for {} on contract {}: {}", action, contractId, e.getMessage());
         }
 
-        Long proposalId = findProposalIdForContract(contractId);
+        Long proposalId = contract.getProposalId();
         publishAfterCommit(() -> {
             if (paymentEventPublisher == null || proposalId == null) {
                 return;
@@ -649,6 +658,31 @@ public class PayoutService {
         });
 
         return saved;
+    }
+    /**
+     * Helper: 3-Attempt exponential backoff for Feign Exception
+     */
+    private ContractDTO getContractWithRetry(Long contractId) {
+        int maxAttempts = 3;
+        long delayMs = 200;
+
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                return contractServiceClient.getContract(contractId);
+            } catch (feign.FeignException.NotFound e) {
+                if (attempt == maxAttempts) {
+                    throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Contract not found after retries", e);
+                }
+                try {
+                    Thread.sleep(delayMs);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    throw new RuntimeException("Retry interrupted", ie);
+                }
+                delayMs *= 2;
+            }
+        }
+        throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Contract not found");
     }
 
     private Long findProposalIdForContract(Long contractId) {

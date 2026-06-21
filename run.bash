@@ -65,7 +65,7 @@ else
 fi
 
 echo "[run] Pointing Docker CLI to minikube's Docker daemon..."
-eval "$(minikube docker-env)"
+eval "$(minikube docker-env --shell bash)"
 
 # ──────────────────────────────────────────────────────────────
 # Build Docker images
