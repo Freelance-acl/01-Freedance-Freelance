@@ -8,76 +8,76 @@
       "id": 1,
       "title": "HTTP Request Rate",
       "type": "timeseries",
-      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "gridPos": {"h": 8, "w": 8, "x": 0, "y": 0},
       "targets": [
         {
           "datasource": "Prometheus",
-          "expr": "rate(http_server_requests_seconds_count{job=\"proposal-service\"}[5m])",
+          "expr": "sum by (method, uri, status) (rate(http_server_requests_seconds_count{job=\"proposal-service\"}[5m]))",
           "legendFormat": "{{method}} {{uri}} {{status}}"
         }
       ]
     },
     {
       "id": 2,
-      "title": "Saga State Transitions (AMQP Published)",
+      "title": "HTTP P95 Latency",
       "type": "timeseries",
-      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "gridPos": {"h": 8, "w": 8, "x": 8, "y": 0},
       "targets": [
         {
           "datasource": "Prometheus",
-          "expr": "rate(spring_rabbitmq_listener_seconds_count{job=\"proposal-service\"}[5m])",
-          "legendFormat": "AMQP consumed/s"
+          "expr": "histogram_quantile(0.95, sum by (le, uri) (rate(http_server_requests_seconds_bucket{job=\"proposal-service\"}[5m])))",
+          "legendFormat": "P95 {{uri}}"
         }
       ]
     },
     {
       "id": 3,
-      "title": "P99 Latency",
+      "title": "JVM Heap Used",
       "type": "timeseries",
-      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "gridPos": {"h": 8, "w": 8, "x": 16, "y": 0},
       "targets": [
         {
           "datasource": "Prometheus",
-          "expr": "histogram_quantile(0.99, rate(http_server_requests_seconds_bucket{job=\"proposal-service\"}[5m]))",
-          "legendFormat": "P99 {{uri}}"
+          "expr": "sum(jvm_memory_used_bytes{job=\"proposal-service\", area=\"heap\"})",
+          "legendFormat": "heap used"
         }
       ]
     },
     {
       "id": 4,
-      "title": "Error Logs",
-      "type": "logs",
-      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 16},
+      "title": "Error Log Rate",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 8, "x": 0, "y": 8},
       "targets": [
         {
           "datasource": "Loki",
-          "expr": "{app=\"proposal-service\"} |= \"ERROR\"",
-          "legendFormat": ""
+          "expr": "count_over_time({app=\"freelance\", service=\"proposal-service\", level=\"ERROR\"} | json [1m])",
+          "legendFormat": "errors/min"
         }
       ]
     },
     {
       "id": 5,
-      "title": "Saga Logs",
+      "title": "RabbitMQ Event Audit",
       "type": "logs",
-      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24},
+      "gridPos": {"h": 8, "w": 8, "x": 8, "y": 8},
       "targets": [
         {
           "datasource": "Loki",
-          "expr": "{app=\"proposal-service\"} |= \"SAGA\"",
+          "expr": "{app=\"freelance\", service=\"proposal-service\"} | json | routingKey != \"\"",
           "legendFormat": ""
         }
       ]
     },
     {
       "id": 6,
-      "title": "All Logs",
+      "title": "Saga State Transitions",
       "type": "logs",
-      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24},
+      "gridPos": {"h": 8, "w": 8, "x": 16, "y": 8},
       "targets": [
         {
           "datasource": "Loki",
-          "expr": "{app=\"proposal-service\"}",
+          "expr": "{app=\"freelance\", service=\"proposal-service\"} | json | message |= \"transitioning\"",
           "legendFormat": ""
         }
       ]

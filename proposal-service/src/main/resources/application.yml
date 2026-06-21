@@ -48,11 +48,15 @@ management:
   endpoints:
     web:
       exposure:
-        include: health
+        include: "prometheus,health,info"
   endpoint:
     health:
       probes:
         enabled: true
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
 
 jwt:
   secret: ${JWT_SECRET:dGhpcy1pcy1hLXRlc3Qtc2VjcmV0LWtleS1mb3ItbTJhdC1sZWFzdC0zMmJ5dGVz}
