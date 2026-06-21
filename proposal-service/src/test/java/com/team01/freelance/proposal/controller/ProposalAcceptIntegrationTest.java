@@ -66,7 +66,7 @@ class ProposalAcceptIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void acceptSubmittedProposal_createsContractAndUpdatesJob() throws Exception {
+    void acceptSubmittedProposal_publishesEventWithoutDirectJobOrContractWrites() throws Exception {
         Job job = saveOpenJob();
         Proposal proposal = saveProposal(job.getId(), freelancer.getId(), ProposalStatus.SUBMITTED, 2000.0);
 
@@ -78,15 +78,8 @@ class ProposalAcceptIntegrationTest extends AbstractIntegrationTest {
         Proposal updated = proposalRepository.findById(proposal.getId()).orElseThrow();
         assertThat(updated.getStatus()).isEqualTo(ProposalStatus.ACCEPTED);
         assertThat(updated.getAcceptedAt()).isNotNull();
-        assertThat(jobRepository.findById(job.getId()).orElseThrow().getStatus()).isEqualTo(JobStatus.IN_PROGRESS);
-
-        Contract contract = contractRepository.findByProposalId(proposal.getId()).orElseThrow();
-        assertThat(contract.getStatus()).isEqualTo(ContractStatus.ACTIVE);
-        assertThat(contract.getAgreedAmount()).isEqualTo(2000.0);
-        assertThat(contract.getJobId()).isEqualTo(job.getId());
-        assertThat(contract.getFreelancerId()).isEqualTo(freelancer.getId());
-        assertThat(contract.getClientId()).isEqualTo(client.getId());
-        assertThat(contract.getStartDate()).isNotNull();
+        assertThat(jobRepository.findById(job.getId()).orElseThrow().getStatus()).isEqualTo(JobStatus.OPEN);
+        assertThat(contractRepository.findByProposalId(proposal.getId())).isEmpty();
     }
 
     @Test

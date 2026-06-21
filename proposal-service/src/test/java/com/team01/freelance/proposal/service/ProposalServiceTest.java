@@ -19,6 +19,9 @@ import com.team01.freelance.contract.repository.ContractRepository;
 import com.team01.freelance.proposal.model.MilestoneStatus;
 import com.team01.freelance.proposal.repository.ProposalAnalyticsProjection;
 import com.team01.freelance.proposal.repository.ProposalRepository;
+import com.team01.freelance.user.model.User;
+import com.team01.freelance.user.model.UserRole;
+import com.team01.freelance.user.model.UserStatus;
 import com.team01.freelance.job.repository.JobRepository;
 import com.team01.freelance.user.repository.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -197,7 +200,7 @@ class ProposalServiceTest {
     }
 
     @Test
-    void acceptProposal_updatesProposalJobAndCreatesContract() {
+    void acceptProposal_updatesProposalAndPublishesAcceptedEvent() {
         Proposal proposal = new Proposal();
         proposal.setId(10L);
         proposal.setJobId(20L);
@@ -205,28 +208,18 @@ class ProposalServiceTest {
         proposal.setBidAmount(2000.0);
         proposal.setStatus(ProposalStatus.SUBMITTED);
 
-        Job job = new Job();
-        job.setId(20L);
-        job.setClientId(40L);
-
         when(proposalRepository.findById(10L)).thenReturn(Optional.of(proposal));
-        when(userRepository.findRoleByUserId(30L)).thenReturn("FREELANCER");
-        when(jobRepository.findById(20L)).thenReturn(Optional.of(job));
+        when(userRepository.findById(30L)).thenReturn(Optional.of(user(30L, UserRole.FREELANCER)));
         when(proposalRepository.save(any(Proposal.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         Proposal result = proposalService.acceptProposal(10L);
 
         assertThat(result.getStatus()).isEqualTo(ProposalStatus.ACCEPTED);
         assertThat(result.getAcceptedAt()).isNotNull();
-        verify(jobRepository).markJobInProgress(20L);
-        verify(contractRepository).insertActiveContract(
-                eq(20L),
-                eq(30L),
-                eq(40L),
-                eq(10L),
-                eq(2000.0),
-                any(LocalDateTime.class)
-        );
+        verify(proposalEventPublisher).publishProposalAccepted(result);
+        verify(jobRepository, never()).markJobInProgress(anyLong());
+        verify(contractRepository, never()).insertActiveContract(
+                anyLong(), anyLong(), anyLong(), anyLong(), anyDouble(), any(LocalDateTime.class));
     }
 
     @Test
@@ -250,7 +243,7 @@ class ProposalServiceTest {
         proposal.setFreelancerId(30L);
         proposal.setStatus(ProposalStatus.SUBMITTED);
         when(proposalRepository.findById(10L)).thenReturn(Optional.of(proposal));
-        when(userRepository.findRoleByUserId(30L)).thenReturn(null);
+        when(userRepository.findById(30L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> proposalService.acceptProposal(10L))
                 .isInstanceOf(EntityNotFoundException.class)
@@ -264,7 +257,7 @@ class ProposalServiceTest {
         proposal.setFreelancerId(30L);
         proposal.setStatus(ProposalStatus.SUBMITTED);
         when(proposalRepository.findById(10L)).thenReturn(Optional.of(proposal));
-        when(userRepository.findRoleByUserId(30L)).thenReturn("CLIENT");
+        when(userRepository.findById(30L)).thenReturn(Optional.of(user(30L, UserRole.CLIENT)));
 
         assertThatThrownBy(() -> proposalService.acceptProposal(10L))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -365,6 +358,19 @@ class ProposalServiceTest {
         milestone.setMetadata(Map.of("title", title));
         return milestone;
     }
+
+    private User user(Long id, UserRole role) {
+        User user = new User();
+        user.setId(id);
+        user.setName("Test User " + id);
+        user.setEmail("user-" + id + "@test.dev");
+        user.setPassword("secret");
+        user.setPhone("+1000" + id);
+        user.setRole(role);
+        user.setStatus(UserStatus.ACTIVE);
+        return user;
+    }
+
     @Test
     void addMilestonesAssignsOrdersAndPendingStatusFromEmptyProposal() {
         Proposal proposal = proposalWithStatus(20L, 50L, ProposalStatus.SUBMITTED);
@@ -475,31 +481,29 @@ class ProposalServiceTest {
     }
 
     @Test
-    void withdrawProposalSetsSubmittedProposalWithdrawnAndReopensOnlyActiveInProgressJob() {
+    void withdrawProposalSetsSubmittedProposalWithdrawnAndPublishesWithdrawnEvent() {
         Proposal proposal = proposalWithStatus(10L, 25L, ProposalStatus.SUBMITTED);
         when(proposalRepository.findById(10L)).thenReturn(Optional.of(proposal));
-        when(proposalRepository.countByJobIdAndStatusIn(eq(25L), eq(List.of(ProposalStatus.SUBMITTED, ProposalStatus.SHORTLISTED))))
-                .thenReturn(1L);
         when(proposalRepository.save(proposal)).thenReturn(proposal);
 
         Proposal result = proposalService.withdrawProposal(10L);
 
         assertThat(result.getStatus()).isEqualTo(ProposalStatus.WITHDRAWN);
         verify(proposalRepository).save(proposal);
-        verify(jobRepository).reopenIfInProgress(25L);
+        verify(proposalEventPublisher).publishProposalWithdrawn(result);
+        verify(jobRepository, never()).reopenIfInProgress(anyLong());
     }
 
     @Test
     void withdrawProposalAllowsShortlistedProposal() {
         Proposal proposal = proposalWithStatus(11L, 30L, ProposalStatus.SHORTLISTED);
         when(proposalRepository.findById(11L)).thenReturn(Optional.of(proposal));
-        when(proposalRepository.countByJobIdAndStatusIn(eq(30L), eq(List.of(ProposalStatus.SUBMITTED, ProposalStatus.SHORTLISTED))))
-                .thenReturn(2L);
         when(proposalRepository.save(proposal)).thenReturn(proposal);
 
         Proposal result = proposalService.withdrawProposal(11L);
 
         assertThat(result.getStatus()).isEqualTo(ProposalStatus.WITHDRAWN);
+        verify(proposalEventPublisher).publishProposalWithdrawn(result);
         verify(jobRepository, never()).reopenIfInProgress(30L);
     }
 
