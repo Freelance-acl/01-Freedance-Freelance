@@ -16,6 +16,10 @@ public class ProposalAuthSupport {
     }
 
     public Long extractUid(HttpServletRequest request) {
+        String gatewayUserId = request.getHeader("X-User-Id");
+        if (gatewayUserId != null && !gatewayUserId.isBlank()) {
+            return Long.valueOf(gatewayUserId);
+        }
         String token = extractBearerToken(request);
         if (token == null) {
             return null;
@@ -24,6 +28,10 @@ public class ProposalAuthSupport {
     }
 
     public String extractRole(HttpServletRequest request) {
+        String gatewayRole = request.getHeader("X-User-Role");
+        if (gatewayRole != null && !gatewayRole.isBlank()) {
+            return gatewayRole;
+        }
         String token = extractBearerToken(request);
         if (token == null) {
             return null;

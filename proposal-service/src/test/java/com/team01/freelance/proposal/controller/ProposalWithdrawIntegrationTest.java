@@ -83,7 +83,7 @@ class ProposalWithdrawIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void withdrawOnlyActiveProposalForInProgressJobReopensJob() throws Exception {
+    void withdrawOnlyActiveProposalForInProgressJobDoesNotDirectlyReopenJob() throws Exception {
         Job job = saveJob(JobStatus.IN_PROGRESS);
         Proposal proposal = saveProposal(job.getId(), ProposalStatus.SUBMITTED);
 
@@ -91,7 +91,7 @@ class ProposalWithdrawIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("WITHDRAWN"));
 
-        assertThat(jobStatusFromDatabase(job.getId())).isEqualTo("OPEN");
+        assertThat(jobStatusFromDatabase(job.getId())).isEqualTo("IN_PROGRESS");
     }
 
     @Test

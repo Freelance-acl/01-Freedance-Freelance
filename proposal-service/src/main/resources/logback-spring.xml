@@ -21,10 +21,26 @@
             </http>
             <format>
                 <label>
-                    <pattern>app=${appName},host=${HOSTNAME},level=%level</pattern>
+                    <pattern>app=freelance,service=${appName},level=%level,env=k8s</pattern>
                 </label>
                 <message>
-                    <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%X{correlationId:-}] %logger{36} - %msg%n</pattern>
+                    <pattern>
+                        {
+                          "timestamp": "%d{ISO8601}",
+                          "level": "%level",
+                          "service": "${appName}",
+                          "thread": "%thread",
+                          "logger": "%logger{36}",
+                          "correlationId": "%X{correlationId:-}",
+                          "userId": "%X{userId:-}",
+                          "jobId": "%X{jobId:-}",
+                          "proposalId": "%X{proposalId:-}",
+                          "contractId": "%X{contractId:-}",
+                          "payoutId": "%X{payoutId:-}",
+                          "routingKey": "%X{routingKey:-}",
+                          "message": "%msg"
+                        }
+                    </pattern>
                 </message>
             </format>
         </appender>

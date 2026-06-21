@@ -216,11 +216,13 @@ public class ProposalController {
     }
 
     @PutMapping("/{id}/withdraw")
-    public ResponseEntity<Proposal> withdrawProposal(@PathVariable Long id) {
+    public ResponseEntity<Proposal> withdrawProposal(@PathVariable Long id, HttpServletRequest request) {
         try {
-            return ResponseEntity.ok(proposalService.withdrawProposal(id));
+            return ResponseEntity.ok(proposalService.withdrawProposal(id, request));
         } catch (EntityNotFoundException e) {
             return ResponseEntity.notFound().build();
+        } catch (com.team01.freelance.proposal.exception.ForbiddenOperationException e) {
+            return ResponseEntity.status(403).build();
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().build();
         }
