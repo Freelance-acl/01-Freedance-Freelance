@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.http.HttpStatus;
 import com.team01.freelance.wallet.dto.ProcessPayoutRequest;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -202,6 +203,15 @@ public class PayoutController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
         return ResponseEntity.ok(payoutService.getCategoryRevenue(startDate, endDate));
+    }
+
+    // [S5-F3-total] Total completed payout amount for a freelancer in a date range
+    @GetMapping("/freelancer/{freelancerId}/total")
+    public ResponseEntity<BigDecimal> getFreelancerPayoutTotal(
+            @PathVariable Long freelancerId,
+            @RequestParam String startDate,
+            @RequestParam String endDate) {
+        return ResponseEntity.ok(payoutService.getFreelancerPayoutTotal(freelancerId, startDate, endDate));
     }
 
     @GetMapping("/analytics/methods")

@@ -81,6 +81,45 @@
           "legendFormat": ""
         }
       ]
+    },
+    {
+      "id": 7,
+      "title": "Feign Call Outcomes (S5-F3/S5-F10)",
+      "type": "logs",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 32},
+      "targets": [
+        {
+          "datasource": "Loki",
+          "expr": "{app=\"freelance\", service=\"wallet-service\"} |= \"Feign\"",
+          "legendFormat": ""
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "Freelancer Payout Total Requests",
+      "type": "logs",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 32},
+      "targets": [
+        {
+          "datasource": "Loki",
+          "expr": "{app=\"freelance\", service=\"wallet-service\"} |= \"/total\"",
+          "legendFormat": ""
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "title": "Category Analytics Slow Operations",
+      "type": "logs",
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 40},
+      "targets": [
+        {
+          "datasource": "Loki",
+          "expr": "{app=\"freelance\", service=\"wallet-service\"} |= \"ANALYTICS_VIEWED\"",
+          "legendFormat": ""
+        }
+      ]
     }
   ]
 }

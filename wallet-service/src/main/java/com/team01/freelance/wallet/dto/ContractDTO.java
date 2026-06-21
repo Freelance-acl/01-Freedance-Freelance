@@ -10,6 +10,7 @@ public class ContractDTO {
     private Long clientId;
     private Double agreedAmount;
     private Long proposalId;
+    private Long jobId;
 
     public ContractDTO() {}
 
@@ -27,4 +28,7 @@ public class ContractDTO {
 
     public Long getProposalId() { return proposalId; }
     public void setProposalId(Long proposalId) { this.proposalId = proposalId; }
+
+    public Long getJobId() { return jobId; }
+    public void setJobId(Long jobId) { this.jobId = jobId; }
 }

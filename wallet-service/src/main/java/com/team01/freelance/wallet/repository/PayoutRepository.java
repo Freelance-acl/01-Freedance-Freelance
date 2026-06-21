@@ -156,6 +156,21 @@ public interface PayoutRepository extends JpaRepository<Payout, Long> {
             @Param("start") LocalDateTime start,
             @Param("end") LocalDateTime end);
 
+    /**
+     * [S5-F3-total] Find COMPLETED payouts for a specific freelancer within a date range.
+     */
+    @Query(value = """
+            SELECT * FROM payouts
+            WHERE freelancer_id = :freelancerId
+              AND status = 'COMPLETED'
+              AND created_at >= :start
+              AND created_at <= :end
+            """, nativeQuery = true)
+    List<Payout> findCompletedByFreelancerIdBetween(
+            @Param("freelancerId") Long freelancerId,
+            @Param("start") LocalDateTime start,
+            @Param("end") LocalDateTime end);
+
     @Modifying(clearAutomatically = true)
     @Query(value = """
             INSERT INTO payouts (
