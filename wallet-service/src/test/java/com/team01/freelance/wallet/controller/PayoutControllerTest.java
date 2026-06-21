@@ -438,6 +438,26 @@ class PayoutControllerTest {
                 .andExpect(jsonPath("$.message", containsString("Contract not found")));
     }
 
+    // Test for payment.refunded
+    @Test
+    void handle_WhenProposalCancelledEvent_ShouldDelegateToService() {
+        com.team01.freelance.wallet.messaging.PaymentSagaConsumer consumer =
+                new com.team01.freelance.wallet.messaging.PaymentSagaConsumer(payoutService);
+
+        com.team01.freelance.contracts.events.ProposalCancelledEvent cancelledEvent =
+                new com.team01.freelance.contracts.events.ProposalCancelledEvent(
+                        100L,
+                        200L,
+                        300L,
+                        "Client Cancelled"
+                );
+
+        consumer.handle(cancelledEvent);
+
+        org.mockito.Mockito.verify(payoutService, org.mockito.Mockito.times(1))
+                .handleProposalCancelled(eq(100L), eq("Client Cancelled"));
+    }
+
     // -----------------------------------------------------------------------
     // [S5-F5] Apply Promo Code to Payout
     // -----------------------------------------------------------------------

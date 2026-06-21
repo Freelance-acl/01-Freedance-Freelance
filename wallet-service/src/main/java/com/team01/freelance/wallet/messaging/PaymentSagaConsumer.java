@@ -1,6 +1,7 @@
 package com.team01.freelance.wallet.messaging;
 
 import com.team01.freelance.contracts.events.ProposalCompletedEvent;
+import com.team01.freelance.contracts.events.ProposalCancelledEvent;
 import com.team01.freelance.wallet.config.RabbitMQConfig;
 import com.team01.freelance.wallet.service.PayoutService;
 import org.slf4j.Logger;
@@ -24,6 +25,13 @@ public class PaymentSagaConsumer {
         try {
             if (event instanceof ProposalCompletedEvent proposalCompleted) {
                 payoutService.handleProposalCompleted(proposalCompleted);
+            } else if (event instanceof ProposalCancelledEvent proposalCancelled) {
+                log.info("Received ProposalCancelledEvent for proposal {}", proposalCancelled.proposalId());
+
+                payoutService.handleProposalCancelled(
+                        proposalCancelled.proposalId(),
+                        proposalCancelled.reason() != null ? proposalCancelled.reason() : "Saga: Proposal Cancelled"
+                );
             } else {
                 log.debug("Ignoring unsupported wallet-service saga event {}", event.getClass().getName());
             }

@@ -685,6 +685,83 @@ public class PayoutService {
         throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Contract not found");
     }
 
+    /**
+     * Consumes the proposal.cancelled event.
+     * Applies S5-F12 reversal logic and publishes payment.refunded.
+     */
+    @Transactional
+    public Payout handleProposalCancelled(Long proposalId, String cancellationReason) {
+        if (proposalId == null) return null;
+
+        // Find the payout linked to this proposalId.
+        // We look through all payouts to find one whose transactionDetails contains this proposalId,
+        // or matches the freelancerId.
+        List<Payout> allPayouts = payoutRepository.findAll();
+        Payout targetPayout = null;
+
+        for (Payout p : allPayouts) {
+            if (p.getTransactionDetails() != null && p.getTransactionDetails().containsKey("proposalId")) {
+                Object pId = p.getTransactionDetails().get("proposalId");
+                if (pId != null && Long.valueOf(pId.toString()).equals(proposalId)) {
+                    targetPayout = p;
+                    break;
+                }
+            }
+        }
+
+        // If not found via JSONB lookup, fallback safely
+        if (targetPayout == null) {
+            log.warn("No payout record found matching proposalId: {}", proposalId);
+            return null;
+        }
+
+        // Handle PENDING payout cancellation
+        if (targetPayout.getStatus() == PayoutStatus.PENDING) {
+            targetPayout.setStatus(PayoutStatus.REFUNDED); // Or your specific cancel/refund enum value
+            Payout saved = payoutRepository.save(targetPayout);
+
+            // Publish payment.refunded for the pending payout cancellation
+            publishAfterCommit(() -> {
+                if (paymentEventPublisher != null) {
+                    paymentEventPublisher.publishPaymentRefunded(saved, proposalId, java.math.BigDecimal.valueOf(saved.getAmount()));
+                }
+            });
+            return saved;
+        }
+
+        // Handle COMPLETED payout reversal (S5-F12 logic)
+        if (targetPayout.getStatus() == PayoutStatus.COMPLETED) {
+            MilestoneReversalRequest reversalRequest = new MilestoneReversalRequest();
+            reversalRequest.setReason(cancellationReason);
+            reversalRequest.setReversalScope("FULL");
+
+            // Apply S5-F12 Reversal implementation
+            Payout reversedPayout = reverseMilestone(targetPayout.getId(), reversalRequest);
+
+            // Extract the calculated refund amount from transaction details
+            Double refundAmount = reversedPayout.getAmount();
+            if (reversedPayout.getTransactionDetails() != null && reversedPayout.getTransactionDetails().containsKey("refundAmount")) {
+                Object rawRefund = reversedPayout.getTransactionDetails().get("refundAmount");
+                if (rawRefund instanceof Number) {
+                    refundAmount = ((Number) rawRefund).doubleValue();
+                }
+            }
+
+            final java.math.BigDecimal finalRefundAmount = java.math.BigDecimal.valueOf(refundAmount);
+
+            // Publish payment.refunded
+            publishAfterCommit(() -> {
+                if (paymentEventPublisher != null) {
+                    paymentEventPublisher.publishPaymentRefunded(reversedPayout, proposalId, finalRefundAmount);
+                }
+            });
+
+            return reversedPayout;
+        }
+
+        return targetPayout;
+    }
+
     private Long findProposalIdForContract(Long contractId) {
         if (contractId == null) {
             return null;
