@@ -36,6 +36,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Collections;
 import feign.FeignException;
@@ -162,6 +163,7 @@ public class PayoutService {
             @CacheEvict(value = "payout", allEntries = true),
             @CacheEvict(value = "S5-F1", allEntries = true),
             @CacheEvict(value = "S5-F3", allEntries = true),
+            @CacheEvict(value = "S5-F3-total", allEntries = true),
             @CacheEvict(value = "S5-F6", allEntries = true),
             @CacheEvict(value = "S5-F8", allEntries = true),
             @CacheEvict(value = "S5-F10", allEntries = true)
@@ -181,6 +183,7 @@ public class PayoutService {
             @CacheEvict(value = "payout", allEntries = true),
             @CacheEvict(value = "S5-F1", allEntries = true),
             @CacheEvict(value = "S5-F3", allEntries = true),
+            @CacheEvict(value = "S5-F3-total", allEntries = true),
             @CacheEvict(value = "S5-F6", allEntries = true),
             @CacheEvict(value = "S5-F8", allEntries = true),
             @CacheEvict(value = "S5-F10", allEntries = true)
@@ -197,6 +200,7 @@ public class PayoutService {
             @CacheEvict(value = "payout", allEntries = true),
             @CacheEvict(value = "S5-F1", allEntries = true),
             @CacheEvict(value = "S5-F3", allEntries = true),
+            @CacheEvict(value = "S5-F3-total", allEntries = true),
             @CacheEvict(value = "S5-F6", allEntries = true),
             @CacheEvict(value = "S5-F8", allEntries = true),
             @CacheEvict(value = "S5-F10", allEntries = true)
@@ -209,6 +213,7 @@ public class PayoutService {
             @CacheEvict(value = "payout", allEntries = true),
             @CacheEvict(value = "S5-F1", allEntries = true),
             @CacheEvict(value = "S5-F3", allEntries = true),
+            @CacheEvict(value = "S5-F3-total", allEntries = true),
             @CacheEvict(value = "S5-F6", allEntries = true),
             @CacheEvict(value = "S5-F8", allEntries = true),
             @CacheEvict(value = "S5-F10", allEntries = true),
@@ -410,6 +415,7 @@ public class PayoutService {
             @CacheEvict(value = "payout", allEntries = true),
             @CacheEvict(value = "S5-F1", allEntries = true),
             @CacheEvict(value = "S5-F3", allEntries = true),
+            @CacheEvict(value = "S5-F3-total", allEntries = true),
             @CacheEvict(value = "S5-F6", allEntries = true),
             @CacheEvict(value = "S5-F8", allEntries = true),
             @CacheEvict(value = "S5-F10", allEntries = true),
@@ -581,6 +587,7 @@ public class PayoutService {
             @CacheEvict(value = "payout", allEntries = true),
             @CacheEvict(value = "S5-F1", allEntries = true),
             @CacheEvict(value = "S5-F3", allEntries = true),
+            @CacheEvict(value = "S5-F3-total", allEntries = true),
             @CacheEvict(value = "S5-F6", allEntries = true),
             @CacheEvict(value = "S5-F8", allEntries = true),
             @CacheEvict(value = "S5-F10", allEntries = true),
@@ -801,6 +808,7 @@ public class PayoutService {
             @CacheEvict(value = "payout", allEntries = true),
             @CacheEvict(value = "S5-F1", allEntries = true),
             @CacheEvict(value = "S5-F3", allEntries = true),
+            @CacheEvict(value = "S5-F3-total", allEntries = true),
             @CacheEvict(value = "S5-F5", allEntries = true),
             @CacheEvict(value = "S5-F6", allEntries = true),
             @CacheEvict(value = "S5-F8", allEntries = true),
@@ -926,37 +934,41 @@ public class PayoutService {
 
         for (Payout payout : payouts) {
             Long contractId = payout.getContractId();
-            if (contractId == null) continue;
+            String category = null;
 
-            Long jobId = contractToJob.get(contractId);
-            if (jobId == null) {
-                try {
-                    ContractDTO contract = contractServiceClient.getContract(contractId);
-                    jobId = contract.getJobId();
-                    if (jobId != null) {
-                        contractToJob.put(contractId, jobId);
+            if (contractId != null) {
+                Long jobId = contractToJob.get(contractId);
+                if (jobId == null) {
+                    try {
+                        ContractDTO contract = contractServiceClient.getContract(contractId);
+                        jobId = contract.getJobId();
+                        if (jobId != null) {
+                            contractToJob.put(contractId, jobId);
+                        }
+                    } catch (Exception e) {
+                        log.warn("Failed to fetch contract {} for category revenue: {}", contractId, e.getMessage());
                     }
-                } catch (Exception e) {
-                    log.warn("Failed to fetch contract {} for category revenue: {}", contractId, e.getMessage());
-                    continue;
+                }
+
+                if (jobId != null) {
+                    category = jobToCategory.get(jobId);
+                    if (category == null) {
+                        try {
+                            JobDTO job = jobServiceClient.getJobById(jobId);
+                            category = job.getCategory();
+                            if (category != null) {
+                                jobToCategory.put(jobId, category);
+                            }
+                        } catch (Exception e) {
+                            log.warn("Failed to fetch job {} for category revenue: {}", jobId, e.getMessage());
+                        }
+                    }
                 }
             }
-            if (jobId == null) continue;
 
-            String category = jobToCategory.get(jobId);
             if (category == null) {
-                try {
-                    JobDTO job = jobServiceClient.getJobById(jobId);
-                    category = job.getCategory();
-                    if (category != null) {
-                        jobToCategory.put(jobId, category);
-                    }
-                } catch (Exception e) {
-                    log.warn("Failed to fetch job {} for category revenue: {}", jobId, e.getMessage());
-                    continue;
-                }
+                category = "UNKNOWN";
             }
-            if (category == null) continue;
 
             Object feeObj = payout.getTransactionDetails() != null
                     ? payout.getTransactionDetails().get("platformFee")
@@ -994,8 +1006,19 @@ public class PayoutService {
     // [S5-F3-total] Sum of COMPLETED payout amounts for a freelancer in a date range
     @Cacheable(value = "S5-F3-total", key = "#freelancerId + #startDate + #endDate")
     public BigDecimal getFreelancerPayoutTotal(Long freelancerId, String startDate, String endDate) {
-        LocalDate start = LocalDate.parse(startDate);
-        LocalDate end = LocalDate.parse(endDate);
+        LocalDate start;
+        LocalDate end;
+        try {
+            start = LocalDate.parse(startDate);
+            end = LocalDate.parse(endDate);
+        } catch (DateTimeParseException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Invalid date format — expected ISO-8601 (yyyy-MM-dd)");
+        }
+        if (start.isAfter(end)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "startDate cannot be after endDate");
+        }
         LocalDateTime startDt = start.atStartOfDay();
         LocalDateTime endDt = end.atTime(23, 59, 59, 999_999_999);
 

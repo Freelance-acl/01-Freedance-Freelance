@@ -90,7 +90,7 @@
       "targets": [
         {
           "datasource": "Loki",
-          "expr": "{app=\"freelance\", service=\"wallet-service\"} |= \"Feign\"",
+          "expr": "{app=\"wallet-service\"} |= \"Feign\"",
           "legendFormat": ""
         }
       ]
@@ -103,7 +103,7 @@
       "targets": [
         {
           "datasource": "Loki",
-          "expr": "{app=\"freelance\", service=\"wallet-service\"} |= \"/total\"",
+          "expr": "{app=\"wallet-service\"} |= \"/total\"",
           "legendFormat": ""
         }
       ]
@@ -116,7 +116,7 @@
       "targets": [
         {
           "datasource": "Loki",
-          "expr": "{app=\"freelance\", service=\"wallet-service\"} |= \"ANALYTICS_VIEWED\"",
+          "expr": "{app=\"wallet-service\"} |= \"ANALYTICS_VIEWED\"",
           "legendFormat": ""
         }
       ]

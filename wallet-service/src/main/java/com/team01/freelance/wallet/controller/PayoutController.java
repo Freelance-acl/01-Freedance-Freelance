@@ -19,6 +19,7 @@ import com.team01.freelance.wallet.dto.ProcessPayoutRequest;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 
 @RestController
@@ -209,9 +210,14 @@ public class PayoutController {
     @GetMapping("/freelancer/{freelancerId}/total")
     public ResponseEntity<BigDecimal> getFreelancerPayoutTotal(
             @PathVariable Long freelancerId,
-            @RequestParam String startDate,
-            @RequestParam String endDate) {
-        return ResponseEntity.ok(payoutService.getFreelancerPayoutTotal(freelancerId, startDate, endDate));
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate) {
+        try {
+            return ResponseEntity.ok(payoutService.getFreelancerPayoutTotal(freelancerId, startDate, endDate));
+        } catch (DateTimeParseException e) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "Invalid date format");
+        }
     }
 
     @GetMapping("/analytics/methods")
