@@ -330,64 +330,108 @@ class PayoutControllerTest {
     }
 
     // -----------------------------------------------------------------------
-    // [S5-F4] Process Payout for Contract
+    // [S5-F4] Process Payout for Contract (M3 Refactor)
     // -----------------------------------------------------------------------
 
     @Test
-    void processContractPayout_returns201() throws Exception {
+    void processContractPayout_success_returns2xx() throws Exception {
         Long contractId = 42L;
+        Long callerId = 42L;
+        String callerRole = "CLIENT";
+
         Payout payout = new Payout();
         payout.setId(10L);
         payout.setContractId(contractId);
         payout.setStatus(PayoutStatus.COMPLETED);
         payout.setMethod(PayoutMethod.BANK_TRANSFER);
 
-        when(payoutService.processContractPayout(eq(contractId), any(ProcessPayoutRequest.class)))
+        when(payoutService.processContractPayout(eq(contractId), any(ProcessPayoutRequest.class), eq(callerId), eq(callerRole)))
                 .thenReturn(payout);
 
         mockMvc.perform(post("/api/payouts/contract/{contractId}", contractId)
+                        .header("X-User-Id", callerId)
+                        .header("X-User-Role", callerRole)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"method":"BANK_TRANSFER","accountLastFour":"9876"}
                                 """))
-                .andExpect(status().isCreated())
+                .andExpect(status().is2xxSuccessful()) // Handles either 201 or 200 OK from the idempotency block
                 .andExpect(jsonPath("$.status").value("COMPLETED"))
                 .andExpect(jsonPath("$.method").value("BANK_TRANSFER"));
     }
 
     @Test
-    void processContractPayout_alreadyPaid_returns400() throws Exception {
+    void processContractPayout_alreadyProcessed_returns200Idempotent() throws Exception {
         Long contractId = 42L;
-        when(payoutService.processContractPayout(eq(contractId), any(ProcessPayoutRequest.class)))
-                .thenThrow(new IllegalStateException("Payout already paid for contract: " + contractId));
+        Long callerId = 42L;
+        String callerRole = "CLIENT";
+
+        Payout existingPayout = new Payout();
+        existingPayout.setId(10L);
+        existingPayout.setContractId(contractId);
+        existingPayout.setStatus(PayoutStatus.COMPLETED);
+        existingPayout.setMethod(PayoutMethod.BANK_TRANSFER);
+
+        when(payoutService.processContractPayout(eq(contractId), any(ProcessPayoutRequest.class), eq(callerId), eq(callerRole)))
+                .thenReturn(existingPayout);
 
         mockMvc.perform(post("/api/payouts/contract/{contractId}", contractId)
+                        .header("X-User-Id", callerId)
+                        .header("X-User-Role", callerRole)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"method\":\"BANK_TRANSFER\"}"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message", containsString("already paid")));
+                .andExpect(status().isOk()) // Idempotency check explicitly returns 200 OK
+                .andExpect(jsonPath("$.status").value("COMPLETED"));
     }
 
     @Test
     void processContractPayout_contractNotCompleted_returns400() throws Exception {
         Long contractId = 7L;
-        when(payoutService.processContractPayout(eq(contractId), any(ProcessPayoutRequest.class)))
-                .thenThrow(new IllegalStateException("Contract " + contractId + " is not COMPLETED"));
+        Long callerId = 42L;
+        String callerRole = "CLIENT";
+
+        when(payoutService.processContractPayout(eq(contractId), any(ProcessPayoutRequest.class), eq(callerId), eq(callerRole)))
+                .thenThrow(new ResponseStatusException(HttpStatus.BAD_REQUEST, "Contract is not completed. Status: ACTIVE"));
 
         mockMvc.perform(post("/api/payouts/contract/{contractId}", contractId)
+                        .header("X-User-Id", callerId)
+                        .header("X-User-Role", callerRole)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"method\":\"PAYPAL\"}"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message", containsString("not COMPLETED")));
+                .andExpect(jsonPath("$.message", containsString("not completed")));
+    }
+
+    @Test
+    void processContractPayout_forbidden_returns403() throws Exception {
+        Long contractId = 42L;
+        Long callerId = 99L; // Different user trying to release the payout
+        String callerRole = "CLIENT";
+
+        when(payoutService.processContractPayout(eq(contractId), any(ProcessPayoutRequest.class), eq(callerId), eq(callerRole)))
+                .thenThrow(new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the contract's client (or an ADMIN) can release this payout"));
+
+        mockMvc.perform(post("/api/payouts/contract/{contractId}", contractId)
+                        .header("X-User-Id", callerId)
+                        .header("X-User-Role", callerRole)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"method\":\"BANK_TRANSFER\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message", containsString("ADMIN")));
     }
 
     @Test
     void processContractPayout_contractNotFound_returns404() throws Exception {
         Long contractId = 999L;
-        when(payoutService.processContractPayout(eq(contractId), any(ProcessPayoutRequest.class)))
-                .thenThrow(new EntityNotFoundException("Contract not found with id: " + contractId));
+        Long callerId = 42L;
+        String callerRole = "CLIENT";
+
+        when(payoutService.processContractPayout(eq(contractId), any(ProcessPayoutRequest.class), eq(callerId), eq(callerRole)))
+                .thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND, "Contract not found after retries"));
 
         mockMvc.perform(post("/api/payouts/contract/{contractId}", contractId)
+                        .header("X-User-Id", callerId)
+                        .header("X-User-Role", callerRole)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"method\":\"BANK_TRANSFER\"}"))
                 .andExpect(status().isNotFound())

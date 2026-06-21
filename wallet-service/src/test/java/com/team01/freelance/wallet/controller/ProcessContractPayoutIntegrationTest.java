@@ -7,19 +7,26 @@ import com.team01.freelance.user.model.User;
 import com.team01.freelance.user.model.UserRole;
 import com.team01.freelance.user.model.UserStatus;
 import com.team01.freelance.user.repository.UserRepository;
+import com.team01.freelance.wallet.dto.ContractDTO;
+import com.team01.freelance.wallet.feign.ContractServiceClient;
 import com.team01.freelance.wallet.model.Payout;
 import com.team01.freelance.wallet.model.PayoutMethod;
 import com.team01.freelance.wallet.model.PayoutStatus;
 import com.team01.freelance.wallet.repository.PayoutRepository;
+import com.team01.freelance.wallet.service.PayoutService;
 import com.team01.freelance.wallet.support.AbstractIntegrationTest;
+
 import org.junit.jupiter.api.BeforeEach;
-import org.springframework.security.test.context.support.WithMockUser;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 
@@ -54,8 +61,13 @@ class ProcessContractPayoutIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private PayoutService payoutService;
+
     private User freelancer;
     private User client;
+
+    private Long activeContractId = -1L;
 
     @BeforeEach
     void setUp() {
@@ -63,17 +75,39 @@ class ProcessContractPayoutIntegrationTest extends AbstractIntegrationTest {
 
         client = saveUser("Client", UserRole.CLIENT);
         freelancer = saveUser("Freelancer", UserRole.FREELANCER);
+
+        // Injecting a manual stub to bypass Feign entirely without Mockito
+        ContractServiceClient stubClient = new ContractServiceClient() {
+            @Override
+            public String getContractStatus(Long contractId) {
+                return contractId.equals(activeContractId) ? "ACTIVE" : "COMPLETED";
+            }
+
+            @Override
+            public ContractDTO getContract(Long contractId) {
+                if (contractId == 999_999L) {
+                    throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Contract not found");
+                }
+                ContractDTO dto = new ContractDTO();
+                dto.setId(contractId);
+                dto.setStatus(contractId.equals(activeContractId) ? "ACTIVE" : "COMPLETED");
+                dto.setClientId(client.getId());
+                dto.setAgreedAmount(3000.0);
+                dto.setProposalId(1L);
+                return dto;
+            }
+        };
+        ReflectionTestUtils.setField(payoutService, "contractServiceClient", stubClient);
     }
 
-    /**
-     * Spec scenarios (a)+(b): COMPLETED contract with agreedAmount=3000, pay pending payout → 201.
-     */
     @Test
     void processCompletedContract_returns201AndUpdatesPendingPayout() throws Exception {
         Contract contract = saveContract(ContractStatus.COMPLETED, 3000.0);
         Payout pending = savePendingPayout(contract.getId(), freelancer.getId(), 3000.0);
 
         mockMvc.perform(post(PROCESS_URL, contract.getId())
+                        .header("X-User-Id", String.valueOf(client.getId()))
+                        .header("X-User-Role", "CLIENT")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"method":"BANK_TRANSFER","accountLastFour":"9876"}
@@ -98,9 +132,8 @@ class ProcessContractPayoutIntegrationTest extends AbstractIntegrationTest {
         assertNotNull(updated.getTransactionDetails().get("processedAt"));
     }
 
-    /** Spec scenario (c): second payment for same contract → 400 with "already paid". */
     @Test
-    void processTwice_secondRequestReturns400AlreadyPaid() throws Exception {
+    void processTwice_secondRequestReturns200Idempotent() throws Exception {
         Contract contract = saveContract(ContractStatus.COMPLETED, 3000.0);
         savePendingPayout(contract.getId(), freelancer.getId(), 3000.0);
 
@@ -108,36 +141,48 @@ class ProcessContractPayoutIntegrationTest extends AbstractIntegrationTest {
                 {"method":"BANK_TRANSFER","accountLastFour":"9876"}
                 """;
 
+        // First execution acts normally -> 201
         mockMvc.perform(post(PROCESS_URL, contract.getId())
+                        .header("X-User-Id", String.valueOf(client.getId()))
+                        .header("X-User-Role", "CLIENT")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isCreated());
 
+        // Idempotent execution triggers check -> 200
         mockMvc.perform(post(PROCESS_URL, contract.getId())
+                        .header("X-User-Id", String.valueOf(client.getId()))
+                        .header("X-User-Role", "CLIENT")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message", containsString("already paid")));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("COMPLETED"));
     }
 
-    /** Spec scenario (d): ACTIVE contract → 400. */
     @Test
     void processActiveContract_returns400() throws Exception {
         Contract contract = saveContract(ContractStatus.ACTIVE, 3000.0);
         savePendingPayout(contract.getId(), freelancer.getId(), 3000.0);
 
+        // Let the stub know to return ACTIVE for this ID
+        this.activeContractId = contract.getId();
+
         mockMvc.perform(post(PROCESS_URL, contract.getId())
+                        .header("X-User-Id", String.valueOf(client.getId()))
+                        .header("X-User-Role", "CLIENT")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"method":"BANK_TRANSFER","accountLastFour":"9876"}
                                 """))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message", containsString("not COMPLETED")));
+                .andExpect(jsonPath("$.message", containsString("not completed")));
     }
 
     @Test
     void processUnknownContract_returns404() throws Exception {
         mockMvc.perform(post(PROCESS_URL, 999_999L)
+                        .header("X-User-Id", String.valueOf(client.getId()))
+                        .header("X-User-Role", "CLIENT")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"method":"BANK_TRANSFER"}
@@ -151,12 +196,45 @@ class ProcessContractPayoutIntegrationTest extends AbstractIntegrationTest {
         Contract contract = saveContract(ContractStatus.COMPLETED, 3000.0);
 
         mockMvc.perform(post(PROCESS_URL, contract.getId())
+                        .header("X-User-Id", String.valueOf(client.getId()))
+                        .header("X-User-Role", "CLIENT")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"method":"BANK_TRANSFER"}
                                 """))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.message", containsString("No pending payout")));
+    }
+
+    @Test
+    void processContractPayout_withDifferentClient_returns403() throws Exception {
+        Contract contract = saveContract(ContractStatus.COMPLETED, 3000.0);
+        savePendingPayout(contract.getId(), freelancer.getId(), 3000.0);
+
+        mockMvc.perform(post(PROCESS_URL, contract.getId())
+                        .header("X-User-Id", "999") // Unauthorized client
+                        .header("X-User-Role", "CLIENT")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"method":"BANK_TRANSFER","accountLastFour":"9876"}
+                                """))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message", containsString("Only the contract's client (or an ADMIN) can release this payout")));
+    }
+
+    @Test
+    void processContractPayout_withAdmin_returns201() throws Exception {
+        Contract contract = saveContract(ContractStatus.COMPLETED, 3000.0);
+        savePendingPayout(contract.getId(), freelancer.getId(), 3000.0);
+
+        mockMvc.perform(post(PROCESS_URL, contract.getId())
+                        .header("X-User-Id", "999")
+                        .header("X-User-Role", "ADMIN") // Admin role overrides client check
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"method":"BANK_TRANSFER","accountLastFour":"9876"}
+                                """))
+                .andExpect(status().isCreated());
     }
 
     private User saveUser(String prefix, UserRole role) {
