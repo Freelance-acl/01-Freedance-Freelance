@@ -47,12 +47,12 @@ public class ProposalEventPublisher {
         publish(ProposalCompletedEvent.ROUTING_KEY, event, proposal.getId());
     }
 
-    public void publishProposalCancelled(Proposal proposal) {
+    public void publishProposalCancelled(Proposal proposal, String reason) {
         ProposalCancelledEvent event = new ProposalCancelledEvent(
                 proposal.getId(),
                 proposal.getJobId(),
                 proposal.getFreelancerId(),
-                "payment_failed"
+                reason
         );
         publish(ProposalCancelledEvent.ROUTING_KEY, event, proposal.getId());
     }

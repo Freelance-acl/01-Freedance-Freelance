@@ -54,6 +54,14 @@ public class Proposal {
     @JsonAlias({"acceptedAt", "accepted_at"})
     private LocalDateTime acceptedAt;
 
+    @Column(name = "contract_id")
+    @JsonAlias({"contractId", "contract_id"})
+    private Long contractId;
+
+    @Column(name = "payment_pending_at")
+    @JsonAlias({"paymentPendingAt", "payment_pending_at"})
+    private LocalDateTime paymentPendingAt;
+
     @JsonIgnore
     @OrderBy("milestoneOrder ASC")
     @OneToMany(mappedBy = "proposal", cascade = CascadeType.ALL, orphanRemoval = true)
@@ -151,6 +159,22 @@ public class Proposal {
 
     public void setAcceptedAt(LocalDateTime acceptedAt) {
         this.acceptedAt = acceptedAt;
+    }
+
+    public Long getContractId() {
+        return contractId;
+    }
+
+    public void setContractId(Long contractId) {
+        this.contractId = contractId;
+    }
+
+    public LocalDateTime getPaymentPendingAt() {
+        return paymentPendingAt;
+    }
+
+    public void setPaymentPendingAt(LocalDateTime paymentPendingAt) {
+        this.paymentPendingAt = paymentPendingAt;
     }
 
     @JsonProperty("proposalMilestones")
