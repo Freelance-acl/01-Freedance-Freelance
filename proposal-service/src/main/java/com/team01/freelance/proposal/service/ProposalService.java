@@ -24,6 +24,8 @@ import com.team01.freelance.common.observer.EventSubject;
 import com.team01.freelance.contract.model.Contract;
 import com.team01.freelance.contract.model.ContractStatus;
 import com.team01.freelance.contract.repository.ContractRepository;
+import com.team01.freelance.contracts.events.ContractCreatedEvent;
+import com.team01.freelance.contracts.events.ContractStatusChangedEvent;
 import com.team01.freelance.contracts.events.PaymentCompletedEvent;
 import com.team01.freelance.contracts.events.PaymentFailedEvent;
 import com.team01.freelance.contracts.events.PaymentInitiatedEvent;
@@ -49,6 +51,7 @@ import com.team01.freelance.proposal.model.ProposalMilestone;
 import com.team01.freelance.proposal.model.ProposalStatus;
 import com.team01.freelance.proposal.repository.ProposalAnalyticsProjection;
 import com.team01.freelance.proposal.repository.ProposalRepository;
+import com.team01.freelance.proposal.saga.ProposalStateMachine;
 import com.team01.freelance.user.repository.UserRepository;
 import com.team01.freelance.proposal.security.ProposalAuthSupport;
 
@@ -102,14 +105,17 @@ public class ProposalService {
     @Autowired
     private ProposalAnalyticsCacheService proposalAnalyticsCacheService;
 
-    @Autowired(required = false)
-    private ContractServiceClient contractServiceClient;
+    @Autowired
+    private ProposalStateMachine proposalStateMachine;
 
     @Autowired(required = false)
     private UserServiceClient userServiceClient;
 
     @Autowired(required = false)
     private JobServiceClient jobServiceClient;
+
+    @Autowired(required = false)
+    private ContractServiceClient contractServiceClient;
 
     @Autowired(required = false)
     private ProposalEventPublisher proposalEventPublisher;
@@ -432,13 +438,7 @@ public class ProposalService {
     }
 
     /**
-     * Completes work for an accepted proposal: closes the active contract, closes the job,
-     * and creates a pending payout transactionally.
-     *
-     * @param id the proposal ID
-     * @return the proposal (status remains ACCEPTED)
-     * @throws EntityNotFoundException if the proposal is not found
-     * @throws IllegalArgumentException if the proposal is not ACCEPTED or has no ACTIVE contract
+     * Completes work for an accepted proposal and publishes proposal.completed.
      */
     @Transactional
     public Proposal completeProposal(Long id) {
@@ -454,13 +454,13 @@ public class ProposalService {
             throw new IllegalArgumentException("No ACTIVE contract found for proposal");
         }
         ProposalStatus oldStatus = proposal.getStatus();
-        proposal.setStatus(ProposalStatus.COMPLETING);
+        proposalStateMachine.transition(proposal, ProposalStatus.COMPLETING);
         Proposal saved = proposalRepository.saveAndFlush(proposal);
         logProposalTransition(proposal.getId(), oldStatus, ProposalStatus.COMPLETING);
         if (proposalEventPublisher != null) {
             proposalEventPublisher.publishProposalCompleted(saved, contract);
         }
-        return proposal;
+        return saved;
     }
 
     private FeignContractDTO getActiveContractForCompletion(Long proposalId) {
@@ -482,6 +482,41 @@ public class ProposalService {
         dto.setAgreedAmount(contract.getAgreedAmount());
         dto.setStatus(contract.getStatus().name());
         return dto;
+    }
+
+    @Transactional
+    public Proposal handleContractCreated(ContractCreatedEvent event) {
+        if (event == null || event.proposalId() == null) {
+            throw new IllegalArgumentException("contract.created event is missing proposalId");
+        }
+        Proposal proposal = proposalRepository.findById(event.proposalId())
+                .orElseThrow(() -> new EntityNotFoundException(
+                        "Proposal not found with id: " + event.proposalId()));
+        if (event.contractId() != null
+                && event.contractId().equals(proposal.getContractId())) {
+            return proposal;
+        }
+        proposal.setContractId(event.contractId());
+        return proposalRepository.saveAndFlush(proposal);
+    }
+
+    @Transactional
+    public Proposal handleContractStatusChanged(ContractStatusChangedEvent event) {
+        if (event == null || event.contractId() == null) {
+            throw new IllegalArgumentException("contract.status-changed event is missing contractId");
+        }
+        return proposalRepository.findByContractId(event.contractId())
+                .map(proposal -> {
+                    if (event.contractId().equals(proposal.getContractId())) {
+                        return proposal;
+                    }
+                    proposal.setContractId(event.contractId());
+                    return proposalRepository.saveAndFlush(proposal);
+                })
+                .orElseGet(() -> {
+                    log.debug("No proposal linked to contractId {} for contract.status-changed", event.contractId());
+                    return null;
+                });
     }
 
     public boolean deleteProposalById(Long id) {
@@ -606,7 +641,13 @@ public class ProposalService {
                 || proposal.getStatus() == ProposalStatus.REFUNDED) {
             return proposal;
         }
-        proposal.setStatus(ProposalStatus.PAYMENT_PENDING);
+        if (!proposalStateMachine.canTransition(proposal.getStatus(), ProposalStatus.PAYMENT_PENDING)) {
+            return proposal;
+        }
+        proposalStateMachine.transition(proposal, ProposalStatus.PAYMENT_PENDING);
+        if (event.contractId() != null && proposal.getContractId() == null) {
+            proposal.setContractId(event.contractId());
+        }
         return proposalRepository.saveAndFlush(proposal);
     }
 
@@ -616,7 +657,10 @@ public class ProposalService {
         if (proposal.getStatus() == ProposalStatus.PAID) {
             return proposal;
         }
-        proposal.setStatus(ProposalStatus.PAID);
+        if (!proposalStateMachine.canTransition(proposal.getStatus(), ProposalStatus.PAID)) {
+            return proposal;
+        }
+        proposalStateMachine.transition(proposal, ProposalStatus.PAID);
         return proposalRepository.saveAndFlush(proposal);
     }
 
@@ -627,10 +671,14 @@ public class ProposalService {
                 || proposal.getStatus() == ProposalStatus.REFUNDED) {
             return proposal;
         }
-        proposal.setStatus(ProposalStatus.PAYMENT_FAILED);
+        if (!proposalStateMachine.canTransition(proposal.getStatus(), ProposalStatus.PAYMENT_FAILED)) {
+            return proposal;
+        }
+        proposalStateMachine.transition(proposal, ProposalStatus.PAYMENT_FAILED);
         Proposal saved = proposalRepository.saveAndFlush(proposal);
         if (proposalEventPublisher != null) {
-            proposalEventPublisher.publishProposalCancelled(saved);
+            String reason = event.reason() != null ? event.reason() : "payment_failed";
+            proposalEventPublisher.publishProposalCancelled(saved, reason);
         }
         return saved;
     }
@@ -641,7 +689,10 @@ public class ProposalService {
         if (proposal.getStatus() == ProposalStatus.REFUNDED) {
             return proposal;
         }
-        proposal.setStatus(ProposalStatus.REFUNDED);
+        if (!proposalStateMachine.canTransition(proposal.getStatus(), ProposalStatus.REFUNDED)) {
+            return proposal;
+        }
+        proposalStateMachine.transition(proposal, ProposalStatus.REFUNDED);
         return proposalRepository.saveAndFlush(proposal);
     }
 

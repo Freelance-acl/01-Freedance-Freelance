@@ -21,6 +21,7 @@ import com.team01.freelance.job.model.Job;
 import com.team01.freelance.job.model.JobCategory;
 import com.team01.freelance.job.model.JobStatus;
 import com.team01.freelance.job.repository.JobRepository;
+import com.team01.freelance.proposal.dto.FeignContractDTO;
 import com.team01.freelance.proposal.messaging.ProposalEventPublisher;
 import com.team01.freelance.proposal.model.Proposal;
 import com.team01.freelance.proposal.model.ProposalStatus;
@@ -100,7 +101,8 @@ class ProposalCompleteIntegrationTest extends AbstractIntegrationTest {
         org.mockito.Mockito.verify(proposalEventPublisher)
                 .publishProposalCompleted(
                         org.mockito.Mockito.any(Proposal.class),
-                        org.mockito.Mockito.argThat(publishedContract -> publishedContract.getId().equals(contract.getId())));
+                        org.mockito.Mockito.argThat((FeignContractDTO publishedContract) ->
+                                publishedContract.getId().equals(contract.getId())));
     }
 
     @Test

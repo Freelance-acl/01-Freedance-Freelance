@@ -3,14 +3,31 @@ package com.team01.freelance.proposal.config;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.team01.freelance.contracts.events.ContractCancelledEvent;
+import com.team01.freelance.contracts.events.ContractCreatedEvent;
+import com.team01.freelance.contracts.events.ContractStatusChangedEvent;
+import com.team01.freelance.contracts.events.JobClosedEvent;
+import com.team01.freelance.contracts.events.JobRatedEvent;
+import com.team01.freelance.contracts.events.JobStatusChangedEvent;
+import com.team01.freelance.contracts.events.PaymentCompletedEvent;
+import com.team01.freelance.contracts.events.PaymentFailedEvent;
+import com.team01.freelance.contracts.events.PaymentInitiatedEvent;
+import com.team01.freelance.contracts.events.PaymentRefundedEvent;
+import com.team01.freelance.contracts.events.UserDeactivatedEvent;
+import com.team01.freelance.contracts.events.UserRegisteredEvent;
 import org.springframework.amqp.core.Binding;
 import org.springframework.amqp.core.BindingBuilder;
 import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.core.QueueBuilder;
 import org.springframework.amqp.core.TopicExchange;
+import org.springframework.amqp.support.converter.DefaultJackson2JavaTypeMapper;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * Section 2.9 topology for proposal-service (saga orchestrator).
@@ -29,6 +46,11 @@ public class RabbitMQConfig {
     public static final String QUEUE = "proposal.saga-feedback";
     public static final String DLX   = "proposal.events.dlx";
     public static final String DLQ   = "proposal.saga-feedback.dlq";
+
+    public static final String TRUSTED_EVENT_PACKAGE = "com.team01.freelance.contracts.events";
+
+    @Value("${proposal-service.rabbitmq.trusted-event-package}")
+    private String trustedEventPackage;
 
     @Bean
     public TopicExchange proposalEventsExchange() {
@@ -143,6 +165,40 @@ public class RabbitMQConfig {
         ObjectMapper mapper = new ObjectMapper();
         mapper.registerModule(new JavaTimeModule());
         mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
-        return new Jackson2JsonMessageConverter(mapper);
+
+        DefaultJackson2JavaTypeMapper typeMapper = new DefaultJackson2JavaTypeMapper();
+        typeMapper.setTrustedPackages(trustedEventPackage);
+        typeMapper.setIdClassMapping(sagaFeedbackEventTypeMapping());
+
+        Jackson2JsonMessageConverter converter = new Jackson2JsonMessageConverter(mapper);
+        converter.setJavaTypeMapper(typeMapper);
+        return converter;
+    }
+
+    private static Map<String, Class<?>> sagaFeedbackEventTypeMapping() {
+        Map<String, Class<?>> mappings = new LinkedHashMap<>();
+        registerEvent(mappings, UserRegisteredEvent.class);
+        registerEvent(mappings, UserDeactivatedEvent.class);
+        registerEvent(mappings, JobStatusChangedEvent.class);
+        registerEvent(mappings, JobRatedEvent.class);
+        registerEvent(mappings, JobClosedEvent.class);
+        registerEvent(mappings, ContractCreatedEvent.class);
+        registerEvent(mappings, ContractStatusChangedEvent.class);
+        registerEvent(mappings, ContractCancelledEvent.class);
+        registerEvent(mappings, PaymentInitiatedEvent.class);
+        registerEvent(mappings, PaymentCompletedEvent.class);
+        registerEvent(mappings, PaymentFailedEvent.class);
+        registerEvent(mappings, PaymentRefundedEvent.class);
+        return Map.copyOf(mappings);
+    }
+
+    private static void registerEvent(Map<String, Class<?>> mappings, Class<?> eventClass) {
+        try {
+            Object routingKey = eventClass.getField("ROUTING_KEY").get(null);
+            mappings.put(eventClass.getName(), eventClass);
+            mappings.put(String.valueOf(routingKey), eventClass);
+        } catch (ReflectiveOperationException ex) {
+            throw new IllegalStateException("Failed to register event type mapping for " + eventClass.getName(), ex);
+        }
     }
 }

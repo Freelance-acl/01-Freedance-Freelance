@@ -128,4 +128,8 @@ public interface ProposalRepository extends JpaRepository<Proposal, Long> {
     Double getAverageEstimatedDays(
             @Param("start") LocalDateTime start,
             @Param("endExclusive") LocalDateTime endExclusive);
+
+    Optional<Proposal> findByContractId(Long contractId);
+
+    List<Proposal> findByStatusAndPaymentPendingAtBefore(ProposalStatus status, LocalDateTime cutoff);
 }
