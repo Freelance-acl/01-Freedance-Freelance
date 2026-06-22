@@ -445,7 +445,10 @@ public class ProposalService {
      * Completes work for an accepted proposal via the M3 saga trigger.
      */
     @Transactional
-    public Proposal completeProposal(Long id) {
+    public Proposal completeProposal(Long id, HttpServletRequest request) {
+        Proposal proposal = proposalRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Proposal not found with id: " + id));
+        assertProposalOwnerOrAdmin(proposal, request);
         return sagaTriggerService.triggerCompletion(id);
     }
 

@@ -5,8 +5,10 @@ import static org.mockito.Mockito.verify;
 
 import com.team01.freelance.contracts.events.ContractCreatedEvent;
 import com.team01.freelance.contracts.events.ContractStatusChangedEvent;
+import com.team01.freelance.contracts.events.PaymentCompletedEvent;
 import com.team01.freelance.contracts.events.PaymentFailedEvent;
 import com.team01.freelance.contracts.events.PaymentInitiatedEvent;
+import com.team01.freelance.contracts.events.PaymentRefundedEvent;
 import com.team01.freelance.proposal.model.Proposal;
 import com.team01.freelance.proposal.model.ProposalStatus;
 import com.team01.freelance.proposal.repository.ProposalRepository;
@@ -93,5 +95,47 @@ class ProposalSagaConsumerIntegrationTest extends AbstractIntegrationTest {
         Proposal updated = proposalRepository.findById(proposal.getId()).orElseThrow();
         assertThat(updated.getStatus()).isEqualTo(ProposalStatus.PAYMENT_FAILED);
         verify(proposalEventPublisher).publishProposalCancelled(updated, "payment_failed");
+    }
+
+    @Test
+    void handlePaymentCompleted_movesPaymentPendingProposalToPaid() {
+        proposal.setStatus(ProposalStatus.PAYMENT_PENDING);
+        proposal.setPaymentPendingAt(LocalDateTime.now());
+        proposal.setContractId(901L);
+        proposalRepository.saveAndFlush(proposal);
+
+        proposalSagaConsumer.handle(new PaymentCompletedEvent(
+                3L, proposal.getId(), 901L, BigDecimal.valueOf(1500)));
+
+        Proposal updated = proposalRepository.findById(proposal.getId()).orElseThrow();
+        assertThat(updated.getStatus()).isEqualTo(ProposalStatus.PAID);
+    }
+
+    @Test
+    void handlePaymentRefunded_movesPaymentFailedProposalToRefunded() {
+        proposal.setStatus(ProposalStatus.PAYMENT_FAILED);
+        proposal.setContractId(901L);
+        proposalRepository.saveAndFlush(proposal);
+
+        proposalSagaConsumer.handle(new PaymentRefundedEvent(
+                4L, proposal.getId(), 901L, BigDecimal.valueOf(1500)));
+
+        Proposal updated = proposalRepository.findById(proposal.getId()).orElseThrow();
+        assertThat(updated.getStatus()).isEqualTo(ProposalStatus.REFUNDED);
+    }
+
+    @Test
+    void scenarioD_abandonedPayoutReasonMarksFailedAndPublishesCancellation() {
+        proposal.setStatus(ProposalStatus.PAYMENT_PENDING);
+        proposal.setPaymentPendingAt(LocalDateTime.now().minusHours(80));
+        proposal.setContractId(901L);
+        proposalRepository.saveAndFlush(proposal);
+
+        proposalSagaConsumer.handle(new PaymentFailedEvent(
+                5L, proposal.getId(), 901L, "payout_abandoned"));
+
+        Proposal updated = proposalRepository.findById(proposal.getId()).orElseThrow();
+        assertThat(updated.getStatus()).isEqualTo(ProposalStatus.PAYMENT_FAILED);
+        verify(proposalEventPublisher).publishProposalCancelled(updated, "payout_abandoned");
     }
 }
