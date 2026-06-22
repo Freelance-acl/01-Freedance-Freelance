@@ -1,26 +1,27 @@
 # Code owners for Freelance Marketplace (ACL M3).
 # Source of truth: team.json — used by the "PR before Merge" ruleset
 # (require review from code owners). Any listed owner can approve paths they own.
+# @youssefmmagdy is included on every path as repo maintainer / cross-service approver.
 
 # Shared event contracts (consumed by all services)
-/contracts/ @AbdelrahmanTamer21 @yousef-megeed @amrkhaled04 @youssefhipa @khalodesta @mohamedwaelw2s @ziadwess2003 @HamzaElewa @marwanhosny99 @seifheshammm @omartaha7507 @youssefmmagdy @Abdalrahman-Ashraf @sabaa-frh
+/contracts/ @youssefmmagdy @AbdelrahmanTamer21 @yousef-megeed @amrkhaled04 @youssefhipa @khalodesta @mohamedwaelw2s @ziadwess2003 @HamzaElewa @marwanhosny99 @seifheshammm @omartaha7507 @Abdalrahman-Ashraf @sabaa-frh
 
 # user-service
-/user-service/ @marwanhosny99 @seifheshammm @omartaha7507
+/user-service/ @youssefmmagdy @marwanhosny99 @seifheshammm @omartaha7507
 
 # job-service
-/job-service/ @mohamedwaelw2s @ziadwess2003 @HamzaElewa
+/job-service/ @youssefmmagdy @mohamedwaelw2s @ziadwess2003 @HamzaElewa
 
 # proposal-service
-/proposal-service/ @AbdelrahmanTamer21 @yousef-megeed
+/proposal-service/ @youssefmmagdy @AbdelrahmanTamer21 @yousef-megeed
 
 # contract-service
-/contract-service/ @amrkhaled04 @youssefhipa @khalodesta
+/contract-service/ @youssefmmagdy @amrkhaled04 @youssefhipa @khalodesta
 
 # wallet-service
 /wallet-service/ @youssefmmagdy @Abdalrahman-Ashraf @sabaa-frh
 
-# api-gateway (no dedicated team in team.json — route to org maintainers)
+# api-gateway
 /api-gateway/ @youssefmmagdy
 
 # Kubernetes / Docker / shared scripts
