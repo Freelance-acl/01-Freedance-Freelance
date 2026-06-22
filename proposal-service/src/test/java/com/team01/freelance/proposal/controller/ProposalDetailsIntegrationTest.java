@@ -1,20 +1,12 @@
 package com.team01.freelance.proposal.controller;
 
-import com.team01.freelance.job.model.Job;
-import com.team01.freelance.job.model.JobCategory;
-import com.team01.freelance.job.model.JobStatus;
-import com.team01.freelance.job.repository.JobRepository;
 import com.team01.freelance.proposal.model.MilestoneStatus;
 import com.team01.freelance.proposal.model.Proposal;
 import com.team01.freelance.proposal.model.ProposalMilestone;
-import com.team01.freelance.proposal.model.ProposalStatus;
 import com.team01.freelance.proposal.repository.ProposalMilestoneRepository;
 import com.team01.freelance.proposal.repository.ProposalRepository;
 import com.team01.freelance.proposal.support.AbstractIntegrationTest;
-import com.team01.freelance.user.model.User;
-import com.team01.freelance.user.model.UserRole;
-import com.team01.freelance.user.model.UserStatus;
-import com.team01.freelance.user.repository.UserRepository;
+import com.team01.freelance.proposal.support.ProposalTestData;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -42,42 +34,11 @@ class ProposalDetailsIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private ProposalMilestoneRepository proposalMilestoneRepository;
 
-    @Autowired
-    private JobRepository jobRepository;
-
-    @Autowired
-    private UserRepository userRepository;
-
-    private Job job;
-    private User freelancer;
-
     @BeforeEach
     void setUp() {
         mockMvc = buildMockMvc(webApplicationContext);
-
         proposalMilestoneRepository.deleteAll();
         proposalRepository.deleteAll();
-        jobRepository.deleteAll();
-        userRepository.deleteAll();
-
-        job = new Job();
-        job.setClientId(1L);
-        job.setTitle("Proposal details job");
-        job.setDescription("Details job");
-        job.setCategory(JobCategory.WEB_DEV);
-        job.setStatus(JobStatus.OPEN);
-        job.setBudgetMin(100.0);
-        job.setBudgetMax(5000.0);
-        job = jobRepository.save(job);
-
-        freelancer = new User();
-        freelancer.setName("Details Freelancer");
-        freelancer.setEmail("details-" + System.nanoTime() + "@test.dev");
-        freelancer.setPassword("secret");
-        freelancer.setPhone("+4000" + (System.nanoTime() % 1_000_000_000L));
-        freelancer.setRole(UserRole.FREELANCER);
-        freelancer.setStatus(UserStatus.ACTIVE);
-        freelancer = userRepository.save(freelancer);
     }
 
     @Test
@@ -90,8 +51,8 @@ class ProposalDetailsIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/proposals/{proposalId}/details", proposal.getId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.proposalId").value(proposal.getId()))
-                .andExpect(jsonPath("$.jobId").value(job.getId()))
-                .andExpect(jsonPath("$.freelancerId").value(freelancer.getId()))
+                .andExpect(jsonPath("$.jobId").value(ProposalTestData.JOB_ID))
+                .andExpect(jsonPath("$.freelancerId").value(ProposalTestData.FREELANCER_ID))
                 .andExpect(jsonPath("$.status").value("SUBMITTED"))
                 .andExpect(jsonPath("$.bidAmount").value(2000.0))
                 .andExpect(jsonPath("$.totalMilestones").value(3))
@@ -136,12 +97,12 @@ class ProposalDetailsIntegrationTest extends AbstractIntegrationTest {
 
     private Proposal saveProposal() {
         Proposal proposal = new Proposal();
-        proposal.setJobId(job.getId());
-        proposal.setFreelancerId(freelancer.getId());
+        proposal.setJobId(ProposalTestData.JOB_ID);
+        proposal.setFreelancerId(ProposalTestData.FREELANCER_ID);
         proposal.setCoverLetter("Details letter");
         proposal.setBidAmount(2000.0);
         proposal.setEstimatedDays(7);
-        proposal.setStatus(ProposalStatus.SUBMITTED);
+        proposal.setStatus(com.team01.freelance.proposal.model.ProposalStatus.SUBMITTED);
         return proposalRepository.save(proposal);
     }
 

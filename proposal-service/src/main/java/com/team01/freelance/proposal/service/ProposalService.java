@@ -21,26 +21,18 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.team01.freelance.common.observer.EventSubject;
-import com.team01.freelance.contract.model.Contract;
-import com.team01.freelance.contract.model.ContractStatus;
-import com.team01.freelance.contract.repository.ContractRepository;
 import com.team01.freelance.contracts.events.ContractCreatedEvent;
 import com.team01.freelance.contracts.events.ContractStatusChangedEvent;
 import com.team01.freelance.contracts.events.PaymentCompletedEvent;
 import com.team01.freelance.contracts.events.PaymentFailedEvent;
 import com.team01.freelance.contracts.events.PaymentInitiatedEvent;
 import com.team01.freelance.contracts.events.PaymentRefundedEvent;
-import com.team01.freelance.proposal.dto.FeignContractDTO;
 import com.team01.freelance.proposal.dto.FeignJobDTO;
 import com.team01.freelance.proposal.dto.FeignUserDTO;
-import com.team01.freelance.job.model.Job;
-import com.team01.freelance.job.repository.JobRepository;
-import com.team01.freelance.wallet.repository.PayoutRepository;
 import com.team01.freelance.proposal.dto.JobProposalSummaryByJobDTO;
 import com.team01.freelance.proposal.dto.JobProposalSummaryDTO;
 import com.team01.freelance.proposal.dto.ProposalAnalyticsDTO;
 import com.team01.freelance.proposal.dto.ProposalDetailsDTO;
-import com.team01.freelance.proposal.feign.ContractServiceClient;
 import com.team01.freelance.proposal.feign.JobServiceClient;
 import com.team01.freelance.proposal.feign.UserServiceClient;
 import com.team01.freelance.proposal.exception.ForbiddenOperationException;
@@ -53,7 +45,6 @@ import com.team01.freelance.proposal.repository.ProposalAnalyticsProjection;
 import com.team01.freelance.proposal.repository.ProposalRepository;
 import com.team01.freelance.proposal.saga.ProposalStateMachine;
 import com.team01.freelance.proposal.saga.SagaTriggerService;
-import com.team01.freelance.user.repository.UserRepository;
 import com.team01.freelance.proposal.security.ProposalAuthSupport;
 
 import feign.FeignException;
@@ -83,18 +74,6 @@ public class ProposalService {
     private ProposalRepository proposalRepository;
 
     @Autowired
-    private JobRepository jobRepository;
-
-    @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
-    private ContractRepository contractRepository;
-
-    @Autowired
-    private PayoutRepository payoutRepository;
-
-    @Autowired
     private EventSubject proposalEventSubject;
 
     @Autowired
@@ -112,16 +91,13 @@ public class ProposalService {
     @Autowired
     private SagaTriggerService sagaTriggerService;
 
-    @Autowired(required = false)
+    @Autowired
     private UserServiceClient userServiceClient;
 
-    @Autowired(required = false)
+    @Autowired
     private JobServiceClient jobServiceClient;
 
-    @Autowired(required = false)
-    private ContractServiceClient contractServiceClient;
-
-    @Autowired(required = false)
+    @Autowired
     private ProposalEventPublisher proposalEventPublisher;
 
     @Autowired
@@ -293,11 +269,8 @@ public class ProposalService {
             throw new IllegalArgumentException("Freelancer and Job IDs are required to create a Proposal");
         }
 
-        jobRepository.findById(proposal.getJobId())
-                .orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + proposal.getJobId()));
-
-        userRepository.findById(proposal.getFreelancerId())
-                .orElseThrow(() -> new EntityNotFoundException("Freelancer not found with id: " + proposal.getFreelancerId()));
+        getJobForEnrichment(proposal.getJobId());
+        getUserForEnrichment(proposal.getFreelancerId());
 
         return proposalRepository.save(proposal);
     }
@@ -568,8 +541,7 @@ public class ProposalService {
     }
 
     public JobProposalSummaryDTO getJobProposalSummary(Long jobId, LocalDate startDate, LocalDate endDate) {
-        jobRepository.findById(jobId)
-                .orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + jobId));
+        getJobForEnrichment(jobId);
 
         LocalDateTime queryStart = startDate == null ? null : startDate.atStartOfDay();
         LocalDateTime queryEndExclusive = endDate == null ? null : endDate.plusDays(1).atStartOfDay();
@@ -684,35 +656,10 @@ public class ProposalService {
     }
 
     private FeignUserDTO getFreelancerForAccept(Long freelancerId) {
-        if (userServiceClient == null) {
-            return getUserForEnrichment(freelancerId);
-        }
-        try {
-            log.info("Calling UserServiceClient.getUser with args={}", freelancerId);
-            FeignUserDTO user = userServiceClient.getUser(freelancerId);
-            log.info("UserServiceClient.getUser returned successfully");
-            return user;
-        } catch (FeignException.NotFound e) {
-            throw new EntityNotFoundException("Freelancer not found with id: " + freelancerId);
-        } catch (FeignException e) {
-            log.warn("Feign call to user-service failed: {}", e.getMessage());
-            return getUserForEnrichment(freelancerId);
-        }
+        return getUserForEnrichment(freelancerId);
     }
 
     private FeignUserDTO getUserForEnrichment(Long userId) {
-        if (userServiceClient == null) {
-            return userRepository.findById(userId)
-                    .map(user -> {
-                        FeignUserDTO dto = new FeignUserDTO();
-                        dto.setId(user.getId());
-                        dto.setName(user.getName());
-                        dto.setRole(user.getRole() == null ? null : user.getRole().name());
-                        dto.setStatus(user.getStatus() == null ? null : user.getStatus().name());
-                        return dto;
-                    })
-                    .orElseThrow(() -> new EntityNotFoundException("Freelancer not found with id: " + userId));
-        }
         try {
             log.info("Calling UserServiceClient.getUser with args={}", userId);
             FeignUserDTO user = userServiceClient.getUser(userId);
@@ -722,33 +669,11 @@ public class ProposalService {
             throw new EntityNotFoundException("Freelancer not found with id: " + userId);
         } catch (FeignException e) {
             log.warn("Feign call to user-service failed: {}", e.getMessage());
-            return userRepository.findById(userId)
-                    .map(user -> {
-                        FeignUserDTO dto = new FeignUserDTO();
-                        dto.setId(user.getId());
-                        dto.setName(user.getName());
-                        dto.setRole(user.getRole() == null ? null : user.getRole().name());
-                        dto.setStatus(user.getStatus() == null ? null : user.getStatus().name());
-                        return dto;
-                    })
-                    .orElseThrow(() -> new EntityNotFoundException("Freelancer not found with id: " + userId));
+            throw new IllegalStateException("User service temporarily unavailable");
         }
     }
 
     private FeignJobDTO getJobForEnrichment(Long jobId) {
-        if (jobServiceClient == null) {
-            return jobRepository.findById(jobId)
-                    .map(job -> {
-                        FeignJobDTO dto = new FeignJobDTO();
-                        dto.setId(job.getId());
-                        dto.setClientId(job.getClientId());
-                        dto.setTitle(job.getTitle());
-                        dto.setCategory(job.getCategory() == null ? null : job.getCategory().name());
-                        dto.setStatus(job.getStatus() == null ? null : job.getStatus().name());
-                        return dto;
-                    })
-                    .orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + jobId));
-        }
         try {
             log.info("Calling JobServiceClient.getJob with args={}", jobId);
             FeignJobDTO job = jobServiceClient.getJob(jobId);
@@ -758,17 +683,7 @@ public class ProposalService {
             throw new EntityNotFoundException("Job not found with id: " + jobId);
         } catch (FeignException e) {
             log.warn("Feign call to job-service failed: {}", e.getMessage());
-            return jobRepository.findById(jobId)
-                    .map(job -> {
-                        FeignJobDTO dto = new FeignJobDTO();
-                        dto.setId(job.getId());
-                        dto.setClientId(job.getClientId());
-                        dto.setTitle(job.getTitle());
-                        dto.setCategory(job.getCategory() == null ? null : job.getCategory().name());
-                        dto.setStatus(job.getStatus() == null ? null : job.getStatus().name());
-                        return dto;
-                    })
-                    .orElseThrow(() -> new EntityNotFoundException("Job not found with id: " + jobId));
+            throw new IllegalStateException("Job service temporarily unavailable");
         }
     }
 
