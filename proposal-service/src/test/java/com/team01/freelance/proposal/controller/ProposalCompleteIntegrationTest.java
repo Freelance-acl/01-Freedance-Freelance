@@ -26,6 +26,7 @@ import com.team01.freelance.proposal.messaging.ProposalEventPublisher;
 import com.team01.freelance.proposal.model.Proposal;
 import com.team01.freelance.proposal.model.ProposalStatus;
 import com.team01.freelance.proposal.repository.ProposalRepository;
+import com.team01.freelance.proposal.saga.SagaTriggerService;
 import com.team01.freelance.proposal.service.ProposalService;
 import com.team01.freelance.proposal.support.AbstractIntegrationTest;
 import com.team01.freelance.user.model.User;
@@ -64,6 +65,9 @@ class ProposalCompleteIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private ProposalService proposalService;
 
+    @Autowired
+    private SagaTriggerService sagaTriggerService;
+
     private ProposalEventPublisher proposalEventPublisher;
 
     private User client;
@@ -73,7 +77,7 @@ class ProposalCompleteIntegrationTest extends AbstractIntegrationTest {
     void setUp() {
         mockMvc = buildMockMvc(webApplicationContext);
         proposalEventPublisher = org.mockito.Mockito.mock(ProposalEventPublisher.class);
-        ReflectionTestUtils.setField(proposalService, "proposalEventPublisher", proposalEventPublisher);
+        ReflectionTestUtils.setField(sagaTriggerService, "proposalEventPublisher", proposalEventPublisher);
 
         payoutRepository.deleteAll();
         contractRepository.deleteAll();
@@ -139,6 +143,72 @@ class ProposalCompleteIntegrationTest extends AbstractIntegrationTest {
                 .isEqualTo(ProposalStatus.ACCEPTED);
         assertThat(payoutRepository.count()).isZero();
         org.mockito.Mockito.verifyNoInteractions(proposalEventPublisher);
+    }
+
+    @Test
+    void completeWhenJobClosed_returns400AndPublishesNoEvent() throws Exception {
+        AcceptedWorkSetup setup = saveAcceptedWork(2000.0);
+        Job job = jobRepository.findById(setup.job().getId()).orElseThrow();
+        job.setStatus(JobStatus.CLOSED);
+        jobRepository.save(job);
+
+        mockMvc.perform(put("/api/proposals/{id}/complete", setup.proposal().getId()))
+                .andExpect(status().isBadRequest());
+
+        assertThat(proposalRepository.findById(setup.proposal().getId()).orElseThrow().getStatus())
+                .isEqualTo(ProposalStatus.ACCEPTED);
+        org.mockito.Mockito.verifyNoInteractions(proposalEventPublisher);
+    }
+
+    @Test
+    void completeWhenFreelancerDeactivated_returns400AndPublishesNoEvent() throws Exception {
+        AcceptedWorkSetup setup = saveAcceptedWork(2000.0);
+        User deactivated = userRepository.findById(freelancer.getId()).orElseThrow();
+        deactivated.setStatus(UserStatus.DEACTIVATED);
+        userRepository.save(deactivated);
+
+        mockMvc.perform(put("/api/proposals/{id}/complete", setup.proposal().getId()))
+                .andExpect(status().isBadRequest());
+
+        assertThat(proposalRepository.findById(setup.proposal().getId()).orElseThrow().getStatus())
+                .isEqualTo(ProposalStatus.ACCEPTED);
+        org.mockito.Mockito.verifyNoInteractions(proposalEventPublisher);
+    }
+
+    @Test
+    void completeWhenCallerIsNotOwner_returns403AndPublishesNoEvent() throws Exception {
+        AcceptedWorkSetup setup = saveAcceptedWork(2000.0);
+
+        mockMvc.perform(put("/api/proposals/{id}/complete", setup.proposal().getId())
+                        .header("X-User-Id", "99")
+                        .header("X-User-Role", "FREELANCER"))
+                .andExpect(status().isForbidden());
+
+        assertThat(proposalRepository.findById(setup.proposal().getId()).orElseThrow().getStatus())
+                .isEqualTo(ProposalStatus.ACCEPTED);
+        org.mockito.Mockito.verifyNoInteractions(proposalEventPublisher);
+    }
+
+    @Test
+    void completeWhenCallerIsAdmin_returns200() throws Exception {
+        AcceptedWorkSetup setup = saveAcceptedWork(2000.0);
+
+        mockMvc.perform(put("/api/proposals/{id}/complete", setup.proposal().getId())
+                        .header("X-User-Id", "99")
+                        .header("X-User-Role", "ADMIN"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("COMPLETING"));
+    }
+
+    @Test
+    void completeWhenCallerIsOwnerFreelancer_returns200() throws Exception {
+        AcceptedWorkSetup setup = saveAcceptedWork(2000.0);
+
+        mockMvc.perform(put("/api/proposals/{id}/complete", setup.proposal().getId())
+                        .header("X-User-Id", String.valueOf(freelancer.getId()))
+                        .header("X-User-Role", "FREELANCER"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("COMPLETING"));
     }
 
     private AcceptedWorkSetup saveAcceptedWork(double agreedAmount) {

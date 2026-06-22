@@ -9,5 +9,5 @@ import org.springframework.web.bind.annotation.PathVariable;
 public interface JobServiceClient {
 
     @GetMapping("/api/jobs/{jobId}")
-    FeignJobDTO getJob(@PathVariable Long jobId);
+    FeignJobDTO getJob(@PathVariable("jobId") Long jobId);
 }

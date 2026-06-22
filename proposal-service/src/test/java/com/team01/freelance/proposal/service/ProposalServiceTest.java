@@ -12,6 +12,7 @@ import com.team01.freelance.proposal.model.MilestoneStatus;
 import com.team01.freelance.proposal.dto.ProposalAnalyticsDTO;
 import com.team01.freelance.proposal.messaging.ProposalEventPublisher;
 import com.team01.freelance.proposal.model.Proposal;
+import com.team01.freelance.proposal.security.ProposalAuthSupport;
 import com.team01.freelance.proposal.model.ProposalMilestone;
 import com.team01.freelance.proposal.model.ProposalStatus;
 import com.team01.freelance.wallet.repository.PayoutRepository;
@@ -25,6 +26,7 @@ import com.team01.freelance.user.model.UserStatus;
 import com.team01.freelance.job.repository.JobRepository;
 import com.team01.freelance.user.repository.UserRepository;
 import com.team01.freelance.proposal.saga.ProposalStateMachine;
+import com.team01.freelance.proposal.saga.SagaTriggerService;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -75,6 +77,10 @@ class ProposalServiceTest {
     private DataSource dataSource;
     @Mock
     private ProposalEventPublisher proposalEventPublisher;
+    @Mock
+    private SagaTriggerService sagaTriggerService;
+    @Mock
+    private ProposalAuthSupport proposalAuthSupport;
     @Spy
     private ProposalStateMachine proposalStateMachine = new ProposalStateMachine();
 
@@ -712,5 +718,41 @@ class ProposalServiceTest {
         assertThatThrownBy(() -> proposalService.estimatePlatformFee(0.0, 10))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("bidAmount");
+    }
+
+    @Test
+    void completeProposal_delegatesToSagaTriggerService() {
+        Proposal proposal = new Proposal();
+        proposal.setId(5L);
+        proposal.setFreelancerId(5L);
+        proposal.setStatus(ProposalStatus.ACCEPTED);
+        when(proposalRepository.findById(5L)).thenReturn(Optional.of(proposal));
+
+        Proposal expected = new Proposal();
+        expected.setId(5L);
+        expected.setStatus(ProposalStatus.COMPLETING);
+        when(sagaTriggerService.triggerCompletion(5L)).thenReturn(expected);
+
+        Proposal result = proposalService.completeProposal(5L, null);
+
+        assertThat(result).isSameAs(expected);
+        verify(sagaTriggerService).triggerCompletion(5L);
+    }
+
+    @Test
+    void completeProposal_rejectsNonOwnerCaller() {
+        Proposal proposal = new Proposal();
+        proposal.setId(5L);
+        proposal.setFreelancerId(5L);
+        when(proposalRepository.findById(5L)).thenReturn(Optional.of(proposal));
+
+        jakarta.servlet.http.HttpServletRequest request = org.mockito.Mockito.mock(
+                jakarta.servlet.http.HttpServletRequest.class);
+        when(proposalAuthSupport.extractUid(request)).thenReturn(99L);
+        when(proposalAuthSupport.extractRole(request)).thenReturn("FREELANCER");
+
+        assertThatThrownBy(() -> proposalService.completeProposal(5L, request))
+                .isInstanceOf(com.team01.freelance.proposal.exception.ForbiddenOperationException.class);
+        verify(sagaTriggerService, org.mockito.Mockito.never()).triggerCompletion(5L);
     }
 }

@@ -229,11 +229,15 @@ public class ProposalController {
     }
 
     @PutMapping("/{id}/complete")
-    public ResponseEntity<Proposal> completeProposal(@PathVariable("id") Long proposalId) {
+    public ResponseEntity<Proposal> completeProposal(
+            @PathVariable("id") Long proposalId,
+            HttpServletRequest request) {
         try {
-            return ResponseEntity.ok(proposalService.completeProposal(proposalId));
+            return ResponseEntity.ok(proposalService.completeProposal(proposalId, request));
         } catch (EntityNotFoundException e) {
             return ResponseEntity.notFound().build();
+        } catch (com.team01.freelance.proposal.exception.ForbiddenOperationException e) {
+            return ResponseEntity.status(403).build();
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().build();
         } catch (IllegalStateException e) {
