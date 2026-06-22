@@ -25,6 +25,7 @@ import com.team01.freelance.user.model.UserStatus;
 import com.team01.freelance.job.repository.JobRepository;
 import com.team01.freelance.user.repository.UserRepository;
 import com.team01.freelance.proposal.saga.ProposalStateMachine;
+import com.team01.freelance.proposal.saga.SagaTriggerService;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -75,6 +76,8 @@ class ProposalServiceTest {
     private DataSource dataSource;
     @Mock
     private ProposalEventPublisher proposalEventPublisher;
+    @Mock
+    private SagaTriggerService sagaTriggerService;
     @Spy
     private ProposalStateMachine proposalStateMachine = new ProposalStateMachine();
 
@@ -712,5 +715,18 @@ class ProposalServiceTest {
         assertThatThrownBy(() -> proposalService.estimatePlatformFee(0.0, 10))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("bidAmount");
+    }
+
+    @Test
+    void completeProposal_delegatesToSagaTriggerService() {
+        Proposal expected = new Proposal();
+        expected.setId(5L);
+        expected.setStatus(ProposalStatus.COMPLETING);
+        when(sagaTriggerService.triggerCompletion(5L)).thenReturn(expected);
+
+        Proposal result = proposalService.completeProposal(5L);
+
+        assertThat(result).isSameAs(expected);
+        verify(sagaTriggerService).triggerCompletion(5L);
     }
 }

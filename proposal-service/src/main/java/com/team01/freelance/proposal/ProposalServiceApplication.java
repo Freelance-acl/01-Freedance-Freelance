@@ -5,11 +5,13 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.persistence.autoconfigure.EntityScan;
 import org.springframework.cloud.openfeign.EnableFeignClients;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SpringBootApplication(scanBasePackages = {
         "com.team01.freelance.proposal"
 })
 @EnableFeignClients
+@EnableScheduling
 @EnableJpaRepositories(basePackages = {
         "com.team01.freelance.proposal",
         "com.team01.freelance.job",

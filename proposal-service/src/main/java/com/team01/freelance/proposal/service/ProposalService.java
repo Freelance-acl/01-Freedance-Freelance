@@ -52,6 +52,7 @@ import com.team01.freelance.proposal.model.ProposalStatus;
 import com.team01.freelance.proposal.repository.ProposalAnalyticsProjection;
 import com.team01.freelance.proposal.repository.ProposalRepository;
 import com.team01.freelance.proposal.saga.ProposalStateMachine;
+import com.team01.freelance.proposal.saga.SagaTriggerService;
 import com.team01.freelance.user.repository.UserRepository;
 import com.team01.freelance.proposal.security.ProposalAuthSupport;
 
@@ -107,6 +108,9 @@ public class ProposalService {
 
     @Autowired
     private ProposalStateMachine proposalStateMachine;
+
+    @Autowired
+    private SagaTriggerService sagaTriggerService;
 
     @Autowired(required = false)
     private UserServiceClient userServiceClient;
@@ -438,50 +442,11 @@ public class ProposalService {
     }
 
     /**
-     * Completes work for an accepted proposal and publishes proposal.completed.
+     * Completes work for an accepted proposal via the M3 saga trigger.
      */
     @Transactional
     public Proposal completeProposal(Long id) {
-        Proposal proposal = proposalRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Proposal not found with id: " + id));
-
-        if (proposal.getStatus() != ProposalStatus.ACCEPTED) {
-            throw new IllegalArgumentException("Only ACCEPTED proposals can be completed");
-        }
-
-        FeignContractDTO contract = getActiveContractForCompletion(id);
-        if (!"ACTIVE".equalsIgnoreCase(contract.getStatus())) {
-            throw new IllegalArgumentException("No ACTIVE contract found for proposal");
-        }
-        ProposalStatus oldStatus = proposal.getStatus();
-        proposalStateMachine.transition(proposal, ProposalStatus.COMPLETING);
-        Proposal saved = proposalRepository.saveAndFlush(proposal);
-        logProposalTransition(proposal.getId(), oldStatus, ProposalStatus.COMPLETING);
-        if (proposalEventPublisher != null) {
-            proposalEventPublisher.publishProposalCompleted(saved, contract);
-        }
-        return saved;
-    }
-
-    private FeignContractDTO getActiveContractForCompletion(Long proposalId) {
-        if (contractServiceClient != null && usesPostgresDatabase()) {
-            try {
-                return contractServiceClient.getActiveContract(proposalId);
-            } catch (FeignException.NotFound e) {
-                throw new IllegalArgumentException("No ACTIVE contract found for proposal");
-            }
-        }
-        Contract contract = contractRepository.findByProposalId(proposalId)
-                .filter(existing -> existing.getStatus() == ContractStatus.ACTIVE)
-                .orElseThrow(() -> new IllegalArgumentException("No ACTIVE contract found for proposal"));
-        FeignContractDTO dto = new FeignContractDTO();
-        dto.setId(contract.getId());
-        dto.setJobId(contract.getJobId());
-        dto.setFreelancerId(contract.getFreelancerId());
-        dto.setProposalId(contract.getProposalId());
-        dto.setAgreedAmount(contract.getAgreedAmount());
-        dto.setStatus(contract.getStatus().name());
-        return dto;
+        return sagaTriggerService.triggerCompletion(id);
     }
 
     @Transactional
