@@ -5,6 +5,8 @@ import com.team01.freelance.contracts.events.ProposalCompletedEvent;
 import com.team01.freelance.user.repository.UserRepository;
 import com.team01.freelance.wallet.dto.*;
 import com.team01.freelance.wallet.feign.ContractServiceClient;
+import com.team01.freelance.wallet.feign.JobServiceClient;
+import com.team01.freelance.wallet.feign.UserServiceClient;
 import com.team01.freelance.wallet.model.Payout;
 import com.team01.freelance.wallet.model.PayoutPromo;
 import com.team01.freelance.wallet.model.PayoutStatus;
@@ -33,8 +35,11 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.math.BigDecimal;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Collections;
+import feign.FeignException;
 import org.springframework.web.server.ResponseStatusException;
 import com.team01.freelance.wallet.model.DiscountType;
 import java.time.LocalDate;
@@ -77,6 +82,12 @@ public class PayoutService {
 
     @Autowired
     private ContractServiceClient contractServiceClient;
+
+    @Autowired
+    private UserServiceClient userServiceClient;
+
+    @Autowired
+    private JobServiceClient jobServiceClient;
 
     private final List<EntityObserver> observers = new ArrayList<>();
 
@@ -152,6 +163,7 @@ public class PayoutService {
             @CacheEvict(value = "payout", allEntries = true),
             @CacheEvict(value = "S5-F1", allEntries = true),
             @CacheEvict(value = "S5-F3", allEntries = true),
+            @CacheEvict(value = "S5-F3-total", allEntries = true),
             @CacheEvict(value = "S5-F6", allEntries = true),
             @CacheEvict(value = "S5-F8", allEntries = true),
             @CacheEvict(value = "S5-F10", allEntries = true)
@@ -171,6 +183,7 @@ public class PayoutService {
             @CacheEvict(value = "payout", allEntries = true),
             @CacheEvict(value = "S5-F1", allEntries = true),
             @CacheEvict(value = "S5-F3", allEntries = true),
+            @CacheEvict(value = "S5-F3-total", allEntries = true),
             @CacheEvict(value = "S5-F6", allEntries = true),
             @CacheEvict(value = "S5-F8", allEntries = true),
             @CacheEvict(value = "S5-F10", allEntries = true)
@@ -187,6 +200,7 @@ public class PayoutService {
             @CacheEvict(value = "payout", allEntries = true),
             @CacheEvict(value = "S5-F1", allEntries = true),
             @CacheEvict(value = "S5-F3", allEntries = true),
+            @CacheEvict(value = "S5-F3-total", allEntries = true),
             @CacheEvict(value = "S5-F6", allEntries = true),
             @CacheEvict(value = "S5-F8", allEntries = true),
             @CacheEvict(value = "S5-F10", allEntries = true)
@@ -199,6 +213,7 @@ public class PayoutService {
             @CacheEvict(value = "payout", allEntries = true),
             @CacheEvict(value = "S5-F1", allEntries = true),
             @CacheEvict(value = "S5-F3", allEntries = true),
+            @CacheEvict(value = "S5-F3-total", allEntries = true),
             @CacheEvict(value = "S5-F6", allEntries = true),
             @CacheEvict(value = "S5-F8", allEntries = true),
             @CacheEvict(value = "S5-F10", allEntries = true),
@@ -351,7 +366,9 @@ public class PayoutService {
      */
     @Cacheable(value = "S5-F3", key = "#freelancerId")
     public FreelancerPayoutSummaryDTO getFreelancerPayoutSummary(Long freelancerId) {
-        if (!userRepository.existsById(freelancerId)) {
+        try {
+            userServiceClient.getUser(freelancerId);
+        } catch (FeignException.NotFound e) {
             throw new ResponseStatusException(
                     HttpStatus.NOT_FOUND,
                     "User not found with id: " + freelancerId);
@@ -398,6 +415,7 @@ public class PayoutService {
             @CacheEvict(value = "payout", allEntries = true),
             @CacheEvict(value = "S5-F1", allEntries = true),
             @CacheEvict(value = "S5-F3", allEntries = true),
+            @CacheEvict(value = "S5-F3-total", allEntries = true),
             @CacheEvict(value = "S5-F6", allEntries = true),
             @CacheEvict(value = "S5-F8", allEntries = true),
             @CacheEvict(value = "S5-F10", allEntries = true),
@@ -569,6 +587,7 @@ public class PayoutService {
             @CacheEvict(value = "payout", allEntries = true),
             @CacheEvict(value = "S5-F1", allEntries = true),
             @CacheEvict(value = "S5-F3", allEntries = true),
+            @CacheEvict(value = "S5-F3-total", allEntries = true),
             @CacheEvict(value = "S5-F6", allEntries = true),
             @CacheEvict(value = "S5-F8", allEntries = true),
             @CacheEvict(value = "S5-F10", allEntries = true),
@@ -789,6 +808,7 @@ public class PayoutService {
             @CacheEvict(value = "payout", allEntries = true),
             @CacheEvict(value = "S5-F1", allEntries = true),
             @CacheEvict(value = "S5-F3", allEntries = true),
+            @CacheEvict(value = "S5-F3-total", allEntries = true),
             @CacheEvict(value = "S5-F5", allEntries = true),
             @CacheEvict(value = "S5-F6", allEntries = true),
             @CacheEvict(value = "S5-F8", allEntries = true),
@@ -890,7 +910,7 @@ public class PayoutService {
                 .build();
     }
 
-    // [S5-F10] Category revenue analytics
+    // [S5-F10] Category revenue analytics — Feign-based aggregation
     @Cacheable(value = "S5-F10", key = "#startDate.toString() + #endDate.toString()")
     public List<CategoryRevenueDTO> getCategoryRevenue(LocalDate startDate, LocalDate endDate) {
         if (startDate.isAfter(endDate)) {
@@ -905,26 +925,109 @@ public class PayoutService {
         LocalDateTime start = startDate.atStartOfDay();
         LocalDateTime end = endDate.atTime(23, 59, 59, 999_999_999);
 
-        List<Object[]> rows = payoutRepository.aggregateCompletedByCategory(start, end);
-        List<CategoryRevenueDTO> result = new ArrayList<>();
+        List<Payout> payouts = payoutRepository.searchByStatusAndCreatedAtRange("COMPLETED", start, end);
 
-        for (Object[] row : rows) {
-            String category = (String) row[0];
-            double platformFee = row[1] != null ? ((Number) row[1]).doubleValue() : 0.0;
-            double netPayout   = row[2] != null ? ((Number) row[2]).doubleValue() : 0.0;
-            double total       = row[3] != null ? ((Number) row[3]).doubleValue() : 0.0;
-            long   count       = row[4] != null ? ((Number) row[4]).longValue()   : 0L;
+        Map<Long, Long> contractToJob = new HashMap<>();
+        Map<Long, String> jobToCategory = new HashMap<>();
+        // category -> [platformFeeSum, totalAmountSum, payoutCount]
+        Map<String, double[]> categoryData = new LinkedHashMap<>();
+
+        for (Payout payout : payouts) {
+            Long contractId = payout.getContractId();
+            String category = null;
+
+            if (contractId != null) {
+                Long jobId = contractToJob.get(contractId);
+                if (jobId == null) {
+                    try {
+                        ContractDTO contract = contractServiceClient.getContract(contractId);
+                        jobId = contract.getJobId();
+                        if (jobId != null) {
+                            contractToJob.put(contractId, jobId);
+                        }
+                    } catch (Exception e) {
+                        log.warn("Failed to fetch contract {} for category revenue: {}", contractId, e.getMessage());
+                    }
+                }
+
+                if (jobId != null) {
+                    category = jobToCategory.get(jobId);
+                    if (category == null) {
+                        try {
+                            JobDTO job = jobServiceClient.getJobById(jobId);
+                            category = job.getCategory();
+                            if (category != null) {
+                                jobToCategory.put(jobId, category);
+                            }
+                        } catch (Exception e) {
+                            log.warn("Failed to fetch job {} for category revenue: {}", jobId, e.getMessage());
+                        }
+                    }
+                }
+            }
+
+            if (category == null) {
+                category = "UNKNOWN";
+            }
+
+            Object feeObj = payout.getTransactionDetails() != null
+                    ? payout.getTransactionDetails().get("platformFee")
+                    : null;
+            double platformFee = feeObj instanceof Number
+                    ? ((Number) feeObj).doubleValue()
+                    : payout.getAmount() * 0.10;
+
+            double[] stats = categoryData.computeIfAbsent(category, k -> new double[3]);
+            stats[0] += platformFee;
+            stats[1] += payout.getAmount();
+            stats[2]++;
+        }
+
+        List<CategoryRevenueDTO> result = new ArrayList<>();
+        for (Map.Entry<String, double[]> entry : categoryData.entrySet()) {
+            double[] stats = entry.getValue();
+            double platformFeeRevenue = stats[0];
+            double totalRevenue = stats[1];
+            long payoutCount = (long) stats[2];
+            double netPayoutRevenue = totalRevenue - platformFeeRevenue;
 
             result.add(CategoryRevenueDTO.builder()
-                    .category(category)
-                    .platformFeeRevenue(platformFee)
-                    .netPayoutRevenue(netPayout)
-                    .totalRevenue(total)
-                    .payoutCount(count)
+                    .category(entry.getKey())
+                    .platformFeeRevenue(platformFeeRevenue)
+                    .netPayoutRevenue(netPayoutRevenue)
+                    .totalRevenue(totalRevenue)
+                    .payoutCount(payoutCount)
                     .build());
         }
 
         return result;
+    }
+
+    // [S5-F3-total] Sum of COMPLETED payout amounts for a freelancer in a date range
+    @Cacheable(value = "S5-F3-total", key = "#freelancerId + #startDate + #endDate")
+    public BigDecimal getFreelancerPayoutTotal(Long freelancerId, String startDate, String endDate) {
+        LocalDate start;
+        LocalDate end;
+        try {
+            start = LocalDate.parse(startDate);
+            end = LocalDate.parse(endDate);
+        } catch (DateTimeParseException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Invalid date format — expected ISO-8601 (yyyy-MM-dd)");
+        }
+        if (start.isAfter(end)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "startDate cannot be after endDate");
+        }
+        LocalDateTime startDt = start.atStartOfDay();
+        LocalDateTime endDt = end.atTime(23, 59, 59, 999_999_999);
+
+        List<Payout> payouts = payoutRepository.findCompletedByFreelancerIdBetween(freelancerId, startDt, endDt);
+
+        return payouts.stream()
+                .filter(p -> p.getAmount() != null)
+                .map(p -> BigDecimal.valueOf(p.getAmount()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     // Feature [S5-F11]

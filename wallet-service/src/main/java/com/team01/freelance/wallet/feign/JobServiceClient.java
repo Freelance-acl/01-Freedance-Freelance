@@ -1,5 +1,6 @@
 package com.team01.freelance.wallet.feign;
 
+import com.team01.freelance.wallet.dto.JobDTO;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -9,5 +10,5 @@ public interface JobServiceClient {
 
     // S5-F10: get job category for platform fee analytics
     @GetMapping("/api/jobs/{jobId}")
-    Object getJobById(@PathVariable Long jobId);
+    JobDTO getJobById(@PathVariable Long jobId);
 }
