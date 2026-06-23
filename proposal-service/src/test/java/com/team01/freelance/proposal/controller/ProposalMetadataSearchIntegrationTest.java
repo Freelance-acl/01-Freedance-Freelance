@@ -7,25 +7,17 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import com.team01.freelance.proposal.model.Proposal;
+import com.team01.freelance.proposal.model.ProposalStatus;
+import com.team01.freelance.proposal.repository.ProposalRepository;
+import com.team01.freelance.proposal.support.AbstractIntegrationTest;
+import com.team01.freelance.proposal.support.ProposalTestData;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
-
-import com.team01.freelance.job.model.Job;
-import com.team01.freelance.job.model.JobCategory;
-import com.team01.freelance.job.model.JobStatus;
-import com.team01.freelance.job.repository.JobRepository;
-import com.team01.freelance.proposal.model.Proposal;
-import com.team01.freelance.proposal.model.ProposalStatus;
-import com.team01.freelance.proposal.repository.ProposalRepository;
-import com.team01.freelance.proposal.support.AbstractIntegrationTest;
-import com.team01.freelance.user.model.User;
-import com.team01.freelance.user.model.UserRole;
-import com.team01.freelance.user.model.UserStatus;
-import com.team01.freelance.user.repository.UserRepository;
 
 /**
  * [S3-F5] Integration tests for {@code GET /api/proposals/metadata/search}.
@@ -41,33 +33,17 @@ class ProposalMetadataSearchIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private ProposalRepository proposalRepository;
 
-    @Autowired
-    private JobRepository jobRepository;
-
-    @Autowired
-    private UserRepository userRepository;
-
-    private User client;
-    private User freelancer;
-
     @BeforeEach
     void setUp() {
         mockMvc = buildMockMvc(webApplicationContext);
-
-        long suffix = System.nanoTime();
-        client = saveUser("Client", "client-" + suffix + "@test.dev", UserRole.CLIENT);
-        freelancer = saveUser("Freelancer", "freelancer-" + suffix + "@test.dev", UserRole.FREELANCER);
+        proposalRepository.deleteAll();
     }
 
     @Test
     void searchByMetadata_returnsMatchingProposals() throws Exception {
-        Job job1 = saveJob();
-        Job job2 = saveJob();
-        Job job3 = saveJob();
-
-        Proposal agile = saveProposal(job1.getId(), Map.of("approach", "agile"));
-        saveProposal(job2.getId(), Map.of("approach", "waterfall"));
-        saveProposal(job3.getId(), Map.of("approach", "waterfall"));
+        Proposal agile = saveProposal(101L, Map.of("approach", "agile"));
+        saveProposal(102L, Map.of("approach", "waterfall"));
+        saveProposal(103L, Map.of("approach", "waterfall"));
 
         mockMvc.perform(get("/api/proposals/metadata/search")
                         .param("key", "approach")
@@ -94,34 +70,11 @@ class ProposalMetadataSearchIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isBadRequest());
     }
 
-    private User saveUser(String name, String email, UserRole role) {
-        User user = new User();
-        user.setName(name);
-        user.setEmail(email);
-        user.setPassword("secret");
-        user.setPhone("+3000" + (System.nanoTime() % 1_000_000_000L));
-        user.setRole(role);
-        user.setStatus(UserStatus.ACTIVE);
-        return userRepository.save(user);
-    }
-
-    private Job saveJob() {
-        Job job = new Job();
-        job.setClientId(client.getId());
-        job.setTitle("Metadata search job");
-        job.setDescription("Integration test job");
-        job.setCategory(JobCategory.WEB_DEV);
-        job.setStatus(JobStatus.OPEN);
-        job.setBudgetMin(500.0);
-        job.setBudgetMax(5000.0);
-        return jobRepository.save(job);
-    }
-
     private Proposal saveProposal(Long jobId, Map<String, Object> metadata) {
         Map<String, Object> storedMetadata = new LinkedHashMap<>(metadata);
         Proposal proposal = new Proposal();
         proposal.setJobId(jobId);
-        proposal.setFreelancerId(freelancer.getId());
+        proposal.setFreelancerId(ProposalTestData.FREELANCER_ID);
         proposal.setCoverLetter("Metadata test proposal");
         proposal.setBidAmount(2000.0);
         proposal.setEstimatedDays(14);

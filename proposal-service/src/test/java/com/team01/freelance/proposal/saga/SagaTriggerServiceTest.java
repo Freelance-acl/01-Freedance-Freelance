@@ -9,31 +9,28 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.team01.freelance.contract.model.Contract;
-import com.team01.freelance.contract.model.ContractStatus;
-import com.team01.freelance.contract.repository.ContractRepository;
-import com.team01.freelance.job.model.Job;
-import com.team01.freelance.job.model.JobStatus;
-import com.team01.freelance.job.repository.JobRepository;
 import com.team01.freelance.proposal.dto.FeignContractDTO;
+import com.team01.freelance.proposal.dto.FeignJobDTO;
+import com.team01.freelance.proposal.dto.FeignUserDTO;
+import com.team01.freelance.proposal.feign.ContractServiceClient;
+import com.team01.freelance.proposal.feign.JobServiceClient;
+import com.team01.freelance.proposal.feign.UserServiceClient;
 import com.team01.freelance.proposal.messaging.ProposalEventPublisher;
 import com.team01.freelance.proposal.model.Proposal;
 import com.team01.freelance.proposal.model.ProposalStatus;
 import com.team01.freelance.proposal.repository.ProposalRepository;
-import com.team01.freelance.user.model.User;
-import com.team01.freelance.user.model.UserRole;
-import com.team01.freelance.user.model.UserStatus;
-import com.team01.freelance.user.repository.UserRepository;
+import com.team01.freelance.proposal.support.FeignTestFixtures;
+import feign.FeignException;
+import feign.Request;
+import feign.RequestTemplate;
+import java.util.Collections;
 import java.util.Optional;
-import javax.sql.DataSource;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class SagaTriggerServiceTest {
@@ -45,16 +42,13 @@ class SagaTriggerServiceTest {
     private ProposalStateMachine stateMachine = new ProposalStateMachine();
 
     @Mock
-    private JobRepository jobRepository;
+    private JobServiceClient jobServiceClient;
 
     @Mock
-    private UserRepository userRepository;
+    private UserServiceClient userServiceClient;
 
     @Mock
-    private ContractRepository contractRepository;
-
-    @Mock
-    private DataSource dataSource;
+    private ContractServiceClient contractServiceClient;
 
     @Mock
     private ProposalEventPublisher proposalEventPublisher;
@@ -62,22 +56,16 @@ class SagaTriggerServiceTest {
     @InjectMocks
     private SagaTriggerService sagaTriggerService;
 
-    @BeforeEach
-    void setUp() {
-        ReflectionTestUtils.setField(sagaTriggerService, "proposalEventPublisher", proposalEventPublisher);
-    }
-
     @Test
-    void triggerCompletion_setsCompletingAndPublishesEvent() throws Exception {
+    void triggerCompletion_setsCompletingAndPublishesEvent() {
         Proposal proposal = acceptedProposal();
-        Contract contract = activeContract();
+        FeignContractDTO contract = FeignTestFixtures.activeContract(20L, 5L, 2000.0);
 
         when(proposalRepository.findById(5L)).thenReturn(Optional.of(proposal));
-        when(jobRepository.findById(7L)).thenReturn(Optional.of(openJob()));
-        when(userRepository.findById(30L)).thenReturn(Optional.of(activeFreelancer()));
-        when(contractRepository.findByProposalId(5L)).thenReturn(Optional.of(contract));
+        when(jobServiceClient.getJob(7L)).thenReturn(FeignTestFixtures.openJob(7L, 1L));
+        when(userServiceClient.getUser(30L)).thenReturn(FeignTestFixtures.activeFreelancer(30L));
+        when(contractServiceClient.getActiveContract(5L)).thenReturn(contract);
         when(proposalRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
-        stubNonPostgresDatabase();
 
         Proposal result = sagaTriggerService.triggerCompletion(5L);
 
@@ -99,14 +87,12 @@ class SagaTriggerServiceTest {
     }
 
     @Test
-    void triggerCompletion_rejectsClosedJob() throws Exception {
+    void triggerCompletion_rejectsClosedJob() {
         Proposal proposal = acceptedProposal();
-        Job job = openJob();
-        job.setStatus(JobStatus.CLOSED);
+        FeignJobDTO closedJob = FeignTestFixtures.jobWithStatus(7L, 1L, "CLOSED");
 
         when(proposalRepository.findById(5L)).thenReturn(Optional.of(proposal));
-        when(jobRepository.findById(7L)).thenReturn(Optional.of(job));
-        stubNonPostgresDatabase();
+        when(jobServiceClient.getJob(7L)).thenReturn(closedJob);
 
         assertThatThrownBy(() -> sagaTriggerService.triggerCompletion(5L))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -116,15 +102,14 @@ class SagaTriggerServiceTest {
     }
 
     @Test
-    void triggerCompletion_rejectsDeactivatedFreelancer() throws Exception {
+    void triggerCompletion_rejectsDeactivatedFreelancer() {
         Proposal proposal = acceptedProposal();
-        User freelancer = activeFreelancer();
-        freelancer.setStatus(UserStatus.DEACTIVATED);
+        FeignUserDTO deactivated = FeignTestFixtures.activeFreelancer(30L);
+        deactivated.setStatus("DEACTIVATED");
 
         when(proposalRepository.findById(5L)).thenReturn(Optional.of(proposal));
-        when(jobRepository.findById(7L)).thenReturn(Optional.of(openJob()));
-        when(userRepository.findById(30L)).thenReturn(Optional.of(freelancer));
-        stubNonPostgresDatabase();
+        when(jobServiceClient.getJob(7L)).thenReturn(FeignTestFixtures.openJob(7L, 1L));
+        when(userServiceClient.getUser(30L)).thenReturn(deactivated);
 
         assertThatThrownBy(() -> sagaTriggerService.triggerCompletion(5L))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -134,14 +119,13 @@ class SagaTriggerServiceTest {
     }
 
     @Test
-    void triggerCompletion_requiresActiveContract() throws Exception {
+    void triggerCompletion_requiresActiveContract() {
         Proposal proposal = acceptedProposal();
 
         when(proposalRepository.findById(5L)).thenReturn(Optional.of(proposal));
-        when(jobRepository.findById(7L)).thenReturn(Optional.of(openJob()));
-        when(userRepository.findById(30L)).thenReturn(Optional.of(activeFreelancer()));
-        when(contractRepository.findByProposalId(5L)).thenReturn(Optional.empty());
-        stubNonPostgresDatabase();
+        when(jobServiceClient.getJob(7L)).thenReturn(FeignTestFixtures.openJob(7L, 1L));
+        when(userServiceClient.getUser(30L)).thenReturn(FeignTestFixtures.activeFreelancer(30L));
+        when(contractServiceClient.getActiveContract(5L)).thenThrow(notFound());
 
         assertThatThrownBy(() -> sagaTriggerService.triggerCompletion(5L))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -150,12 +134,10 @@ class SagaTriggerServiceTest {
         verify(proposalEventPublisher, never()).publishProposalCompleted(any(), any());
     }
 
-    private void stubNonPostgresDatabase() throws Exception {
-        var connection = org.mockito.Mockito.mock(java.sql.Connection.class);
-        var metadata = org.mockito.Mockito.mock(java.sql.DatabaseMetaData.class);
-        when(dataSource.getConnection()).thenReturn(connection);
-        when(connection.getMetaData()).thenReturn(metadata);
-        when(metadata.getDatabaseProductName()).thenReturn("H2");
+    private static FeignException.NotFound notFound() {
+        Request request = Request.create(
+                Request.HttpMethod.GET, "/test", Collections.emptyMap(), null, new RequestTemplate());
+        return new FeignException.NotFound("not found", request, null, null);
     }
 
     private static Proposal acceptedProposal() {
@@ -165,29 +147,5 @@ class SagaTriggerServiceTest {
         proposal.setFreelancerId(30L);
         proposal.setStatus(ProposalStatus.ACCEPTED);
         return proposal;
-    }
-
-    private static Job openJob() {
-        Job job = new Job();
-        job.setId(7L);
-        job.setStatus(JobStatus.IN_PROGRESS);
-        return job;
-    }
-
-    private static User activeFreelancer() {
-        User user = new User();
-        user.setId(30L);
-        user.setStatus(UserStatus.ACTIVE);
-        user.setRole(UserRole.FREELANCER);
-        return user;
-    }
-
-    private static Contract activeContract() {
-        Contract contract = new Contract();
-        contract.setId(20L);
-        contract.setProposalId(5L);
-        contract.setAgreedAmount(2000.0);
-        contract.setStatus(ContractStatus.ACTIVE);
-        return contract;
     }
 }

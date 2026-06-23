@@ -1,17 +1,10 @@
 package com.team01.freelance.proposal.controller;
 
-import com.team01.freelance.job.model.Job;
-import com.team01.freelance.job.model.JobCategory;
-import com.team01.freelance.job.model.JobStatus;
-import com.team01.freelance.job.repository.JobRepository;
 import com.team01.freelance.proposal.model.Proposal;
 import com.team01.freelance.proposal.model.ProposalStatus;
 import com.team01.freelance.proposal.repository.ProposalRepository;
 import com.team01.freelance.proposal.support.AbstractIntegrationTest;
-import com.team01.freelance.user.model.User;
-import com.team01.freelance.user.model.UserRole;
-import com.team01.freelance.user.model.UserStatus;
-import com.team01.freelance.user.repository.UserRepository;
+import com.team01.freelance.proposal.support.ProposalTestData;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,41 +30,10 @@ class ProposalAnalyticsIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private ProposalRepository proposalRepository;
 
-    @Autowired
-    private JobRepository jobRepository;
-
-    @Autowired
-    private UserRepository userRepository;
-
-    private Job job;
-    private User freelancer;
-
     @BeforeEach
     void setUp() {
         mockMvc = buildMockMvc(webApplicationContext);
-
         proposalRepository.deleteAll();
-        jobRepository.deleteAll();
-        userRepository.deleteAll();
-
-        job = new Job();
-        job.setClientId(1L);
-        job.setTitle("Analytics job");
-        job.setDescription("Desc");
-        job.setCategory(JobCategory.WEB_DEV);
-        job.setStatus(JobStatus.OPEN);
-        job.setBudgetMin(100.0);
-        job.setBudgetMax(10000.0);
-        job = jobRepository.save(job);
-
-        freelancer = new User();
-        freelancer.setName("Analytics Freelancer");
-        freelancer.setEmail("analytics-" + System.nanoTime() + "@test.dev");
-        freelancer.setPassword("secret");
-        freelancer.setPhone("+6000" + (System.nanoTime() % 1_000_000_000L));
-        freelancer.setRole(UserRole.FREELANCER);
-        freelancer.setStatus(UserStatus.ACTIVE);
-        freelancer = userRepository.save(freelancer);
     }
 
     @Test
@@ -111,8 +73,8 @@ class ProposalAnalyticsIntegrationTest extends AbstractIntegrationTest {
 
     private void saveProposal(ProposalStatus status, double bidAmount, LocalDateTime submittedAt) {
         Proposal proposal = new Proposal();
-        proposal.setJobId(job.getId());
-        proposal.setFreelancerId(freelancer.getId());
+        proposal.setJobId(ProposalTestData.JOB_ID);
+        proposal.setFreelancerId(ProposalTestData.FREELANCER_ID);
         proposal.setCoverLetter("Analytics letter");
         proposal.setBidAmount(bidAmount);
         proposal.setEstimatedDays(7);

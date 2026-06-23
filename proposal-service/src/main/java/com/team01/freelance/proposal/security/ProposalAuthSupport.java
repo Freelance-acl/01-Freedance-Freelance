@@ -2,7 +2,7 @@ package com.team01.freelance.proposal.security;
 
 import org.springframework.stereotype.Component;
 
-import com.team01.freelance.user.service.JwtService;
+import com.team01.freelance.proposal.config.security.JwtService;
 
 import jakarta.servlet.http.HttpServletRequest;
 
