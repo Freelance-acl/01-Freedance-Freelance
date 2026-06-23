@@ -7,18 +7,26 @@ import com.team01.freelance.user.model.User;
 import com.team01.freelance.user.model.UserRole;
 import com.team01.freelance.user.model.UserStatus;
 import com.team01.freelance.user.repository.UserRepository;
+import com.team01.freelance.wallet.dto.UserDTO;
+import com.team01.freelance.wallet.feign.UserServiceClient;
 import com.team01.freelance.wallet.model.Payout;
 import com.team01.freelance.wallet.model.PayoutMethod;
 import com.team01.freelance.wallet.model.PayoutStatus;
 import com.team01.freelance.wallet.repository.PayoutRepository;
 import com.team01.freelance.wallet.support.AbstractIntegrationTest;
+import feign.FeignException;
 import org.junit.jupiter.api.BeforeEach;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
+
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.time.LocalDateTime;
 
@@ -40,6 +48,9 @@ class FreelancerPayoutSummaryIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private WebApplicationContext webApplicationContext;
 
+    @MockitoBean
+    private UserServiceClient userServiceClient;
+
     @Autowired
     private PayoutRepository payoutRepository;
 
@@ -55,6 +66,9 @@ class FreelancerPayoutSummaryIntegrationTest extends AbstractIntegrationTest {
     @BeforeEach
     void setUp() {
         mockMvc = buildMockMvc(webApplicationContext);
+
+        when(userServiceClient.getUser(anyLong())).thenReturn(new UserDTO());
+        when(userServiceClient.getUser(999_999L)).thenThrow(mock(FeignException.NotFound.class));
 
         User client = saveUser("Client", UserRole.CLIENT);
         freelancer = saveUser("Freelancer", UserRole.FREELANCER);

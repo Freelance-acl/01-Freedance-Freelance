@@ -3,7 +3,9 @@ package com.team01.freelance.wallet.service;
 import com.team01.freelance.contract.repository.ContractRepository;
 import com.team01.freelance.user.repository.UserRepository;
 import com.team01.freelance.wallet.dto.FreelancerPayoutSummaryDTO;
+import com.team01.freelance.wallet.feign.UserServiceClient;
 import com.team01.freelance.wallet.repository.PayoutRepository;
+import feign.FeignException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
@@ -18,6 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -36,6 +39,9 @@ class PayoutServiceTest {
     @Mock
     private ContractRepository contractRepository;
 
+    @Mock
+    private UserServiceClient userServiceClient;
+
     @InjectMocks
     private PayoutService payoutService;
 
@@ -52,7 +58,6 @@ class PayoutServiceTest {
     @Test
     void getFreelancerPayoutSummary_returnsBreakdownAndTotals() {
         Long freelancerId = 1L;
-        when(userRepository.existsById(freelancerId)).thenReturn(true);
         when(payoutRepository.aggregateCompletedByMethodForFreelancer(freelancerId))
                 .thenReturn(List.of(
                         new Object[]{"BANK_TRANSFER", 2L, 3500.0},
@@ -73,7 +78,7 @@ class PayoutServiceTest {
         assertEquals(800.0,  breakdown.get("PAYPAL"));
         assertEquals(500.0,  breakdown.get("CRYPTO"));
 
-        verify(userRepository).existsById(freelancerId);
+        verify(userServiceClient).getUser(freelancerId);
         verify(payoutRepository).aggregateCompletedByMethodForFreelancer(freelancerId);
     }
 
@@ -81,7 +86,6 @@ class PayoutServiceTest {
     @Test
     void getFreelancerPayoutSummary_noPayouts_returnsZeroes() {
         Long freelancerId = 5L;
-        when(userRepository.existsById(freelancerId)).thenReturn(true);
         when(payoutRepository.aggregateCompletedByMethodForFreelancer(freelancerId))
                 .thenReturn(List.of());
 
@@ -97,14 +101,14 @@ class PayoutServiceTest {
     @Test
     void getFreelancerPayoutSummary_userNotFound_throws404() {
         Long freelancerId = 9999L;
-        when(userRepository.existsById(freelancerId)).thenReturn(false);
+        when(userServiceClient.getUser(freelancerId)).thenThrow(mock(FeignException.NotFound.class));
 
         ResponseStatusException ex = assertThrows(
                 ResponseStatusException.class,
                 () -> payoutService.getFreelancerPayoutSummary(freelancerId));
 
         assertEquals(404, ex.getStatusCode().value());
-        verify(userRepository).existsById(freelancerId);
+        verify(userServiceClient).getUser(freelancerId);
         verify(payoutRepository, never()).aggregateCompletedByMethodForFreelancer(freelancerId);
     }
 
@@ -115,7 +119,6 @@ class PayoutServiceTest {
     @Test
     void getFreelancerPayoutSummary_handlesNumericTypeVariance() {
         Long freelancerId = 7L;
-        when(userRepository.existsById(freelancerId)).thenReturn(true);
         when(payoutRepository.aggregateCompletedByMethodForFreelancer(freelancerId))
                 .thenReturn(List.<Object[]>of(
                         new Object[]{"BANK_TRANSFER", java.math.BigInteger.valueOf(2),
