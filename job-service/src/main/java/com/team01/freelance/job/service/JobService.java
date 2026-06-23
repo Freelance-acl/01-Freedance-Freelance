@@ -14,7 +14,7 @@ import com.team01.freelance.job.feign.dto.ProposalJobSummaryByJobResponse;
 import com.team01.freelance.job.feign.dto.ProposalJobSummaryResponse;
 import com.team01.freelance.job.event.JobEventTypes;
 import com.team01.freelance.job.exception.ForbiddenOperationException;
-import com.team01.freelance.job.messaging.JobEventPublisher;
+import com.team01.freelance.job.messaging.publishers.JobEventPublisher;
 import com.team01.freelance.job.model.JobAttachmentAlertDTO;
 import com.team01.freelance.job.model.JobAttachment;
 import com.team01.freelance.job.model.JobAttachmentVerificationRequest;

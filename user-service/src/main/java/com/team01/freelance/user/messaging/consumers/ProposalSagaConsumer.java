@@ -1,4 +1,4 @@
-package com.team01.freelance.user.messaging;
+package com.team01.freelance.user.messaging.consumers;
 
 import com.team01.freelance.contracts.events.ProposalCancelledEvent;
 import com.team01.freelance.contracts.events.ProposalCompletedEvent;

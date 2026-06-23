@@ -107,6 +107,27 @@
             <version>0.0.1-SNAPSHOT</version>
         </dependency>
 
+        <!-- test-only: allows integration tests to seed user/job data in H2 -->
+        <dependency>
+            <groupId>com.team01.freelance</groupId>
+            <artifactId>user-service</artifactId>
+            <version>0.0.1-SNAPSHOT</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.team01.freelance</groupId>
+            <artifactId>user-service</artifactId>
+            <version>0.0.1-SNAPSHOT</version>
+            <classifier>tests</classifier>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.team01.freelance</groupId>
+            <artifactId>job-service</artifactId>
+            <version>0.0.1-SNAPSHOT</version>
+            <scope>test</scope>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.cloud</groupId>
             <artifactId>spring-cloud-starter-openfeign</artifactId>

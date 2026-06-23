@@ -3,7 +3,7 @@ package com.team01.freelance.contract.service;
 import com.team01.freelance.contract.model.Contract;
 import com.team01.freelance.contract.feign.UserServiceClient;
 import com.team01.freelance.contract.repository.ContractRepository;
-import com.team01.freelance.user.model.User;
+import com.team01.freelance.contract.dto.UserDTO;
 import feign.FeignException;
 import feign.Request;
 import jakarta.persistence.EntityNotFoundException;
@@ -49,7 +49,7 @@ class ContractServiceF1Test {
         Contract contract = new Contract();
         contract.setId(77L);
 
-        when(userServiceClient.getUser(10L)).thenReturn(new User());
+        when(userServiceClient.getUser(10L)).thenReturn(new UserDTO());
         when(contractRepository.findMostRecentActiveContractForUser(10L)).thenReturn(Optional.of(contract));
 
         Contract result = contractService.getActiveContractForUser(10L);

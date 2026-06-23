@@ -1,6 +1,6 @@
 package com.team01.freelance.wallet.config;
 
-import com.team01.freelance.common.observer.EventSubject;
+import com.team01.freelance.wallet.event.EventSubject;
 import com.team01.freelance.wallet.support.TestPayoutEventObserver;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

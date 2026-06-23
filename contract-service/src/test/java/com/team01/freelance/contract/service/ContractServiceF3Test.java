@@ -6,8 +6,8 @@ import com.team01.freelance.contract.feign.UserServiceClient;
 import com.team01.freelance.contract.model.Contract;
 import com.team01.freelance.contract.model.ContractStatus;
 import com.team01.freelance.contract.repository.ContractRepository;
-import com.team01.freelance.job.model.Job;
-import com.team01.freelance.user.model.User;
+import com.team01.freelance.contract.dto.JobDTO;
+import com.team01.freelance.contract.dto.UserDTO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -61,9 +61,9 @@ class ContractServiceF3Test {
         contract.setStatus(ContractStatus.ACTIVE);
         contract.setStartDate(start);
         contract.setEndDate(end);
-        User user = new User();
+        UserDTO user = new UserDTO();
         user.setName("Nour");
-        Job job = new Job();
+        JobDTO job = new JobDTO();
         job.setTitle("Backend API");
         when(contractRepository.searchContracts(2000.0, 6000.0, "ACTIVE"))
                 .thenReturn(List.of(contract));

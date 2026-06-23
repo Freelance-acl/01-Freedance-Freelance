@@ -5,7 +5,7 @@ import com.team01.freelance.user.dto.AuthResponse;
 import com.team01.freelance.user.dto.LoginRequest;
 import com.team01.freelance.user.dto.RegisterRequest;
 import com.team01.freelance.user.model.User;
-import com.team01.freelance.user.messaging.UserEventPublisher;
+import com.team01.freelance.user.messaging.publishers.UserEventPublisher;
 import com.team01.freelance.user.repository.UserRepository;
 import com.team01.freelance.user.model.UserRole;
 

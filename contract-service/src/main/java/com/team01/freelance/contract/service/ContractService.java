@@ -12,7 +12,7 @@ import com.team01.freelance.contract.dto.FreelancerPerformanceDTO;
 import com.team01.freelance.contract.dto.StalledContractDTO;
 import com.team01.freelance.contract.feign.JobServiceClient;
 import com.team01.freelance.contract.feign.UserServiceClient;
-import com.team01.freelance.contract.messaging.ContractEventPublisher;
+import com.team01.freelance.contract.messaging.publishers.ContractEventPublisher;
 import com.team01.freelance.contract.milestone.ContractMilestoneEvent;
 import com.team01.freelance.contract.milestone.ContractMilestoneStatus;
 import com.team01.freelance.contract.milestone.ContractMilestoneTimelineRepository;

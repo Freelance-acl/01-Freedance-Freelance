@@ -5,8 +5,8 @@ import com.team01.freelance.contract.feign.UserServiceClient;
 import com.team01.freelance.contract.model.Contract;
 import com.team01.freelance.contract.model.ContractStatus;
 import com.team01.freelance.contract.repository.ContractRepository;
-import com.team01.freelance.user.dto.UserContractSummaryDTO;
-import com.team01.freelance.user.model.User;
+import com.team01.freelance.contract.dto.UserContractSummaryDTO;
+import com.team01.freelance.contract.dto.UserDTO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -68,7 +68,7 @@ class ContractServiceClientFallbackTest {
     @Test
     void searchContractsFallsBackToLocalJobTitleWhenJobServiceReadFails() {
         Contract contract = contract(1L, 10L, 20L);
-        User user = new User();
+        UserDTO user = new UserDTO();
         user.setName("Remote Freelancer");
 
         when(contractRepository.searchContracts(100.0, 2000.0, "ACTIVE")).thenReturn(List.of(contract));

@@ -1,4 +1,4 @@
-package com.team01.freelance.proposal.messaging;
+package com.team01.freelance.proposal.messaging.consumers;
 
 import com.team01.freelance.contracts.events.ContractCreatedEvent;
 import com.team01.freelance.contracts.events.ContractStatusChangedEvent;
