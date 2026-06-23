@@ -3,22 +3,16 @@ package com.team01.freelance.proposal.controller;
 import com.team01.freelance.proposal.support.cc1.Cc1EndpointScanner;
 import com.team01.freelance.proposal.support.cc1.Cc1EndpointScanner.Endpoint;
 import com.team01.freelance.proposal.support.cc1.Cc1PublicEndpoints;
-import com.team01.freelance.user.config.JwtConfig;
-import com.team01.freelance.user.model.User;
-import com.team01.freelance.user.repository.UserRepository;
-import com.team01.freelance.user.service.JwtService;
-import com.team01.freelance.user.support.JwtTestSupport;
-import com.team01.freelance.user.support.TestAuthHelper;
-import com.team01.freelance.user.support.UserTestFixtures;
+import com.team01.freelance.proposal.config.security.JwtConfig;
+import com.team01.freelance.proposal.config.security.JwtService;
+import com.team01.freelance.proposal.support.ProposalJwtTestSupport;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationContext;
-import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
@@ -31,10 +25,7 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
@@ -46,8 +37,6 @@ class Cc1JwtSecurityIntegrationTest {
     private WebApplicationContext webApplicationContext;
     @Autowired
     private ApplicationContext applicationContext;
-    @Autowired
-    private UserRepository userRepository;
     @Autowired
     private JwtService jwtService;
     @Autowired
@@ -88,10 +77,9 @@ class Cc1JwtSecurityIntegrationTest {
 
     @Test
     void protectedEndpoint_withExpiredToken_returns401() throws Exception {
-        User admin = UserTestFixtures.seedAdmin(userRepository);
-        String expired = JwtTestSupport.expiredToken(admin, jwtConfig);
+        String expired = ProposalJwtTestSupport.expiredToken("admin@freelance.com", 1L, "ADMIN");
         Endpoint sample = endpoints.stream().filter(e -> !e.isPublic()).findFirst().orElseThrow();
-        mockMvc.perform(Cc1EndpointScanner.mockRequest(sample).header("Authorization", TestAuthHelper.bearer(expired)))
+        mockMvc.perform(Cc1EndpointScanner.mockRequest(sample).header("Authorization", ProposalJwtTestSupport.bearer(expired)))
                 .andExpect(status().isUnauthorized());
     }
 

@@ -4,6 +4,7 @@ import com.team01.freelance.contract.dto.FreelancerPerformanceDTO;
 import com.team01.freelance.contract.dto.StalledContractDTO;
 import com.team01.freelance.contract.model.Contract;
 import com.team01.freelance.contract.service.ContractService;
+import com.team01.freelance.user.dto.UserContractSummaryDTO;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -26,6 +27,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 
 class ContractControllerTest {
 
@@ -144,5 +146,60 @@ class ContractControllerTest {
                         .param("maxProgress", "50")
                         .param("stalledDays", "7"))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void providerUserSummaryReturnsOk() throws Exception {
+        UserContractSummaryDTO summary = UserContractSummaryDTO.builder()
+                .userId(10L)
+                .name("Freelancer")
+                .totalContracts(3L)
+                .completedContracts(2L)
+                .terminatedContracts(1L)
+                .totalEarnings(2500.0)
+                .averageContractValue(833.3333333333334)
+                .build();
+        when(contractService.getUserContractSummary(10L)).thenReturn(summary);
+
+        mockMvc.perform(get("/api/contracts/user/{id}/summary", 10L))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.userId").value(10))
+                .andExpect(jsonPath("$.completedContracts").value(2));
+    }
+
+    @Test
+    void providerUserActiveCountReturnsOk() throws Exception {
+        when(contractService.getActiveContractCountForUser(10L)).thenReturn(2);
+
+        mockMvc.perform(get("/api/contracts/user/{id}/active-count", 10L))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").value(2));
+    }
+
+    @Test
+    void providerUserCompletedCountReturnsOk() throws Exception {
+        when(contractService.getCompletedContractCountForUser(10L)).thenReturn(4L);
+
+        mockMvc.perform(get("/api/contracts/user/{id}/completed-count", 10L))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").value(4));
+    }
+
+    @Test
+    void providerJobActiveCountReturnsOk() throws Exception {
+        when(contractService.getActiveContractCountForJob(20L)).thenReturn(1);
+
+        mockMvc.perform(get("/api/contracts/job/{jobId}/active-count", 20L))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").value(1));
+    }
+
+    @Test
+    void providerProposalActiveReturns404WhenNoneExists() throws Exception {
+        when(contractService.getActiveContractForProposal(30L))
+                .thenThrow(new EntityNotFoundException("not found"));
+
+        mockMvc.perform(get("/api/contracts/proposal/{proposalId}/active", 30L))
+                .andExpect(status().isNotFound());
     }
 }

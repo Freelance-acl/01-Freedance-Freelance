@@ -1,5 +1,7 @@
 package com.team01.freelance.proposal.messaging;
 
+import com.team01.freelance.contracts.events.ContractCreatedEvent;
+import com.team01.freelance.contracts.events.ContractStatusChangedEvent;
 import com.team01.freelance.contracts.events.PaymentCompletedEvent;
 import com.team01.freelance.contracts.events.PaymentFailedEvent;
 import com.team01.freelance.contracts.events.PaymentInitiatedEvent;
@@ -25,7 +27,11 @@ public class ProposalSagaConsumer {
     @RabbitListener(queues = RabbitMQConfig.QUEUE)
     public void handle(Object event) {
         try {
-            if (event instanceof PaymentInitiatedEvent paymentInitiated) {
+            if (event instanceof ContractCreatedEvent contractCreated) {
+                proposalService.handleContractCreated(contractCreated);
+            } else if (event instanceof ContractStatusChangedEvent contractStatusChanged) {
+                proposalService.handleContractStatusChanged(contractStatusChanged);
+            } else if (event instanceof PaymentInitiatedEvent paymentInitiated) {
                 proposalService.handlePaymentInitiated(paymentInitiated);
             } else if (event instanceof PaymentCompletedEvent paymentCompleted) {
                 proposalService.handlePaymentCompleted(paymentCompleted);

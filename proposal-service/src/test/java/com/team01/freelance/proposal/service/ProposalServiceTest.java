@@ -1,35 +1,33 @@
 package com.team01.freelance.proposal.service;
 
-import com.team01.freelance.contract.model.Contract;
-import com.team01.freelance.contract.model.ContractStatus;
 import com.team01.freelance.common.observer.EventSubject;
-import com.team01.freelance.contract.repository.ContractRepository;
 import com.team01.freelance.contracts.events.PaymentFailedEvent;
 import com.team01.freelance.proposal.dto.FeeEstimateDTO;
-import com.team01.freelance.job.model.Job;
+import com.team01.freelance.proposal.dto.FeignUserDTO;
 import com.team01.freelance.proposal.dto.ProposalDetailsDTO;
+import com.team01.freelance.proposal.feign.JobServiceClient;
+import com.team01.freelance.proposal.feign.UserServiceClient;
 import com.team01.freelance.proposal.model.MilestoneStatus;
 import com.team01.freelance.proposal.dto.ProposalAnalyticsDTO;
 import com.team01.freelance.proposal.messaging.ProposalEventPublisher;
 import com.team01.freelance.proposal.model.Proposal;
+import com.team01.freelance.proposal.security.ProposalAuthSupport;
 import com.team01.freelance.proposal.model.ProposalMilestone;
 import com.team01.freelance.proposal.model.ProposalStatus;
-import com.team01.freelance.wallet.repository.PayoutRepository;
-import com.team01.freelance.contract.repository.ContractRepository;
-import com.team01.freelance.proposal.model.MilestoneStatus;
 import com.team01.freelance.proposal.repository.ProposalAnalyticsProjection;
 import com.team01.freelance.proposal.repository.ProposalRepository;
-import com.team01.freelance.user.model.User;
-import com.team01.freelance.user.model.UserRole;
-import com.team01.freelance.user.model.UserStatus;
-import com.team01.freelance.job.repository.JobRepository;
-import com.team01.freelance.user.repository.UserRepository;
+import com.team01.freelance.proposal.saga.ProposalStateMachine;
+import com.team01.freelance.proposal.saga.SagaTriggerService;
+import feign.FeignException;
+import feign.Request;
+import feign.RequestTemplate;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import javax.sql.DataSource;
@@ -38,6 +36,7 @@ import java.sql.DatabaseMetaData;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -48,7 +47,6 @@ import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
-import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -62,17 +60,19 @@ class ProposalServiceTest {
     @Mock
     private EventSubject proposalEventSubject;
     @Mock
-    private JobRepository jobRepository;
+    private UserServiceClient userServiceClient;
     @Mock
-    private UserRepository userRepository;
-    @Mock
-    private ContractRepository contractRepository;
-    @Mock
-    private PayoutRepository payoutRepository;
+    private JobServiceClient jobServiceClient;
     @Mock
     private DataSource dataSource;
     @Mock
     private ProposalEventPublisher proposalEventPublisher;
+    @Mock
+    private SagaTriggerService sagaTriggerService;
+    @Mock
+    private ProposalAuthSupport proposalAuthSupport;
+    @Spy
+    private ProposalStateMachine proposalStateMachine = new ProposalStateMachine();
 
     @InjectMocks
     private ProposalService proposalService;
@@ -148,7 +148,7 @@ class ProposalServiceTest {
 
         assertThat(result.getStatus()).isEqualTo(ProposalStatus.PAYMENT_FAILED);
         verify(proposalRepository).saveAndFlush(proposal);
-        verify(proposalEventPublisher).publishProposalCancelled(proposal);
+        verify(proposalEventPublisher).publishProposalCancelled(proposal, "unsupported payout method");
     }
 
     @Test
@@ -209,7 +209,7 @@ class ProposalServiceTest {
         proposal.setStatus(ProposalStatus.SUBMITTED);
 
         when(proposalRepository.findById(10L)).thenReturn(Optional.of(proposal));
-        when(userRepository.findById(30L)).thenReturn(Optional.of(user(30L, UserRole.FREELANCER)));
+        when(userServiceClient.getUser(30L)).thenReturn(freelancerUser(30L, "FREELANCER"));
         when(proposalRepository.save(any(Proposal.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         Proposal result = proposalService.acceptProposal(10L);
@@ -217,9 +217,6 @@ class ProposalServiceTest {
         assertThat(result.getStatus()).isEqualTo(ProposalStatus.ACCEPTED);
         assertThat(result.getAcceptedAt()).isNotNull();
         verify(proposalEventPublisher).publishProposalAccepted(result);
-        verify(jobRepository, never()).markJobInProgress(anyLong());
-        verify(contractRepository, never()).insertActiveContract(
-                anyLong(), anyLong(), anyLong(), anyLong(), anyDouble(), any(LocalDateTime.class));
     }
 
     @Test
@@ -233,7 +230,7 @@ class ProposalServiceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("SUBMITTED or SHORTLISTED");
 
-        verify(userRepository, never()).findRoleByUserId(any());
+        verify(userServiceClient, never()).getUser(anyLong());
     }
 
     @Test
@@ -243,7 +240,7 @@ class ProposalServiceTest {
         proposal.setFreelancerId(30L);
         proposal.setStatus(ProposalStatus.SUBMITTED);
         when(proposalRepository.findById(10L)).thenReturn(Optional.of(proposal));
-        when(userRepository.findById(30L)).thenReturn(Optional.empty());
+        when(userServiceClient.getUser(30L)).thenThrow(notFound());
 
         assertThatThrownBy(() -> proposalService.acceptProposal(10L))
                 .isInstanceOf(EntityNotFoundException.class)
@@ -257,7 +254,7 @@ class ProposalServiceTest {
         proposal.setFreelancerId(30L);
         proposal.setStatus(ProposalStatus.SUBMITTED);
         when(proposalRepository.findById(10L)).thenReturn(Optional.of(proposal));
-        when(userRepository.findById(30L)).thenReturn(Optional.of(user(30L, UserRole.CLIENT)));
+        when(userServiceClient.getUser(30L)).thenReturn(freelancerUser(30L, "CLIENT"));
 
         assertThatThrownBy(() -> proposalService.acceptProposal(10L))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -359,16 +356,19 @@ class ProposalServiceTest {
         return milestone;
     }
 
-    private User user(Long id, UserRole role) {
-        User user = new User();
+    private FeignUserDTO freelancerUser(Long id, String role) {
+        FeignUserDTO user = new FeignUserDTO();
         user.setId(id);
         user.setName("Test User " + id);
-        user.setEmail("user-" + id + "@test.dev");
-        user.setPassword("secret");
-        user.setPhone("+1000" + id);
         user.setRole(role);
-        user.setStatus(UserStatus.ACTIVE);
+        user.setStatus("ACTIVE");
         return user;
+    }
+
+    private static FeignException.NotFound notFound() {
+        Request request = Request.create(
+                Request.HttpMethod.GET, "/test", Collections.emptyMap(), null, new RequestTemplate());
+        return new FeignException.NotFound("not found", request, null, null);
     }
 
     @Test
@@ -491,7 +491,6 @@ class ProposalServiceTest {
         assertThat(result.getStatus()).isEqualTo(ProposalStatus.WITHDRAWN);
         verify(proposalRepository).save(proposal);
         verify(proposalEventPublisher).publishProposalWithdrawn(result);
-        verify(jobRepository, never()).reopenIfInProgress(anyLong());
     }
 
     @Test
@@ -504,7 +503,6 @@ class ProposalServiceTest {
 
         assertThat(result.getStatus()).isEqualTo(ProposalStatus.WITHDRAWN);
         verify(proposalEventPublisher).publishProposalWithdrawn(result);
-        verify(jobRepository, never()).reopenIfInProgress(30L);
     }
 
     @Test
@@ -517,7 +515,6 @@ class ProposalServiceTest {
                 .hasMessageContaining("SUBMITTED or SHORTLISTED");
 
         verify(proposalRepository, never()).save(proposal);
-        verify(jobRepository, never()).reopenIfInProgress(40L);
     }
 
     @Test
@@ -530,7 +527,6 @@ class ProposalServiceTest {
                 .hasMessageContaining("SUBMITTED or SHORTLISTED");
 
         verify(proposalRepository, never()).save(proposal);
-        verify(jobRepository, never()).reopenIfInProgress(41L);
     }
 
     @Test
@@ -711,80 +707,38 @@ class ProposalServiceTest {
     }
 
     @Test
-    void completeProposal_updatesContractJobAndCreatesPayout() {
+    void completeProposal_delegatesToSagaTriggerService() {
         Proposal proposal = new Proposal();
         proposal.setId(5L);
+        proposal.setFreelancerId(5L);
         proposal.setStatus(ProposalStatus.ACCEPTED);
-
-        Contract contract = new Contract();
-        contract.setId(20L);
-        contract.setJobId(7L);
-        contract.setFreelancerId(30L);
-        contract.setAgreedAmount(2000.0);
-        contract.setStatus(ContractStatus.ACTIVE);
-
         when(proposalRepository.findById(5L)).thenReturn(Optional.of(proposal));
-        when(contractRepository.findByProposalId(5L)).thenReturn(Optional.of(contract));
-        when(proposalRepository.saveAndFlush(any())).thenReturn(proposal);
 
-        Proposal result = proposalService.completeProposal(5L);
+        Proposal expected = new Proposal();
+        expected.setId(5L);
+        expected.setStatus(ProposalStatus.COMPLETING);
+        when(sagaTriggerService.triggerCompletion(5L)).thenReturn(expected);
 
-        assertThat(result.getStatus()).isEqualTo(ProposalStatus.COMPLETING);
-        verify(contractRepository, never()).completeActiveContract(anyLong(), any(LocalDateTime.class));
-        verify(jobRepository, never()).markJobClosed(anyLong());
-        verify(payoutRepository, never()).insertPendingPayout(anyLong(), anyLong(), anyDouble(), any());
+        Proposal result = proposalService.completeProposal(5L, null);
+
+        assertThat(result).isSameAs(expected);
+        verify(sagaTriggerService).triggerCompletion(5L);
     }
 
     @Test
-    void completeProposal_rejectsNonAcceptedStatus() {
+    void completeProposal_rejectsNonOwnerCaller() {
         Proposal proposal = new Proposal();
         proposal.setId(5L);
-        proposal.setStatus(ProposalStatus.SUBMITTED);
+        proposal.setFreelancerId(5L);
         when(proposalRepository.findById(5L)).thenReturn(Optional.of(proposal));
 
-        assertThatThrownBy(() -> proposalService.completeProposal(5L))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("ACCEPTED");
+        jakarta.servlet.http.HttpServletRequest request = org.mockito.Mockito.mock(
+                jakarta.servlet.http.HttpServletRequest.class);
+        when(proposalAuthSupport.extractUid(request)).thenReturn(99L);
+        when(proposalAuthSupport.extractRole(request)).thenReturn("FREELANCER");
 
-        verify(contractRepository, never()).findByProposalId(anyLong());
-    }
-
-    @Test
-    void completeProposal_requiresActiveContract() {
-        Proposal proposal = new Proposal();
-        proposal.setId(5L);
-        proposal.setStatus(ProposalStatus.ACCEPTED);
-        when(proposalRepository.findById(5L)).thenReturn(Optional.of(proposal));
-        when(contractRepository.findByProposalId(5L)).thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> proposalService.completeProposal(5L))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("ACTIVE contract");
-
-        verify(payoutRepository, never()).insertPendingPayout(anyLong(), anyLong(), anyDouble(), any());
-    }
-
-    @Test
-    void completeProposal_abortsWhenContractAlreadyCompleted() {
-        Proposal proposal = new Proposal();
-        proposal.setId(5L);
-        proposal.setStatus(ProposalStatus.ACCEPTED);
-
-        Contract contract = new Contract();
-        contract.setId(20L);
-        contract.setJobId(7L);
-        contract.setFreelancerId(30L);
-        contract.setAgreedAmount(2000.0);
-        contract.setStatus(ContractStatus.COMPLETED);
-
-        when(proposalRepository.findById(5L)).thenReturn(Optional.of(proposal));
-        when(contractRepository.findByProposalId(5L)).thenReturn(Optional.of(contract));
-
-        assertThatThrownBy(() -> proposalService.completeProposal(5L))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("ACTIVE contract");
-
-        verify(jobRepository, never()).markJobClosed(anyLong());
-        verify(payoutRepository, never()).insertPendingPayout(anyLong(), anyLong(), anyDouble(), any());
+        assertThatThrownBy(() -> proposalService.completeProposal(5L, request))
+                .isInstanceOf(com.team01.freelance.proposal.exception.ForbiddenOperationException.class);
+        verify(sagaTriggerService, org.mockito.Mockito.never()).triggerCompletion(5L);
     }
 }

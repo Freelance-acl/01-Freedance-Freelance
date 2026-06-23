@@ -62,6 +62,14 @@ jwt:
   secret: ${JWT_SECRET:dGhpcy1pcy1hLXRlc3Qtc2VjcmV0LWtleS1mb3ItbTJhdC1sZWFzdC0zMmJ5dGVz}
   expiration: ${JWT_EXPIRATION:86400000}
 
+saga:
+  payout:
+    abandon-after: PT72H
+
+proposal-service:
+  rabbitmq:
+    trusted-event-package: com.team01.freelance.contracts.events
+
 feign:
   user-service:
     url: http://user-service:8080

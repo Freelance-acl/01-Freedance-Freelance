@@ -7,12 +7,9 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
+import org.springframework.cache.annotation.Cacheable;
 
-import com.team01.freelance.job.model.Job;
-import com.team01.freelance.job.repository.JobRepository;
 import com.team01.freelance.proposal.adapter.Neo4jRecordAdapter;
 import com.team01.freelance.proposal.dto.FeignJobDTO;
 import com.team01.freelance.proposal.dto.JobRecommendationDTO;
@@ -22,7 +19,6 @@ import com.team01.freelance.proposal.feign.UserServiceClient;
 import com.team01.freelance.proposal.graph.InteractionGraphService;
 import com.team01.freelance.proposal.graph.RecommendationScore;
 import com.team01.freelance.proposal.security.ProposalAuthSupport;
-import com.team01.freelance.user.repository.UserRepository;
 
 import feign.FeignException;
 import jakarta.persistence.EntityNotFoundException;
@@ -33,26 +29,24 @@ public class ProposalRecommendationService {
 
     private static final int DEFAULT_LIMIT = 5;
 
-    @Autowired
-    private InteractionGraphService interactionGraphService;
+    private final InteractionGraphService interactionGraphService;
+    private final UserServiceClient userServiceClient;
+    private final JobServiceClient jobServiceClient;
+    private final ProposalAuthSupport proposalAuthSupport;
+    private final Neo4jRecordAdapter neo4jRecordAdapter;
 
-    @Autowired
-    private JobRepository jobRepository;
-
-    @Autowired
-    private UserRepository userRepository;
-
-    @Autowired(required = false)
-    private UserServiceClient userServiceClient;
-
-    @Autowired(required = false)
-    private JobServiceClient jobServiceClient;
-
-    @Autowired
-    private ProposalAuthSupport proposalAuthSupport;
-
-    @Autowired
-    private Neo4jRecordAdapter neo4jRecordAdapter;
+    public ProposalRecommendationService(
+            InteractionGraphService interactionGraphService,
+            UserServiceClient userServiceClient,
+            JobServiceClient jobServiceClient,
+            ProposalAuthSupport proposalAuthSupport,
+            Neo4jRecordAdapter neo4jRecordAdapter) {
+        this.interactionGraphService = interactionGraphService;
+        this.userServiceClient = userServiceClient;
+        this.jobServiceClient = jobServiceClient;
+        this.proposalAuthSupport = proposalAuthSupport;
+        this.neo4jRecordAdapter = neo4jRecordAdapter;
+    }
 
     @Cacheable(cacheNames = "S3-F12", key = "#freelancerId + ':' + #limit + ':' + #request.getHeader('Authorization')")
     public List<JobRecommendationDTO> getRecommendations(
@@ -87,29 +81,16 @@ public class ProposalRecommendationService {
     }
 
     private void assertFreelancerExists(Long freelancerId) {
-        if (userServiceClient == null) {
-            if (!userRepository.existsById(freelancerId)) {
-                throw new EntityNotFoundException("Freelancer not found with id: " + freelancerId);
-            }
-            return;
-        }
         try {
             userServiceClient.getUser(freelancerId);
         } catch (FeignException.NotFound e) {
             throw new EntityNotFoundException("Freelancer not found with id: " + freelancerId);
         } catch (FeignException e) {
-            if (!userRepository.existsById(freelancerId)) {
-                throw new EntityNotFoundException("Freelancer not found with id: " + freelancerId);
-            }
+            throw new IllegalStateException("User service temporarily unavailable");
         }
     }
 
     private Map<Long, FeignJobDTO> loadJobs(List<Long> jobIds) {
-        if (jobServiceClient == null) {
-            return jobRepository.findAllById(jobIds).stream()
-                    .map(this::toFeignJobDTO)
-                    .collect(Collectors.toMap(FeignJobDTO::getId, Function.identity()));
-        }
         return jobIds.stream()
                 .map(this::getJob)
                 .filter(job -> job != null && job.getId() != null)
@@ -122,20 +103,8 @@ public class ProposalRecommendationService {
         } catch (FeignException.NotFound e) {
             return null;
         } catch (FeignException e) {
-            return jobRepository.findById(jobId)
-                    .map(this::toFeignJobDTO)
-                    .orElse(null);
+            throw new IllegalStateException("Job service temporarily unavailable");
         }
-    }
-
-    private FeignJobDTO toFeignJobDTO(Job job) {
-        FeignJobDTO dto = new FeignJobDTO();
-        dto.setId(job.getId());
-        dto.setClientId(job.getClientId());
-        dto.setTitle(job.getTitle());
-        dto.setCategory(job.getCategory() == null ? null : job.getCategory().name());
-        dto.setStatus(job.getStatus() == null ? null : job.getStatus().name());
-        return dto;
     }
 
     private void assertAuthorized(Long freelancerId, HttpServletRequest request) {
