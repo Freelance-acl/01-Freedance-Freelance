@@ -1,8 +1,6 @@
 package com.team01.freelance.wallet.service;
 
-import com.team01.freelance.contract.repository.ContractRepository;
 import com.team01.freelance.contracts.events.ProposalCompletedEvent;
-import com.team01.freelance.user.repository.UserRepository;
 import com.team01.freelance.wallet.dto.*;
 import com.team01.freelance.wallet.feign.ContractServiceClient;
 import com.team01.freelance.wallet.feign.JobServiceClient;
@@ -60,12 +58,6 @@ public class PayoutService {
     private PayoutRepository payoutRepository;
 
     @Autowired
-    private ContractRepository contractRepository;
-
-    @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
     private PayoutPromoRepository payoutPromoRepository;
 
     @Autowired
@@ -88,6 +80,9 @@ public class PayoutService {
 
     @Autowired
     private JobServiceClient jobServiceClient;
+
+    @Autowired
+    private com.team01.freelance.wallet.observability.PayoutMetrics payoutMetrics;
 
     private final List<EntityObserver> observers = new ArrayList<>();
 
@@ -139,11 +134,15 @@ public class PayoutService {
             throw new IllegalArgumentException("Contract and Freelancer IDs are required to create a Payout");
         }
 
-        if (contractRepository.findById(payout.getContractId()).isEmpty()){
+        try {
+            contractServiceClient.getContract(payout.getContractId());
+        } catch (FeignException.NotFound e) {
             throw new EntityNotFoundException("Contract not found with id: " + payout.getContractId());
         }
 
-        if (userRepository.findById(payout.getFreelancerId()).isEmpty()){
+        try {
+            userServiceClient.getUser(payout.getFreelancerId());
+        } catch (FeignException.NotFound e) {
             throw new EntityNotFoundException("Freelancer not found with id: " + payout.getFreelancerId());
         }
 
@@ -671,6 +670,7 @@ public class PayoutService {
             }
             if (saved.getStatus() == PayoutStatus.FAILED) {
                 paymentEventPublisher.publishPaymentFailed(saved, proposalId, "simulated payout failure");
+                payoutMetrics.recordPayoutFailure();
             } else if (saved.getStatus() == PayoutStatus.COMPLETED) {
                 paymentEventPublisher.publishPaymentCompleted(saved, proposalId);
             }
@@ -779,15 +779,6 @@ public class PayoutService {
         }
 
         return targetPayout;
-    }
-
-    private Long findProposalIdForContract(Long contractId) {
-        if (contractId == null) {
-            return null;
-        }
-        return contractRepository.findById(contractId)
-                .map(contract -> contract.getProposalId())
-                .orElse(null);
     }
 
     private void publishAfterCommit(Runnable publisher) {

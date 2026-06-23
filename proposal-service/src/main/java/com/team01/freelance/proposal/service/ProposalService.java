@@ -101,6 +101,9 @@ public class ProposalService {
     private ProposalEventPublisher proposalEventPublisher;
 
     @Autowired
+    private com.team01.freelance.proposal.saga.SagaMetrics sagaMetrics;
+
+    @Autowired
     private ProposalAuthSupport proposalAuthSupport;
 
     public List<Proposal> getAllProposals() {
@@ -601,6 +604,7 @@ public class ProposalService {
             return proposal;
         }
         proposalStateMachine.transition(proposal, ProposalStatus.PAID);
+        sagaMetrics.recordProposalCompleted();
         return proposalRepository.saveAndFlush(proposal);
     }
 
