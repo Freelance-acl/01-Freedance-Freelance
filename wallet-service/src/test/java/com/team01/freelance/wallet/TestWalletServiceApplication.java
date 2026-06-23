@@ -1,7 +1,6 @@
 package com.team01.freelance.wallet;
 
 import com.team01.freelance.user.config.JwtConfig;
-import com.team01.freelance.user.service.JwtService;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.persistence.autoconfigure.EntityScan;
@@ -26,7 +25,7 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 )
 @EnableCaching
 @EnableFeignClients
-@Import({JwtConfig.class, JwtService.class})
+@Import({JwtConfig.class})
 @EnableJpaRepositories(basePackages = {
         "com.team01.freelance.wallet",
         "com.team01.freelance.contract",
