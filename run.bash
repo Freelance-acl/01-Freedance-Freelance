@@ -86,6 +86,19 @@ else
 fi
 
 # ──────────────────────────────────────────────────────────────
+# Cassandra keyspace — create if missing (contract-service needs it)
+# ──────────────────────────────────────────────────────────────
+echo "[run] Ensuring Cassandra keyspace 'freelanceks' exists..."
+if kubectl get pod cassandra-0 -n freelance &>/dev/null; then
+  kubectl exec -n freelance cassandra-0 -- \
+    cqlsh -e "CREATE KEYSPACE IF NOT EXISTS freelanceks WITH replication = {'class':'SimpleStrategy','replication_factor':1};" \
+    2>/dev/null && echo "[run] Cassandra keyspace ready." \
+    || echo "[run] WARNING: Could not init Cassandra keyspace (pod may not be ready yet — contract-service will retry)."
+else
+  echo "[run] WARNING: cassandra-0 pod not found — run setup.bash first."
+fi
+
+# ──────────────────────────────────────────────────────────────
 # Deploy app services (idempotent)
 # ──────────────────────────────────────────────────────────────
 echo "[run] Applying application manifests..."
@@ -148,6 +161,29 @@ if [ "${NO_FORWARD:-0}" != "1" ]; then
     echo "[run] WARNING: port-forward did not stay up — see .gateway-portforward.log."
     echo "[run]          You can still reach the gateway via:  minikube service api-gateway -n freelance --url"
   fi
+
+  # Grafana port-forward (Docker driver: NodePort is not reachable from the host)
+  GRAFANA_PORT="${GRAFANA_LOCAL_PORT:-3000}"
+  GRAFANA_PID_FILE="$ROOT/.grafana-portforward.pid"
+  if [ -f "$GRAFANA_PID_FILE" ]; then
+    OLD_PID="$(cat "$GRAFANA_PID_FILE" 2>/dev/null || true)"
+    if [ -n "${OLD_PID:-}" ] && kill -0 "$OLD_PID" 2>/dev/null; then
+      kill "$OLD_PID" 2>/dev/null || true
+    fi
+    rm -f "$GRAFANA_PID_FILE"
+  fi
+  echo "[run] Starting background Grafana access on http://localhost:${GRAFANA_PORT} ..."
+  nohup kubectl port-forward -n monitoring svc/grafana "${GRAFANA_PORT}:3000" \
+    > "$ROOT/.grafana-portforward.log" 2>&1 &
+  GF_PID=$!
+  disown "$GF_PID" 2>/dev/null || true
+  echo "$GF_PID" > "$GRAFANA_PID_FILE"
+  sleep 2
+  if kill -0 "$GF_PID" 2>/dev/null; then
+    echo "[run] Grafana reachable at http://localhost:${GRAFANA_PORT} (port-forward PID $GF_PID)."
+  else
+    echo "[run] WARNING: Grafana port-forward did not stay up — see .grafana-portforward.log."
+  fi
 fi
 
 # ──────────────────────────────────────────────────────────────
@@ -198,7 +234,7 @@ echo "      -H 'Content-Type: application/json' \\"
 echo "      -d '{\"email\":\"you@example.com\",\"password\":\"...\"}' | jq -r .token)"
 echo "    curl -s \${GW}/api/jobs -H \"Authorization: Bearer \$TOKEN\""
 echo
-echo "  Grafana      -> http://${MINIKUBE_IP}:30030  (admin / admin)"
+echo "  Grafana      -> http://localhost:3000  (admin / admin)   [background port-forward]"
 echo "  RabbitMQ UI  -> kubectl port-forward svc/rabbitmq 15672:15672 -n freelance"
 echo "                  then open http://localhost:15672  (guest / guest)"
 echo
