@@ -1,7 +1,6 @@
 package com.team01.freelance.proposal.messaging.consumers;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.verify;
 
 import com.team01.freelance.contracts.events.ContractCreatedEvent;
 import com.team01.freelance.contracts.events.ContractStatusChangedEvent;
@@ -15,10 +14,15 @@ import com.team01.freelance.proposal.repository.ProposalRepository;
 import com.team01.freelance.proposal.support.AbstractIntegrationTest;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
 import org.springframework.transaction.annotation.Transactional;
 import com.team01.freelance.proposal.messaging.publishers.ProposalEventPublisher;
 
@@ -31,13 +35,14 @@ class ProposalSagaConsumerIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private ProposalRepository proposalRepository;
 
-    @MockitoBean
-    private ProposalEventPublisher proposalEventPublisher;
+    @Autowired
+    private CapturingProposalEventPublisher proposalEventPublisher;
 
     private Proposal proposal;
 
     @BeforeEach
     void setUp() {
+        proposalEventPublisher.clear();
         proposal = new Proposal();
         proposal.setJobId(100L);
         proposal.setFreelancerId(200L);
@@ -95,7 +100,8 @@ class ProposalSagaConsumerIntegrationTest extends AbstractIntegrationTest {
 
         Proposal updated = proposalRepository.findById(proposal.getId()).orElseThrow();
         assertThat(updated.getStatus()).isEqualTo(ProposalStatus.PAYMENT_FAILED);
-        verify(proposalEventPublisher).publishProposalCancelled(updated, "payment_failed");
+        assertThat(proposalEventPublisher.cancelledEvents()).containsExactly(
+                new CapturingProposalEventPublisher.CancelledEvent(updated.getId(), "payment_failed"));
     }
 
     @Test
@@ -137,6 +143,42 @@ class ProposalSagaConsumerIntegrationTest extends AbstractIntegrationTest {
 
         Proposal updated = proposalRepository.findById(proposal.getId()).orElseThrow();
         assertThat(updated.getStatus()).isEqualTo(ProposalStatus.PAYMENT_FAILED);
-        verify(proposalEventPublisher).publishProposalCancelled(updated, "payout_abandoned");
+        assertThat(proposalEventPublisher.cancelledEvents()).containsExactly(
+                new CapturingProposalEventPublisher.CancelledEvent(updated.getId(), "payout_abandoned"));
+    }
+
+    @TestConfiguration
+    static class ProposalEventPublisherCaptureConfig {
+
+        @Bean
+        @Primary
+        CapturingProposalEventPublisher capturingProposalEventPublisher() {
+            return new CapturingProposalEventPublisher();
+        }
+    }
+
+    static class CapturingProposalEventPublisher extends ProposalEventPublisher {
+
+        private final List<CancelledEvent> cancelledEvents = new ArrayList<>();
+
+        CapturingProposalEventPublisher() {
+            super(new RabbitTemplate());
+        }
+
+        @Override
+        public void publishProposalCancelled(Proposal proposal, String reason) {
+            cancelledEvents.add(new CancelledEvent(proposal.getId(), reason));
+        }
+
+        void clear() {
+            cancelledEvents.clear();
+        }
+
+        List<CancelledEvent> cancelledEvents() {
+            return cancelledEvents;
+        }
+
+        record CancelledEvent(Long proposalId, String reason) {
+        }
     }
 }
