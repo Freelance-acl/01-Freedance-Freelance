@@ -6,7 +6,7 @@ import com.team01.freelance.contracts.events.PaymentFailedEvent;
 import com.team01.freelance.contracts.events.PaymentRefundedEvent;
 import com.team01.freelance.contracts.events.ProposalCancelledEvent;
 import com.team01.freelance.proposal.config.RabbitMQConfig;
-import com.team01.freelance.proposal.messaging.ProposalSagaConsumer;
+import com.team01.freelance.proposal.messaging.consumers.ProposalSagaConsumer;
 import com.team01.freelance.proposal.model.Proposal;
 import com.team01.freelance.proposal.model.ProposalStatus;
 import com.team01.freelance.proposal.repository.ProposalRepository;
