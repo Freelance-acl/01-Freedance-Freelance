@@ -1,0 +1,14 @@
+for pod_db in \
+  "user-postgres-0:freelancedb-users" \
+  "job-postgres-0:freelancedb-jobs" \
+  "proposal-postgres-0:freelancedb-proposals" \
+  "contract-postgres-0:freelancedb-contracts" \
+  "wallet-postgres-0:freelancedb-wallet"; do
+  pod="${pod_db%%:*}"
+  db="${pod_db##*:}"
+  echo "→ Seeding $pod ($db)..."
+  kubectl exec -n freelance "$pod" -- \
+    psql -U postgres -d "$db" \
+    -f /dev/stdin < seed.sql 2>&1 | grep -v "^$"
+done
+echo "Done."

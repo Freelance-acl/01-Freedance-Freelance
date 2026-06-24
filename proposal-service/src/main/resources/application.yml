@@ -38,6 +38,10 @@ spring:
           enabled: true
           initial-interval: 1000
           max-attempts: 3
+  cloud:
+    openfeign:
+      circuitbreaker:
+        enabled: true
 
 server:
   port: ${SERVER_PORT:8080}
@@ -69,6 +73,34 @@ saga:
 proposal-service:
   rabbitmq:
     trusted-event-package: com.team01.freelance.contracts.events
+
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 5
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 2
+        automatic-transition-from-open-to-half-open-enabled: true
+        record-exceptions:
+          - feign.FeignException
+          - java.io.IOException
+    instances:
+      UserServiceClient:
+        base-config: default
+      JobServiceClient:
+        base-config: default
+      ContractServiceClient:
+        base-config: default
+      WalletServiceClient:
+        base-config: default
+  timelimiter:
+    configs:
+      default:
+        timeout-duration: 3s
 
 feign:
   user-service:

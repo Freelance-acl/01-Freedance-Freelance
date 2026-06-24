@@ -167,7 +167,8 @@ public class RabbitMQConfig {
         mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
         DefaultJackson2JavaTypeMapper typeMapper = new DefaultJackson2JavaTypeMapper();
-        typeMapper.setTrustedPackages(trustedEventPackage);
+        // Trust the events package AND all packages (so Class.forName() also works as fallback)
+        typeMapper.setTrustedPackages("*");
         typeMapper.setIdClassMapping(sagaFeedbackEventTypeMapping());
 
         Jackson2JsonMessageConverter converter = new Jackson2JsonMessageConverter(mapper);
