@@ -11,9 +11,9 @@ public class FeignCorrelationConfig {
     @Bean
     public RequestInterceptor correlationIdInterceptor() {
         return template -> {
-            String correlationId = MDC.get("correlationId");
+            String correlationId = MDC.get(CorrelationIdFilter.MDC_KEY);
             if (correlationId != null) {
-                template.header("X-Correlation-ID", correlationId);
+                template.header(CorrelationIdFilter.HEADER, correlationId);
             }
         };
     }
