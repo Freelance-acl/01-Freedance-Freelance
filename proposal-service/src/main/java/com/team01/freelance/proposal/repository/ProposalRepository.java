@@ -65,8 +65,8 @@ public interface ProposalRepository extends JpaRepository<Proposal, Long> {
                 COALESCE(MAX(p.bid_amount), 0) AS highestBid
             FROM proposals p
             WHERE p.job_id = :jobId
-              AND (:startDate IS NULL OR p.submitted_at >= :startDate)
-              AND (:endDateExclusive IS NULL OR p.submitted_at < :endDateExclusive)
+              AND (CAST(:startDate AS timestamp) IS NULL OR p.submitted_at >= CAST(:startDate AS timestamp))
+              AND (CAST(:endDateExclusive AS timestamp) IS NULL OR p.submitted_at < CAST(:endDateExclusive AS timestamp))
             """, nativeQuery = true)
     List<Object[]> getJobProposalSummary(
             @Param("jobId") Long jobId,

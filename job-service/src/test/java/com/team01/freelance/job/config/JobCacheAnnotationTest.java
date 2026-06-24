@@ -9,16 +9,17 @@ import org.springframework.data.domain.Pageable;
 import java.time.LocalDate;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 class JobCacheAnnotationTest {
 
     @Test
     void jobReadMethodsUseExpectedCaches() throws Exception {
-        assertCache(JobService.class, "getJobById", "job-by-id", Long.class);
+        assertNoCache(JobService.class, "getJobById", Long.class);
         assertCache(JobService.class, "searchJobsByStatusAndBudgetRange", "S2-F1",
                 String.class, Double.class, Double.class, Pageable.class);
-        assertCache(JobService.class, "getJobProposalSummary", "S2-F3",
+        assertNoCache(JobService.class, "getJobProposalSummary",
                 Long.class, LocalDate.class, LocalDate.class);
         assertCache(JobService.class, "searchByRequirements", "S2-F5",
                 String.class, String.class, String.class);
@@ -35,5 +36,11 @@ class JobCacheAnnotationTest {
         Cacheable cacheable = type.getMethod(methodName, parameterTypes).getAnnotation(Cacheable.class);
         assertNotNull(cacheable);
         assertArrayEquals(new String[]{cacheName}, cacheable.value());
+    }
+
+    private void assertNoCache(Class<?> type, String methodName, Class<?>... parameterTypes)
+            throws Exception {
+        Cacheable cacheable = type.getMethod(methodName, parameterTypes).getAnnotation(Cacheable.class);
+        assertNull(cacheable);
     }
 }

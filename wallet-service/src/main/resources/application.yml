@@ -19,9 +19,11 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         type:
           json_format_mapper: jackson
+  mongodb:
+    uri: ${SPRING_MONGODB_URI:${SPRING_DATA_MONGODB_URI:mongodb://localhost:27017/freelancemongo}}
   data:
     mongodb:
-      uri: ${SPRING_DATA_MONGODB_URI:mongodb://root:rootpass@mongodb:27017/freelancemongo?authSource=admin}
+      uri: ${SPRING_DATA_MONGODB_URI:${SPRING_MONGODB_URI:mongodb://localhost:27017/freelancemongo}}
     redis:
       host: ${SPRING_DATA_REDIS_HOST:${REDIS_HOST:redis}}
       port: ${SPRING_DATA_REDIS_PORT:${REDIS_PORT:6379}}

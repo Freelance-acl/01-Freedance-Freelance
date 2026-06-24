@@ -13,10 +13,13 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.stereotype.Controller;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
 
@@ -30,6 +33,7 @@ class CorrelationIdFilterTest {
     @AfterEach
     void clearMdc() {
         MDC.clear();
+        RequestContextHolder.resetRequestAttributes();
     }
 
     @Test
@@ -86,6 +90,21 @@ class CorrelationIdFilterTest {
         Map<String, Collection<String>> headers = template.headers();
         assertThat(headers).containsKey(CorrelationIdFilter.HEADER);
         assertThat(headers.get(CorrelationIdFilter.HEADER)).containsExactly(correlationId);
+    }
+
+    @Test
+    void feignInterceptorPropagatesAuthorizationHeaderFromCurrentRequest() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader("Authorization", "Bearer demo-token");
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+        RequestInterceptor interceptor = new FeignCorrelationConfig().correlationIdInterceptor();
+        RequestTemplate template = new RequestTemplate();
+
+        interceptor.apply(template);
+
+        Map<String, Collection<String>> headers = template.headers();
+        assertThat(headers).containsKey("Authorization");
+        assertThat(headers.get("Authorization")).containsExactly("Bearer demo-token");
     }
 
     @Controller
