@@ -37,6 +37,10 @@ public final class JwtConfigurationManager {
         instance = new JwtConfigurationManager(secret, expiration);
     }
 
+    public static boolean isConfigured() {
+        return instance != null;
+    }
+
     public static synchronized void resetForTests(String secret, long expiration) {
         configure(secret, expiration);
     }
