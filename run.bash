@@ -102,6 +102,7 @@ fi
 # Deploy app services (idempotent)
 # ──────────────────────────────────────────────────────────────
 echo "[run] Applying application manifests..."
+kubectl apply -f k8s/statefulsets/
 kubectl apply -f k8s/deployments/
 kubectl apply -f k8s/services/
 kubectl apply -f k8s/api-gateway/
