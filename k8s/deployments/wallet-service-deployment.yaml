@@ -42,15 +42,17 @@ spec:
               cpu: "1000m"
           readinessProbe:
             httpGet:
-              path: /actuator/health
-              port: 8081
+              path: /api/payouts/health
+              port: 8080
             initialDelaySeconds: 60
             periodSeconds: 10
             failureThreshold: 6
+            timeoutSeconds: 10
           livenessProbe:
             httpGet:
-              path: /actuator/health
-              port: 8081
+              path: /api/payouts/health
+              port: 8080
             initialDelaySeconds: 150
             periodSeconds: 15
             failureThreshold: 6
+            timeoutSeconds: 10
