@@ -4,7 +4,7 @@ import com.team01.freelance.contract.dto.FreelancerPerformanceDTO;
 import com.team01.freelance.contract.dto.StalledContractDTO;
 import com.team01.freelance.contract.model.Contract;
 import com.team01.freelance.contract.service.ContractService;
-import com.team01.freelance.user.dto.UserContractSummaryDTO;
+import com.team01.freelance.contract.dto.UserContractSummaryDTO;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

@@ -1,4 +1,4 @@
-package com.team01.freelance.user.messaging;
+package com.team01.freelance.user.messaging.publishers;
 
 import com.team01.freelance.contracts.events.UserDeactivatedEvent;
 import com.team01.freelance.contracts.events.UserRegisteredEvent;

@@ -1,4 +1,4 @@
-package com.team01.freelance.proposal.messaging;
+package com.team01.freelance.proposal.messaging.publishers;
 
 import com.team01.freelance.contracts.events.PaymentFailedEvent;
 import com.team01.freelance.proposal.config.RabbitMQConfig;

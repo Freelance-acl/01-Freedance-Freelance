@@ -3,10 +3,10 @@ package com.team01.freelance.wallet.controller;
 import com.team01.freelance.user.config.JwtConfig;
 import com.team01.freelance.user.model.User;
 import com.team01.freelance.user.repository.UserRepository;
-import com.team01.freelance.user.service.JwtService;
 import com.team01.freelance.user.support.JwtTestSupport;
 import com.team01.freelance.user.support.TestAuthHelper;
 import com.team01.freelance.user.support.UserTestFixtures;
+import com.team01.freelance.wallet.security.JwtConfigurationManager;
 import com.team01.freelance.wallet.support.AbstractIntegrationTest;
 import com.team01.freelance.wallet.support.cc1.Cc1EndpointScanner;
 import com.team01.freelance.wallet.support.cc1.Cc1EndpointScanner.Endpoint;
@@ -43,8 +43,6 @@ class Cc1JwtSecurityIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private UserRepository userRepository;
     @Autowired
-    private JwtService jwtService;
-    @Autowired
     private JwtConfig jwtConfig;
 
     private MockMvc mockMvc;
@@ -52,6 +50,7 @@ class Cc1JwtSecurityIntegrationTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        JwtConfigurationManager.resetForTests(jwtConfig.getSecret(), jwtConfig.getExpiration());
         mockMvc = buildMockMvc(webApplicationContext);
         endpoints = Cc1EndpointScanner.scan(applicationContext);
         assertFalse(endpoints.isEmpty());

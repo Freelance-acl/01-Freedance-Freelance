@@ -14,7 +14,7 @@ import com.team01.freelance.job.feign.dto.ProposalJobSummaryByJobResponse;
 import com.team01.freelance.job.feign.dto.ProposalJobSummaryResponse;
 import com.team01.freelance.job.event.JobEventTypes;
 import com.team01.freelance.job.exception.ForbiddenOperationException;
-import com.team01.freelance.job.messaging.JobEventPublisher;
+import com.team01.freelance.job.messaging.publishers.JobEventPublisher;
 import com.team01.freelance.job.model.JobAttachmentAlertDTO;
 import com.team01.freelance.job.model.JobAttachment;
 import com.team01.freelance.job.model.JobAttachmentVerificationRequest;
@@ -25,9 +25,8 @@ import com.team01.freelance.job.dto.TopBudgetJobDTO;
 import com.team01.freelance.job.repository.JobAttachmentRepository;
 import com.team01.freelance.job.repository.JobRepository;
 import com.team01.freelance.job.search.service.JobSearchIndexOperations;
-import com.team01.freelance.user.model.User;
-import com.team01.freelance.user.model.UserRole;
-import com.team01.freelance.user.repository.UserRepository;
+import com.team01.freelance.job.feign.UserServiceClient;
+import com.team01.freelance.job.feign.dto.UserDTO;
 import feign.FeignException;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -68,7 +67,7 @@ public class JobService {
     private JobRepository jobRepository;
 
     @Autowired
-    private UserRepository userRepository;
+    private UserServiceClient userServiceClient;
 
     @Autowired
     private ContractServiceClient contractServiceClient;
@@ -137,8 +136,11 @@ public class JobService {
             throw new IllegalArgumentException("Budget minimum cannot be greater than budget maximum");
         }
 
-        userRepository.findById(job.getClientId())
-                .orElseThrow(() -> new EntityNotFoundException("Client not found with id: " + job.getClientId()));
+        try {
+            userServiceClient.getUser(job.getClientId());
+        } catch (FeignException.NotFound e) {
+            throw new EntityNotFoundException("Client not found with id: " + job.getClientId());
+        }
 
         Job savedJob = jobRepository.save(job);
         jobSearchIndexOperations.index(savedJob);
@@ -478,10 +480,14 @@ public class JobService {
             throw new IllegalArgumentException("Job attachment has expired");
         }
 
-        User verifier = userRepository.findById(request.getVerifiedBy())
-                .orElseThrow(() -> new ForbiddenOperationException("VerifiedBy user must be an admin user"));
+        UserDTO verifier;
+        try {
+            verifier = userServiceClient.getUser(request.getVerifiedBy());
+        } catch (FeignException.NotFound e) {
+            throw new ForbiddenOperationException("VerifiedBy user must be an admin user");
+        }
 
-        if (verifier.getRole() != UserRole.ADMIN) {
+        if (verifier == null || !"ADMIN".equals(verifier.getRole())) {
             throw new ForbiddenOperationException("VerifiedBy user must be an admin user");
         }
 

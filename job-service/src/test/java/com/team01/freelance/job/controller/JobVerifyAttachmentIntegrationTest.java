@@ -1,5 +1,7 @@
 package com.team01.freelance.job.controller;
 
+import com.team01.freelance.job.feign.UserServiceClient;
+import com.team01.freelance.job.feign.dto.UserDTO;
 import com.team01.freelance.job.model.Job;
 import com.team01.freelance.job.model.JobAttachment;
 import com.team01.freelance.job.model.JobAttachmentType;
@@ -17,9 +19,13 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
+
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.when;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -49,6 +55,9 @@ class JobVerifyAttachmentIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private UserRepository userRepository;
 
+    @MockitoBean
+    private UserServiceClient userServiceClient;
+
     private Job job;
     private JobAttachment attachment;
     private User admin;
@@ -58,6 +67,11 @@ class JobVerifyAttachmentIntegrationTest extends AbstractIntegrationTest {
         mockMvc = buildMockMvc(webApplicationContext);
         User client = saveUser("Client", UserRole.CLIENT);
         admin = saveUser("Admin", UserRole.ADMIN);
+
+        UserDTO adminDto = new UserDTO();
+        adminDto.setRole("ADMIN");
+        when(userServiceClient.getUser(anyLong())).thenReturn(adminDto);
+
         job = saveJobWithValidAttachment(client.getId());
         attachment = jobAttachmentRepository.findAll().stream()
                 .filter(a -> job.getId().equals(a.getJob().getId()))

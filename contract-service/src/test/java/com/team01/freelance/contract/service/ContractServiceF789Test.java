@@ -7,8 +7,8 @@ import com.team01.freelance.contract.feign.UserServiceClient;
 import com.team01.freelance.contract.model.Contract;
 import com.team01.freelance.contract.model.ContractStatus;
 import com.team01.freelance.contract.repository.ContractRepository;
-import com.team01.freelance.job.model.Job;
-import com.team01.freelance.user.model.User;
+import com.team01.freelance.contract.dto.JobDTO;
+import com.team01.freelance.contract.dto.UserDTO;
 import feign.FeignException;
 import feign.Request;
 import jakarta.persistence.EntityNotFoundException;
@@ -71,7 +71,7 @@ class ContractServiceF789Test {
 
     @Test
     void freelancerSummaryReturnsExpectedValues() {
-        when(userServiceClient.getUser(10L)).thenReturn(new User());
+        when(userServiceClient.getUser(10L)).thenReturn(new UserDTO());
         when(contractRepository.getFreelancerPerformance(eq(10L), any(LocalDateTime.class), any(LocalDateTime.class)))
                 .thenReturn(new Object[]{5L, 4L, 7000.0, 1400.0, 17.5});
 
@@ -112,9 +112,9 @@ class ContractServiceF789Test {
         contract.setStatus(ContractStatus.ACTIVE);
         contract.setCreatedAt(LocalDateTime.now().minusDays(30));
         contract.setMetadata(Map.of("progressPercentage", 10.0, "lastActivityDate", LocalDateTime.now().minusDays(30).toString()));
-        User user = new User();
+        UserDTO user = new UserDTO();
         user.setName("Freelancer A");
-        Job job = new Job();
+        JobDTO job = new JobDTO();
         job.setTitle("Job A");
         when(contractRepository.findStalledContracts(50.0, 7))
                 .thenReturn(List.of(contract));

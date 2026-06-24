@@ -441,8 +441,8 @@ class PayoutControllerTest {
     // Test for payment.refunded
     @Test
     void handle_WhenProposalCancelledEvent_ShouldDelegateToService() {
-        com.team01.freelance.wallet.messaging.PaymentSagaConsumer consumer =
-                new com.team01.freelance.wallet.messaging.PaymentSagaConsumer(payoutService);
+        com.team01.freelance.wallet.messaging.consumers.PaymentSagaConsumer consumer =
+                new com.team01.freelance.wallet.messaging.consumers.PaymentSagaConsumer(payoutService);
 
         com.team01.freelance.contracts.events.ProposalCancelledEvent cancelledEvent =
                 new com.team01.freelance.contracts.events.ProposalCancelledEvent(

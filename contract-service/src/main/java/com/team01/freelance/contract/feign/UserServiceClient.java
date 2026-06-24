@@ -1,6 +1,6 @@
 package com.team01.freelance.contract.feign;
 
-import com.team01.freelance.user.model.User;
+import com.team01.freelance.contract.dto.UserDTO;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -9,5 +9,5 @@ import org.springframework.web.bind.annotation.PathVariable;
 public interface UserServiceClient {
 
     @GetMapping("/api/users/{id}")
-    User getUser(@PathVariable Long id);
+    UserDTO getUser(@PathVariable Long id);
 }

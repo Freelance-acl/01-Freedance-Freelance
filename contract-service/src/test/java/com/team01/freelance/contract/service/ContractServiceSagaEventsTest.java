@@ -1,14 +1,14 @@
 package com.team01.freelance.contract.service;
 
 import com.team01.freelance.contract.feign.JobServiceClient;
-import com.team01.freelance.contract.messaging.ContractEventPublisher;
+import com.team01.freelance.contract.messaging.publishers.ContractEventPublisher;
 import com.team01.freelance.contract.model.Contract;
 import com.team01.freelance.contract.model.ContractStatus;
 import com.team01.freelance.contract.repository.ContractRepository;
 import com.team01.freelance.contracts.events.ProposalAcceptedEvent;
 import com.team01.freelance.contracts.events.ProposalCancelledEvent;
 import com.team01.freelance.contracts.events.ProposalCompletedEvent;
-import com.team01.freelance.job.model.Job;
+import com.team01.freelance.contract.dto.JobDTO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -45,7 +45,7 @@ class ContractServiceSagaEventsTest {
     @Test
     void proposalAcceptedCreatesActiveContractOnce() {
         ProposalAcceptedEvent event = new ProposalAcceptedEvent(10L, 20L, 30L, BigDecimal.valueOf(1250));
-        Job job = new Job();
+        JobDTO job = new JobDTO();
         job.setClientId(40L);
         when(contractRepository.findByProposalId(10L)).thenReturn(Optional.empty());
         when(jobServiceClient.getJob(20L)).thenReturn(job);

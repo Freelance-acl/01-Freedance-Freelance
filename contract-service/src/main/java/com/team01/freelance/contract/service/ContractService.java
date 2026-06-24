@@ -12,7 +12,7 @@ import com.team01.freelance.contract.dto.FreelancerPerformanceDTO;
 import com.team01.freelance.contract.dto.StalledContractDTO;
 import com.team01.freelance.contract.feign.JobServiceClient;
 import com.team01.freelance.contract.feign.UserServiceClient;
-import com.team01.freelance.contract.messaging.ContractEventPublisher;
+import com.team01.freelance.contract.messaging.publishers.ContractEventPublisher;
 import com.team01.freelance.contract.milestone.ContractMilestoneEvent;
 import com.team01.freelance.contract.milestone.ContractMilestoneStatus;
 import com.team01.freelance.contract.milestone.ContractMilestoneTimelineRepository;
@@ -24,9 +24,9 @@ import com.team01.freelance.contracts.events.ProposalAcceptedEvent;
 import com.team01.freelance.contracts.events.ProposalCancelledEvent;
 import com.team01.freelance.contracts.events.ProposalCompletedEvent;
 import com.team01.freelance.contracts.events.UserDeactivatedEvent;
-import com.team01.freelance.job.model.Job;
-import com.team01.freelance.user.model.User;
-import com.team01.freelance.user.dto.UserContractSummaryDTO;
+import com.team01.freelance.contract.dto.JobDTO;
+import com.team01.freelance.contract.dto.UserDTO;
+import com.team01.freelance.contract.dto.UserContractSummaryDTO;
 import feign.FeignException;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -629,7 +629,7 @@ public class ContractService {
             return existing.get();
         }
 
-        Job job = fetchJob(event.jobId());
+        JobDTO job = fetchJob(event.jobId());
         Contract contract = new Contract();
         contract.setProposalId(event.proposalId());
         contract.setJobId(event.jobId());
@@ -737,7 +737,7 @@ public class ContractService {
         }
         if (userServiceClient != null && usesPostgresDatabase()) {
             try {
-                User user = userServiceClient.getUser(freelancerId);
+                UserDTO user = userServiceClient.getUser(freelancerId);
                 return user == null || user.getName() == null ? "Unknown Freelancer" : user.getName();
             } catch (FeignException.NotFound e) {
                 return "Unknown Freelancer";
@@ -756,7 +756,7 @@ public class ContractService {
         }
         if (jobServiceClient != null && usesPostgresDatabase()) {
             try {
-                Job job = jobServiceClient.getJob(jobId);
+                JobDTO job = jobServiceClient.getJob(jobId);
                 return job == null || job.getTitle() == null ? "Unknown Job" : job.getTitle();
             } catch (FeignException.NotFound e) {
                 return "Unknown Job";
@@ -806,7 +806,7 @@ public class ContractService {
         }
     }
 
-    private Job fetchJob(Long jobId) {
+    private JobDTO fetchJob(Long jobId) {
         if (jobServiceClient == null) {
             throw new IllegalStateException("job-service client is not configured");
         }

@@ -1,4 +1,4 @@
-package com.team01.freelance.wallet.messaging;
+package com.team01.freelance.wallet.messaging.publishers;
 
 import com.team01.freelance.contracts.events.PaymentCompletedEvent;
 import com.team01.freelance.contracts.events.PaymentFailedEvent;

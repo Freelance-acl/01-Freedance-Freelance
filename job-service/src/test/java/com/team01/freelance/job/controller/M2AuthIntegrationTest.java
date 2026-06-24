@@ -1,5 +1,7 @@
 package com.team01.freelance.job.controller;
 
+import com.team01.freelance.job.feign.UserServiceClient;
+import com.team01.freelance.job.feign.dto.UserDTO;
 import com.team01.freelance.job.model.JobStatus;
 import com.team01.freelance.job.support.AbstractIntegrationTest;
 import com.team01.freelance.job.support.TestAuthHelper;
@@ -12,9 +14,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
+
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.when;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -38,6 +44,9 @@ class M2AuthIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private JwtService jwtService;
 
+    @MockitoBean
+    private UserServiceClient userServiceClient;
+
     private MockMvc mockMvc;
     private String adminToken;
 
@@ -45,6 +54,9 @@ class M2AuthIntegrationTest extends AbstractIntegrationTest {
     void setUp() {
         mockMvc = buildMockMvc(webApplicationContext);
         adminToken = TestAuthHelper.adminToken(jwtService, userRepository);
+        UserDTO clientDto = new UserDTO();
+        clientDto.setRole("CLIENT");
+        when(userServiceClient.getUser(anyLong())).thenReturn(clientDto);
     }
 
     @Test

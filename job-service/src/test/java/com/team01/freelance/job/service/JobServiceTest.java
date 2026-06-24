@@ -7,7 +7,7 @@ import com.team01.freelance.job.feign.ProposalServiceClient;
 import com.team01.freelance.job.feign.dto.ContractResponse;
 import com.team01.freelance.job.feign.dto.ProposalJobSummaryByJobResponse;
 import com.team01.freelance.job.feign.dto.ProposalJobSummaryResponse;
-import com.team01.freelance.job.messaging.JobEventPublisher;
+import com.team01.freelance.job.messaging.publishers.JobEventPublisher;
 import com.team01.freelance.job.event.JobEventTypes;
 import com.team01.freelance.job.exception.ForbiddenOperationException;
 import com.team01.freelance.job.dto.TopBudgetJobDTO;
@@ -21,9 +21,8 @@ import com.team01.freelance.job.model.JobStatus;
 import com.team01.freelance.job.repository.JobAttachmentRepository;
 import com.team01.freelance.job.repository.JobRepository;
 import com.team01.freelance.job.search.service.JobSearchIndexOperations;
-import com.team01.freelance.user.model.User;
-import com.team01.freelance.user.model.UserRole;
-import com.team01.freelance.user.repository.UserRepository;
+import com.team01.freelance.job.feign.UserServiceClient;
+import com.team01.freelance.job.feign.dto.UserDTO;
 import org.springframework.data.domain.PageRequest;
 import feign.FeignException;
 import feign.Request;
@@ -62,7 +61,7 @@ class JobServiceTest {
     private JobRepository jobRepository;
 
     @Mock
-    private UserRepository userRepository;
+    private UserServiceClient userServiceClient;
 
     @Mock
     private ContractServiceClient contractServiceClient;
@@ -154,7 +153,7 @@ class JobServiceTest {
         job.setBudgetMin(100.0);
         job.setBudgetMax(200.0);
 
-        when(userRepository.findById(99L)).thenReturn(Optional.empty());
+        when(userServiceClient.getUser(99L)).thenThrow(mock(FeignException.NotFound.class));
 
         assertThrows(EntityNotFoundException.class, () -> jobService.createJob(job));
         verify(jobRepository, never()).save(any(Job.class));
@@ -167,7 +166,7 @@ class JobServiceTest {
         job.setBudgetMin(100.0);
         job.setBudgetMax(200.0);
 
-        when(userRepository.findById(10L)).thenReturn(Optional.of(new User()));
+        when(userServiceClient.getUser(10L)).thenReturn(new UserDTO());
         when(jobRepository.save(job)).thenReturn(job);
 
         Job result = jobService.createJob(job);
@@ -493,15 +492,15 @@ class JobServiceTest {
         attachments.add(attachment);
         job.setJobAttachments(attachments);
 
-        User verifier = new User();
-        verifier.setRole(UserRole.ADMIN);
+        UserDTO verifier = new UserDTO();
+        verifier.setRole("ADMIN");
 
         JobAttachmentVerificationRequest request = new JobAttachmentVerificationRequest();
         request.setVerifiedBy(verifierId);
 
         when(jobRepository.findById(jobId)).thenReturn(Optional.of(job));
         when(jobAttachmentRepository.findById(attachmentId)).thenReturn(Optional.of(attachment));
-        when(userRepository.findById(verifierId)).thenReturn(Optional.of(verifier));
+        when(userServiceClient.getUser(verifierId)).thenReturn(verifier);
         when(jobAttachmentRepository.save(any(JobAttachment.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         Job result = jobService.verifyJobAttachment(jobId, attachmentId, request);
@@ -535,7 +534,7 @@ class JobServiceTest {
 
         assertThrows(IllegalArgumentException.class, () -> jobService.verifyJobAttachment(jobId, attachmentId, request));
         verify(jobAttachmentRepository, never()).save(any(JobAttachment.class));
-        verify(userRepository, never()).findById(anyLong());
+        verify(userServiceClient, never()).getUser(anyLong());
     }
 
     @Test
@@ -562,7 +561,7 @@ class JobServiceTest {
 
         assertThrows(IllegalArgumentException.class, () -> jobService.verifyJobAttachment(jobId, attachmentId, request));
         verify(jobAttachmentRepository, never()).save(any(JobAttachment.class));
-        verify(userRepository, never()).findById(anyLong());
+        verify(userServiceClient, never()).getUser(anyLong());
     }
 
     @Test
@@ -578,15 +577,15 @@ class JobServiceTest {
         attachment.setExpiryDate(LocalDate.now().plusDays(1));
         attachment.setJob(job);
 
-        User verifier = new User();
-        verifier.setRole(UserRole.CLIENT);
+        UserDTO verifier = new UserDTO();
+        verifier.setRole("CLIENT");
 
         JobAttachmentVerificationRequest request = new JobAttachmentVerificationRequest();
         request.setVerifiedBy(3L);
 
         when(jobRepository.findById(jobId)).thenReturn(Optional.of(job));
         when(jobAttachmentRepository.findById(attachmentId)).thenReturn(Optional.of(attachment));
-        when(userRepository.findById(3L)).thenReturn(Optional.of(verifier));
+        when(userServiceClient.getUser(3L)).thenReturn(verifier);
 
         assertThrows(ForbiddenOperationException.class, () -> jobService.verifyJobAttachment(jobId, attachmentId, request));
         verify(jobAttachmentRepository, never()).save(any(JobAttachment.class));
@@ -615,7 +614,7 @@ class JobServiceTest {
         when(jobAttachmentRepository.findById(10L)).thenReturn(Optional.empty());
 
         assertThrows(EntityNotFoundException.class, () -> jobService.verifyJobAttachment(1L, 10L, request));
-        verify(userRepository, never()).findById(anyLong());
+        verify(userServiceClient, never()).getUser(anyLong());
         verify(jobAttachmentRepository, never()).save(any(JobAttachment.class));
     }
 

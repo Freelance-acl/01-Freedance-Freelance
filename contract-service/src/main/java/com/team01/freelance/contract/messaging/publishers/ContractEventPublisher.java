@@ -1,4 +1,4 @@
-package com.team01.freelance.contract.messaging;
+package com.team01.freelance.contract.messaging.publishers;
 
 import com.team01.freelance.contract.config.RabbitMQConfig;
 import com.team01.freelance.contract.model.Contract;

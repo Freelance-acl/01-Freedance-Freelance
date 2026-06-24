@@ -1,6 +1,6 @@
 package com.team01.freelance.wallet.support;
 
-import com.team01.freelance.common.observer.EntityObserver;
+import com.team01.freelance.wallet.observer.EntityObserver;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 

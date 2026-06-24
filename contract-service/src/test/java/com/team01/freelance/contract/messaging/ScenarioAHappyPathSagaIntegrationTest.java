@@ -2,6 +2,7 @@ package com.team01.freelance.contract.messaging;
 
 import com.team01.freelance.contract.config.RabbitMQConfig;
 import com.team01.freelance.contract.feign.JobServiceClient;
+import com.team01.freelance.contract.messaging.consumers.ContractSagaConsumer;
 import com.team01.freelance.contract.model.Contract;
 import com.team01.freelance.contract.model.ContractStatus;
 import com.team01.freelance.contract.repository.ContractRepository;
@@ -10,7 +11,7 @@ import com.team01.freelance.contracts.events.ContractCreatedEvent;
 import com.team01.freelance.contracts.events.ContractStatusChangedEvent;
 import com.team01.freelance.contracts.events.ProposalAcceptedEvent;
 import com.team01.freelance.contracts.events.ProposalCompletedEvent;
-import com.team01.freelance.job.model.Job;
+import com.team01.freelance.contract.dto.JobDTO;
 import java.math.BigDecimal;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -19,7 +20,6 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.times;
@@ -110,8 +110,8 @@ class ScenarioAHappyPathSagaIntegrationTest extends AbstractIntegrationTest {
         assertEquals("COMPLETED", statusChangedEvent.newStatus());
     }
 
-    private static Job job(Long jobId, Long clientId) {
-        Job job = new Job();
+    private static JobDTO job(Long jobId, Long clientId) {
+        JobDTO job = new JobDTO();
         job.setId(jobId);
         job.setClientId(clientId);
         job.setTitle("Scenario A Job");

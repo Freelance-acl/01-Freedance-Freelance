@@ -6,8 +6,8 @@ import com.team01.freelance.contract.feign.JobServiceClient;
 import com.team01.freelance.contract.feign.UserServiceClient;
 import com.team01.freelance.contract.model.ContractStatus;
 import com.team01.freelance.contract.support.AbstractIntegrationTest;
-import com.team01.freelance.job.model.Job;
-import com.team01.freelance.user.model.User;
+import com.team01.freelance.contract.dto.JobDTO;
+import com.team01.freelance.contract.dto.UserDTO;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.junit.jupiter.api.Test;
@@ -71,10 +71,10 @@ class ContractF3IntegrationTest extends AbstractIntegrationTest {
                 LocalDateTime.of(2026, 3, 5, 9, 0),
                 null);
 
-        User freelancerB = new User();
+        UserDTO freelancerB = new UserDTO();
         freelancerB.setName("Freelancer B");
         when(userServiceClient.getUser(702L)).thenReturn(freelancerB);
-        Job largeJob = new Job();
+        JobDTO largeJob = new JobDTO();
         largeJob.setTitle("Large Job");
         when(jobServiceClient.getJob(802L)).thenReturn(largeJob);
 
