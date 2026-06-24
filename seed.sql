@@ -19,7 +19,7 @@ VALUES
      '$2a$10$.F.hAy2H0GbGYDuhvLYeZeyQ5j8bgncylLVySmYHITqFld1Uedpvq',
      '+201012345601', 'FREELANCER', 'ACTIVE',
      '{
-        "language": "en",
+        "language": "ar",
         "notifications": {"email": true, "sms": false},
         "timezone": "Africa/Cairo",
         "profileVisibility": "PUBLIC",
@@ -92,7 +92,8 @@ VALUES
         "lastUsedDate": "2026-02-20",
         "tools": ["Vite", "Redux Toolkit"]
      }'::jsonb,
-     '2026-03-01 10:07:00');
+     '2026-03-01 10:07:00')
+ON CONFLICT (id) DO NOTHING;
 
 
 -- ============================================================================
@@ -124,7 +125,8 @@ VALUES
         "remoteAllowed": true,
         "preferredTimezone": null
      }'::jsonb,
-     '2026-03-15 09:30:00');
+     '2026-03-15 09:30:00')
+ON CONFLICT (id) DO NOTHING;
 
 
 -- ============================================================================
@@ -158,7 +160,8 @@ VALUES
         "versionNumber": 1,
         "rejectionReason": null
      }'::jsonb,
-     '2026-03-15 09:35:00');
+     '2026-03-15 09:35:00')
+ON CONFLICT (id) DO NOTHING;
 
 
 -- ============================================================================
@@ -169,30 +172,19 @@ INSERT INTO proposals
      status, metadata, submitted_at, accepted_at)
 VALUES
     (1, 1, 1,
-     'I have 5 years of experience building scalable e-commerce platforms with Spring Boot and PostgreSQL. I will deliver a clean, well-tested microservices-friendly backend on schedule.',
+     'Microservices with Spring Boot. 5 years exp, 3 backends delivered.',
      10000, 45, 'ACCEPTED',
-     '{
-        "approachSummary": "Microservices architecture with Spring Boot",
-        "relevantExperience": "Built 3 similar e-commerce backends",
-        "toolsProposed": ["Java 25", "Spring Boot 3", "PostgreSQL", "Docker"],
-        "availabilityStart": "2026-03-10",
-        "portfolioLinks": ["https://github.com/ahmed-dev/ecomm"]
-     }'::jsonb,
+     '{"approachSummary":"Microservices with Spring Boot","relevantExperience":"3 e-commerce backends","toolsProposed":["Java 25","Spring Boot"],"availabilityStart":"2026-03-10"}',
      '2026-03-05 09:00:00',
      '2026-03-09 16:30:00'),
 
     (2, 2, 1,
-     'I can deliver a polished Figma-based UI kit and clickable prototype for your shopping app within the requested timeline.',
+     'Mobile-first Figma UI kit and prototype within timeline.',
      5000, 20, 'SUBMITTED',
-     '{
-        "approachSummary": "Mobile-first design with reusable component library",
-        "relevantExperience": "2 shipped mobile apps",
-        "toolsProposed": ["Figma", "Adobe XD"],
-        "availabilityStart": "2026-03-25",
-        "portfolioLinks": ["https://github.com/ahmed-dev/mobile-ui"]
-     }'::jsonb,
+     '{"approachSummary":"Mobile-first design","relevantExperience":"2 shipped mobile apps","toolsProposed":["Figma","Adobe XD"],"availabilityStart":"2026-03-25"}',
      '2026-03-18 14:00:00',
-     NULL);
+     NULL)
+ON CONFLICT (id) DO NOTHING;
 
 
 -- ============================================================================
@@ -232,7 +224,8 @@ VALUES
         "estimatedDays": 14,
         "actualCompletionDate": "2026-03-25",
         "revisionCount": 0
-     }'::jsonb);
+     }'::jsonb)
+ON CONFLICT (id) DO NOTHING;
 
 
 -- ============================================================================
@@ -252,7 +245,8 @@ VALUES
         "progressPercentage": 100,
         "lastActivityDate": "2026-03-25"
      }'::jsonb,
-     '2026-03-10 00:00:00');
+     '2026-03-10 00:00:00')
+ON CONFLICT (id) DO NOTHING;
 
 
 -- ============================================================================
@@ -269,7 +263,8 @@ VALUES
         "receiptUrl": "https://pay.example/payout001",
         "failureReason": null
      }'::jsonb,
-     '2026-03-25 17:50:00');
+     '2026-03-25 17:50:00')
+ON CONFLICT (id) DO NOTHING;
 
 
 -- ============================================================================
@@ -301,7 +296,8 @@ VALUES
         "eligibleJobCategories": ["WEB_DEV", "MOBILE", "DESIGN", "WRITING"],
         "minimumContractAmount": 0,
         "termsAndConditions": "Platform launch promo - expired"
-     }'::jsonb);
+     }'::jsonb)
+ON CONFLICT (id) DO NOTHING;
 
 
 -- ============================================================================
@@ -310,7 +306,8 @@ VALUES
 INSERT INTO payout_promos
     (id, payout_id, promo_code_id, discount_applied, applied_at)
 VALUES
-    (1, 1, 1, 2000.00, '2026-03-25 17:55:00');
+    (1, 1, 1, 2000.00, '2026-03-25 17:55:00')
+ON CONFLICT (id) DO NOTHING;
 
 
 -- ============================================================================

@@ -184,6 +184,29 @@ if [ "${NO_FORWARD:-0}" != "1" ]; then
   else
     echo "[run] WARNING: Grafana port-forward did not stay up — see .grafana-portforward.log."
   fi
+
+  # RabbitMQ Management UI port-forward
+  RABBIT_PORT="${RABBITMQ_LOCAL_PORT:-15672}"
+  RABBIT_PID_FILE="$ROOT/.rabbitmq-portforward.pid"
+  if [ -f "$RABBIT_PID_FILE" ]; then
+    OLD_PID="$(cat "$RABBIT_PID_FILE" 2>/dev/null || true)"
+    if [ -n "${OLD_PID:-}" ] && kill -0 "$OLD_PID" 2>/dev/null; then
+      kill "$OLD_PID" 2>/dev/null || true
+    fi
+    rm -f "$RABBIT_PID_FILE"
+  fi
+  echo "[run] Starting background RabbitMQ Management UI on http://localhost:${RABBIT_PORT} ..."
+  nohup kubectl port-forward -n freelance svc/rabbitmq "${RABBIT_PORT}:15672" \
+    > "$ROOT/.rabbitmq-portforward.log" 2>&1 &
+  RMQ_PID=$!
+  disown "$RMQ_PID" 2>/dev/null || true
+  echo "$RMQ_PID" > "$RABBIT_PID_FILE"
+  sleep 2
+  if kill -0 "$RMQ_PID" 2>/dev/null; then
+    echo "[run] RabbitMQ UI reachable at http://localhost:${RABBIT_PORT} (port-forward PID $RMQ_PID)."
+  else
+    echo "[run] WARNING: RabbitMQ port-forward did not stay up — see .rabbitmq-portforward.log."
+  fi
 fi
 
 # ──────────────────────────────────────────────────────────────
@@ -234,10 +257,24 @@ echo "      -H 'Content-Type: application/json' \\"
 echo "      -d '{\"email\":\"you@example.com\",\"password\":\"...\"}' | jq -r .token)"
 echo "    curl -s \${GW}/api/jobs -H \"Authorization: Bearer \$TOKEN\""
 echo
-echo "  Grafana      -> http://localhost:3000  (admin / admin)   [background port-forward]"
-echo "  RabbitMQ UI  -> kubectl port-forward svc/rabbitmq 15672:15672 -n freelance"
-echo "                  then open http://localhost:15672  (guest / guest)"
+echo "  Grafana      -> http://localhost:3000   (admin / admin)   [background port-forward]"
+echo "  RabbitMQ UI  -> http://localhost:15672  (guest / guest)  [background port-forward]"
 echo
+echo "================================================================"
+echo "  TO TEST ALL ENDPOINTS (wallet-service demo):"
+echo "    bash demo-youssef-magdy.sh"
+echo
+echo "  What it covers:"
+echo "    0  Health checks — all 5 services"
+echo "    1  Register + Login (JWT issued by JwtService)"
+echo "    2  JWT Chain of Responsibility (4 handlers)"
+echo "    3  Seed test payouts"
+echo "    4  Strategy Pattern + Observer/EventFactory + MongoDB audit trail"
+echo "    5  CorrelationIdFilter — X-Correlation-ID propagation"
+echo "    6  Feign client + exponential backoff retry"
+echo "    7  Prometheus metrics (application_payout_failures_total + JVM)"
+echo "    8  processContractPayout idempotency guard"
+echo "    9  RabbitMQ saga queues"
 echo "================================================================"
 echo "[run] Useful commands:"
 echo "  kubectl get pods -n freelance -w                        # watch pod status"
