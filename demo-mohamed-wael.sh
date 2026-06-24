@@ -29,7 +29,7 @@ check_status() {
 }
 check_body() {
   local label="$1" body="$2" pattern="$3"
-  if echo "$body" | grep -qi "$pattern"; then green "$label";
+  if echo "$body" | grep -Eqi "$pattern"; then green "$label";
   else red "$label" "$body"; fi
 }
 pyparse() {
@@ -68,6 +68,30 @@ redis_keys() {
   } | grep -E "$1" || true
 }
 
+clear_redis_keys() {
+  local pattern="$1" key=""
+  while IFS= read -r key; do
+    [ -z "$key" ] && continue
+    kubectl exec -n "$NS" redis-0 -- redis-cli -a redispass DEL "$key" >/dev/null 2>&1 \
+      || kubectl exec -n "$NS" redis-0 -- redis-cli DEL "$key" >/dev/null 2>&1 \
+      || true
+  done < <(redis_keys "$pattern")
+}
+
+wait_for_mongo_event() {
+  local query="$1" pattern="$2" seconds="${3:-12}" body=""
+  for _ in $(seq 1 "$seconds"); do
+    body=$(mongo_eval "$query")
+    if echo "$body" | grep -qi "$pattern"; then
+      echo "$body"
+      return 0
+    fi
+    sleep 1
+  done
+  echo "$body"
+  return 1
+}
+
 wait_for_log() {
   local deployment="$1" pattern="$2" seconds="${3:-8}" hit=""
   for _ in $(seq 1 "$seconds"); do
@@ -90,6 +114,30 @@ start_port_forward() {
   echo "$pid"
 }
 
+ensure_gateway_forward() {
+  local status=""
+  status=$(curl -s -o /dev/null -w "%{http_code}" "$GW$API_PREFIX/health" 2>/dev/null)
+  if [[ "$status" == "200" ]]; then
+    return 0
+  fi
+
+  echo "  Gateway was not reachable at $GW (HTTP $status). Restarting local api-gateway port-forward on :8080."
+  pkill -f "kubectl port-forward.*api-gateway.*8080" 2>/dev/null || true
+  sleep 1
+  start_port_forward "api-gateway-demo" "svc/api-gateway" "8080:8080" >/dev/null
+
+  for _ in $(seq 1 12); do
+    status=$(curl -s -o /dev/null -w "%{http_code}" "$GW$API_PREFIX/health" 2>/dev/null)
+    if [[ "$status" == "200" ]]; then
+      return 0
+    fi
+    sleep 1
+  done
+
+  echo "  Gateway still not reachable after restarting port-forward; Section 0 will report the live failures."
+  return 1
+}
+
 DEMO_JOB_PRIMARY=130009001
 DEMO_JOB_SECONDARY=130009002
 DEMO_JOB_ACTIVE_CONTRACT=130009003
@@ -104,6 +152,7 @@ DEMO_CONTRACT_COMPLETED=130009002
 
 # ─── 0. HEALTH CHECKS ─────────────────────────────────────────────────────────
 header "0 — HEALTH CHECKS (all 5 services)"
+ensure_gateway_forward || true
 for svc in users jobs proposals contracts payouts; do
   resp=$(curl -s -o /dev/null -w "%{http_code}" "$GW/api/$svc/health")
   check_status "$svc-service reachable" "$resp" "200"
@@ -274,6 +323,7 @@ fi
 
 echo ""
 echo "  Indexing seeded jobs into Elasticsearch through actual endpoint POST $API_PREFIX/{id}/index."
+clear_redis_keys "S2-F10"
 for id in "$DEMO_JOB_PRIMARY" "$DEMO_JOB_SECONDARY" "$DEMO_JOB_ACTIVE_CONTRACT" "$DEMO_JOB_CLOSE"; do
   S=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$GW$API_PREFIX/$id/index" -H "Authorization: Bearer $TOKEN")
   check_status "index job $id into Elasticsearch" "$S" "200"
@@ -291,7 +341,8 @@ REQ_BODY=$(curl -s -X PUT "$GW$API_PREFIX/$DEMO_JOB_PRIMARY/requirements" \
 echo "  Requirements update → $REQ_BODY"
 check_body "S2-F2 requirements update returned updated job" "$REQ_BODY" "observerProof"
 
-MONGO_EVENT=$(mongo_eval "db.getSiblingDB('freelancemongo').job_events.find({jobId:$DEMO_JOB_PRIMARY, action:'REQUIREMENTS_UPDATED_JOB'}).sort({_id:-1}).limit(1).forEach(printjson)")
+MONGO_REQUIREMENTS_QUERY="db.getSiblingDB('freelancemongo').job_events.find({jobId:$DEMO_JOB_PRIMARY, action:'REQUIREMENTS_UPDATED_JOB'}).sort({_id:-1}).limit(1).forEach(printjson)"
+MONGO_EVENT=$(wait_for_mongo_event "$MONGO_REQUIREMENTS_QUERY" "REQUIREMENTS_UPDATED_JOB" 15)
 echo "  Mongo job_events latest REQUIREMENTS_UPDATED_JOB → $MONGO_EVENT"
 check_body "MongoDB job_events contains REQUIREMENTS_UPDATED_JOB" "$MONGO_EVENT" "REQUIREMENTS_UPDATED_JOB"
 
@@ -400,9 +451,16 @@ header "9 — M3 Prometheus metrics"
 echo "  Killing stale local :8081 port-forwards, then starting a fresh one to deployment/job-service target port 8081."
 pkill -f "kubectl port-forward.*8081" 2>/dev/null || true
 sleep 1
-start_port_forward "job-service-prometheus" "deployment/job-service" "8081:8081" >/dev/null
+start_port_forward "job-service-prometheus" "svc/job-service" "8081:8081" >/dev/null
 
 PROMETHEUS=$(curl -s http://localhost:8081/actuator/prometheus 2>/dev/null || true)
+for _ in $(seq 1 12); do
+  if echo "$PROMETHEUS" | grep -q "http_server_requests_seconds_count"; then
+    break
+  fi
+  sleep 1
+  PROMETHEUS=$(curl -s --max-time 2 http://localhost:8081/actuator/prometheus 2>/dev/null || true)
+done
 if [ -z "$PROMETHEUS" ]; then
   red "Actuator /prometheus reachable on localhost:8081" "empty response"
 else
@@ -420,10 +478,12 @@ COUNT_ROWS=$(kubectl exec -n "$NS" "$DB_POD" -- psql -U postgres -d "$DB_NAME" -
 echo "  Seeded demo job row count → $COUNT_ROWS"
 check_body "idempotent seed produced exactly 5 deterministic rows" "$COUNT_ROWS" "^5$"
 
-IDEM1=$(curl -s -o /dev/null -w "%{http_code}" "$GW$API_PREFIX/$DEMO_JOB_CLOSED" -H "Authorization: Bearer $TOKEN")
-IDEM2=$(curl -s -o /dev/null -w "%{http_code}" "$GW$API_PREFIX/$DEMO_JOB_CLOSED" -H "Authorization: Bearer $TOKEN")
-check_status "first stable GET of already-closed job → 200" "$IDEM1" "200"
-check_status "second stable GET of already-closed job → 200" "$IDEM2" "200"
+IDEM1=$(curl -s -o /dev/null -w "%{http_code}" "$GW$API_PREFIX" -H "Authorization: Bearer $TOKEN")
+IDEM2_BODY=$(curl -s "$GW$API_PREFIX" -H "Authorization: Bearer $TOKEN")
+IDEM2=$(curl -s -o /dev/null -w "%{http_code}" "$GW$API_PREFIX" -H "Authorization: Bearer $TOKEN")
+check_status "first stable repeated job-service list operation → 200" "$IDEM1" "200"
+check_status "second stable repeated job-service list operation → 200" "$IDEM2" "200"
+check_body "repeated list still includes deterministic CLOSED job" "$IDEM2_BODY" "$DEMO_JOB_CLOSED"
 
 # ─── 11. M3 RABBITMQ SAGA ────────────────────────────────────────────────────
 header "11 — M3 RabbitMQ saga + job.closed"
@@ -480,7 +540,8 @@ CLOSE_BODY=$(curl -s -X PUT "$GW$API_PREFIX/$DEMO_JOB_CLOSE/close" \
 echo "  Close no-active-contract job → $CLOSE_BODY"
 check_body "close no-active-contract job returns CLOSED" "$CLOSE_BODY" "CLOSED"
 
-JOB_CLOSED_EVENT=$(mongo_eval "db.getSiblingDB('freelancemongo').job_events.find({jobId:$DEMO_JOB_CLOSE, action:'JOB_CLOSED'}).sort({_id:-1}).limit(1).forEach(printjson)")
+MONGO_CLOSED_QUERY="db.getSiblingDB('freelancemongo').job_events.find({jobId:$DEMO_JOB_CLOSE, action:'JOB_CLOSED'}).sort({_id:-1}).limit(1).forEach(printjson)"
+JOB_CLOSED_EVENT=$(wait_for_mongo_event "$MONGO_CLOSED_QUERY" "JOB_CLOSED" 15)
 echo "  Mongo JOB_CLOSED event → $JOB_CLOSED_EVENT"
 check_body "MongoDB job_events contains JOB_CLOSED" "$JOB_CLOSED_EVENT" "JOB_CLOSED"
 

@@ -6,7 +6,7 @@ metadata:
 data:
   SPRING_DATASOURCE_URL: "jdbc:postgresql://contract-postgres:5432/freelancedb-contracts"
   SPRING_DATASOURCE_USERNAME: "postgres"
-  SPRING_DATA_MONGODB_URI: "mongodb://root:rootpass@mongo:27017/freelancemongo?authSource=admin"
+  SPRING_DATA_MONGODB_URI: "mongodb://mongo:27017/freelancemongo"
   SPRING_DATA_REDIS_HOST: "redis"
   SPRING_DATA_REDIS_PORT: "6379"
   SPRING_DATA_REDIS_PASSWORD: "redispass"

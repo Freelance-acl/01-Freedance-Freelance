@@ -95,7 +95,6 @@ public class JobService {
         return jobRepository.findAll();
     }
 
-    @Cacheable(value = "job-by-id", key = "#id", unless = "#result == null")
     public Optional<Job> getJobById(Long id) {
         return jobRepository.findById(id);
     }
@@ -262,11 +261,6 @@ public class JobService {
      * @throws IllegalArgumentException if startDate is after endDate
      * @throws EntityNotFoundException if job is not found
      */
-    @Cacheable(
-            value = "S2-F3",
-            key = "#jobId + ':' + (#startDate == null ? 'NONE' : #startDate.toString()) + ':' + (#endDate == null ? 'NONE' : #endDate.toString())",
-            unless = "#result == null"
-    )
     public JobProposalSummaryDTO getJobProposalSummary(Long jobId, LocalDate startDate, LocalDate endDate) {
         if (startDate == null || endDate == null) {
             throw new IllegalArgumentException("startDate and endDate are required");

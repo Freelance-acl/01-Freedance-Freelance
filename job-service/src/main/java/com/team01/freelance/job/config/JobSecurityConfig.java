@@ -14,6 +14,9 @@ public class JobSecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http, JwtAuthFilter jwtAuthFilter) throws Exception {
-        return JwtResourceServerSecurityConfig.configure(http, jwtAuthFilter, "/api/jobs/health");
+        return JwtResourceServerSecurityConfig.configure(http, jwtAuthFilter,
+                "/api/jobs/health",
+                "/actuator/health",
+                "/actuator/prometheus");
     }
 }

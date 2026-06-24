@@ -8,6 +8,7 @@ public final class PublicEndpoints {
     }
 
     public static boolean isPublic(HttpMethod method, String path) {
-        return path != null && path.endsWith("/health");
+        return path != null
+                && (path.endsWith("/health") || "/actuator/prometheus".equals(path));
     }
 }
