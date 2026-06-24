@@ -1,5 +1,6 @@
 package com.team01.freelance.wallet.support;
 
+import com.team01.freelance.wallet.TestWalletServiceApplication;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -7,7 +8,7 @@ import org.springframework.web.context.WebApplicationContext;
 
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 
-@SpringBootTest
+@SpringBootTest(classes = TestWalletServiceApplication.class)
 @ActiveProfiles("test")
 public abstract class AbstractIntegrationTest {
 

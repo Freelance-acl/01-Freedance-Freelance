@@ -1,4 +1,4 @@
-package com.team01.freelance.contract.messaging;
+package com.team01.freelance.contract.messaging.consumers;
 
 import com.team01.freelance.contract.config.RabbitMQConfig;
 import com.team01.freelance.contract.service.ContractService;

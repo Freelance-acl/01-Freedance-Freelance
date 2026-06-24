@@ -1,12 +1,8 @@
 package com.team01.freelance.contract.config;
 
 import com.team01.freelance.contract.security.JwtAuthenticationFilter;
-import com.team01.freelance.user.config.JwtConfig;
-import com.team01.freelance.user.config.JwtConfigurationBootstrap;
-import com.team01.freelance.user.service.JwtService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Import;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -19,7 +15,6 @@ import static org.springframework.http.HttpStatus.UNAUTHORIZED;
 
 @Configuration
 @EnableWebSecurity
-@Import({JwtConfigurationBootstrap.class, JwtConfig.class, JwtService.class})
 public class ContractSecurityConfig {
 
     @Bean

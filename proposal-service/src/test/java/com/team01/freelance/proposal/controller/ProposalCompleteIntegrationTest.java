@@ -10,7 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.team01.freelance.proposal.dto.FeignContractDTO;
 import com.team01.freelance.proposal.dto.FeignJobDTO;
 import com.team01.freelance.proposal.dto.FeignUserDTO;
-import com.team01.freelance.proposal.messaging.ProposalEventPublisher;
+import com.team01.freelance.proposal.messaging.publishers.ProposalEventPublisher;
 import com.team01.freelance.proposal.model.Proposal;
 import com.team01.freelance.proposal.model.ProposalStatus;
 import com.team01.freelance.proposal.repository.ProposalRepository;

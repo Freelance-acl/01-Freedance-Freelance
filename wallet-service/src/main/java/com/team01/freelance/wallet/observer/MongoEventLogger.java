@@ -2,8 +2,6 @@ package com.team01.freelance.wallet.observer;
 
 import com.team01.freelance.common.event.EventType;
 import com.team01.freelance.common.event.MongoEvent;
-import com.team01.freelance.common.observer.EntityObserver;
-import com.team01.freelance.wallet.observer.WalletCacheInvalidationService;
 import com.team01.freelance.wallet.event.EventFactory;
 import com.team01.freelance.wallet.event.PayoutAuditEvent;
 import com.team01.freelance.wallet.repository.PayoutAuditEventRepository;

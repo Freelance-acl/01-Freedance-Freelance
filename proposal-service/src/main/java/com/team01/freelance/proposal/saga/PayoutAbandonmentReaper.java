@@ -1,6 +1,6 @@
 package com.team01.freelance.proposal.saga;
 
-import com.team01.freelance.proposal.messaging.PaymentEventPublisher;
+import com.team01.freelance.proposal.messaging.publishers.PaymentEventPublisher;
 import com.team01.freelance.proposal.model.Proposal;
 import com.team01.freelance.proposal.model.ProposalStatus;
 import com.team01.freelance.proposal.repository.ProposalRepository;

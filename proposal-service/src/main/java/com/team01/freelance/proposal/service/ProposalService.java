@@ -36,7 +36,7 @@ import com.team01.freelance.proposal.dto.ProposalDetailsDTO;
 import com.team01.freelance.proposal.feign.JobServiceClient;
 import com.team01.freelance.proposal.feign.UserServiceClient;
 import com.team01.freelance.proposal.exception.ForbiddenOperationException;
-import com.team01.freelance.proposal.messaging.ProposalEventPublisher;
+import com.team01.freelance.proposal.messaging.publishers.ProposalEventPublisher;
 import com.team01.freelance.proposal.model.MilestoneStatus;
 import com.team01.freelance.proposal.model.Proposal;
 import com.team01.freelance.proposal.model.ProposalMilestone;
@@ -99,6 +99,9 @@ public class ProposalService {
 
     @Autowired
     private ProposalEventPublisher proposalEventPublisher;
+
+    @Autowired
+    private com.team01.freelance.proposal.saga.SagaMetrics sagaMetrics;
 
     @Autowired
     private ProposalAuthSupport proposalAuthSupport;
@@ -601,6 +604,7 @@ public class ProposalService {
             return proposal;
         }
         proposalStateMachine.transition(proposal, ProposalStatus.PAID);
+        sagaMetrics.recordProposalCompleted();
         return proposalRepository.saveAndFlush(proposal);
     }
 

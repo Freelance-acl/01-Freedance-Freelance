@@ -1,6 +1,6 @@
 package com.team01.freelance.contract.feign;
 
-import com.team01.freelance.job.model.Job;
+import com.team01.freelance.contract.dto.JobDTO;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -9,5 +9,5 @@ import org.springframework.web.bind.annotation.PathVariable;
 public interface JobServiceClient {
 
     @GetMapping("/api/jobs/{id}")
-    Job getJob(@PathVariable Long id);
+    JobDTO getJob(@PathVariable Long id);
 }

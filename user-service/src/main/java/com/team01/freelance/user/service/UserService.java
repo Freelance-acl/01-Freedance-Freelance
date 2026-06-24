@@ -15,7 +15,7 @@ import com.team01.freelance.user.event.AuthEvent;
 import com.team01.freelance.user.feign.ContractServiceClient;
 import com.team01.freelance.user.feign.WalletServiceClient;
 import com.team01.freelance.user.model.User;
-import com.team01.freelance.user.messaging.UserEventPublisher;
+import com.team01.freelance.user.messaging.publishers.UserEventPublisher;
 import com.team01.freelance.user.model.UserRole;
 import com.team01.freelance.user.model.UserSkill;
 import com.team01.freelance.user.model.UserStatus;

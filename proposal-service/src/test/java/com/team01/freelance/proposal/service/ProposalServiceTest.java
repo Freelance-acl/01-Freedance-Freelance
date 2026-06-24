@@ -9,7 +9,7 @@ import com.team01.freelance.proposal.feign.JobServiceClient;
 import com.team01.freelance.proposal.feign.UserServiceClient;
 import com.team01.freelance.proposal.model.MilestoneStatus;
 import com.team01.freelance.proposal.dto.ProposalAnalyticsDTO;
-import com.team01.freelance.proposal.messaging.ProposalEventPublisher;
+import com.team01.freelance.proposal.messaging.publishers.ProposalEventPublisher;
 import com.team01.freelance.proposal.model.Proposal;
 import com.team01.freelance.proposal.security.ProposalAuthSupport;
 import com.team01.freelance.proposal.model.ProposalMilestone;

@@ -13,7 +13,7 @@ data:
       - job_name: user-service
         metrics_path: /actuator/prometheus
         static_configs:
-          - targets: ['user-service.freelance.svc.cluster.local:8080']
+          - targets: ['user-service.freelance.svc.cluster.local:8081']
 
       - job_name: job-service
         metrics_path: /actuator/prometheus
@@ -23,7 +23,7 @@ data:
       - job_name: proposal-service
         metrics_path: /actuator/prometheus
         static_configs:
-          - targets: ['proposal-service.freelance.svc.cluster.local:8082']
+          - targets: ['proposal-service.freelance.svc.cluster.local:8081']
 
       - job_name: contract-service
         metrics_path: /actuator/prometheus
@@ -33,4 +33,4 @@ data:
       - job_name: wallet-service
         metrics_path: /actuator/prometheus
         static_configs:
-          - targets: ['wallet-service.freelance.svc.cluster.local:8084']
+          - targets: ['wallet-service.freelance.svc.cluster.local:8081']

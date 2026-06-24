@@ -6,7 +6,7 @@ import com.team01.freelance.proposal.dto.FeignUserDTO;
 import com.team01.freelance.proposal.feign.ContractServiceClient;
 import com.team01.freelance.proposal.feign.JobServiceClient;
 import com.team01.freelance.proposal.feign.UserServiceClient;
-import com.team01.freelance.proposal.messaging.ProposalEventPublisher;
+import com.team01.freelance.proposal.messaging.publishers.ProposalEventPublisher;
 import com.team01.freelance.proposal.model.Proposal;
 import com.team01.freelance.proposal.model.ProposalStatus;
 import com.team01.freelance.proposal.repository.ProposalRepository;

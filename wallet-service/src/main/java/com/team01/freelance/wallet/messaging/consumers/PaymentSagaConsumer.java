@@ -1,4 +1,4 @@
-package com.team01.freelance.wallet.messaging;
+package com.team01.freelance.wallet.messaging.consumers;
 
 import com.team01.freelance.contracts.events.ProposalCompletedEvent;
 import com.team01.freelance.contracts.events.ProposalCancelledEvent;
