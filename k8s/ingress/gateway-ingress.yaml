@@ -1,0 +1,23 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api-gateway-ingress
+  namespace: freelance
+  annotations:
+    # minikube: nginx.ingress.kubernetes.io/rewrite-target keeps paths intact
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: freelance.local
+      http:
+        paths:
+          # Route all /api/* traffic to the gateway; the gateway's own
+          # path predicates then dispatch to the correct microservice.
+          - path: /(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: api-gateway
+                port:
+                  number: 8080
