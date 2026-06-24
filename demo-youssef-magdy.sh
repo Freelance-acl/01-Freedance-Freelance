@@ -113,7 +113,9 @@ echo "   for newly registered users not present in contract-service's local DB)"
 # Payout A: COMPLETED — for FullPayoutReversalStrategy (FULL scope)
 PAYOUT_ID=$(seed_payout 991 1 500.00 BANK_TRANSFER COMPLETED)
 if [ -z "$PAYOUT_ID" ] || ! echo "$PAYOUT_ID" | grep -qE "^[0-9]+$"; then
-  echo "  ⚠ Could not seed payout A via psql — falling back to ID=1"
+  echo "  ⚠ Could not seed payout A via psql — falling back to ID=1, resetting created_at + status"
+  kubectl exec -n freelance wallet-postgres-0 -- psql -U postgres -d "freelancedb-wallet" -c \
+    "UPDATE payouts SET status='COMPLETED', created_at=NOW() WHERE id=1;" >/dev/null 2>&1 || true
   PAYOUT_ID=1
 fi
 echo "  Payout A (COMPLETED, BANK_TRANSFER, amount=500): id=$PAYOUT_ID"
