@@ -109,6 +109,15 @@ kubectl apply -f k8s/services/
 kubectl apply -f k8s/api-gateway/
 
 # ──────────────────────────────────────────────────────────────
+# Deploy monitoring stack (Loki + Prometheus + Grafana)
+# ──────────────────────────────────────────────────────────────
+echo "[run] Deploying monitoring stack..."
+kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f - 2>/dev/null
+kubectl apply -f k8s/monitoring/loki/       -n monitoring
+kubectl apply -f k8s/monitoring/prometheus/ -n monitoring
+kubectl apply -f k8s/monitoring/grafana/    -n monitoring
+
+# ──────────────────────────────────────────────────────────────
 # Wait for pods — show status on timeout instead of just failing
 # ──────────────────────────────────────────────────────────────
 echo "[run] Waiting for services to become ready (up to 5 min)..."
