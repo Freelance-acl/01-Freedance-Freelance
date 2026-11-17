@@ -24,7 +24,17 @@ public class ProposalSagaConsumer {
         this.proposalService = proposalService;
     }
 
+    @org.springframework.beans.factory.annotation.Autowired
+    @org.springframework.beans.factory.annotation.Qualifier("jsonMessageConverter")
+    private org.springframework.amqp.support.converter.MessageConverter messageConverter;
+
     @RabbitListener(queues = RabbitMQConfig.QUEUE)
+    public void handleMessage(org.springframework.amqp.core.Message message) {
+        // Object parameters can match the framework's provided raw Message argument.
+        // Decode explicitly so the dispatcher always receives the shared event record.
+        handle(messageConverter.fromMessage(message));
+    }
+
     public void handle(Object event) {
         try {
             if (event instanceof ContractCreatedEvent contractCreated) {

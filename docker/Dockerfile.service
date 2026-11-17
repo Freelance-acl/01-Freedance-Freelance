@@ -5,7 +5,6 @@
 ARG MODULE=user-service
 
 FROM eclipse-temurin:25.0.2_10-jdk-noble AS build
-ARG MODULE
 WORKDIR /workspace
 
 COPY pom.xml mvnw ./

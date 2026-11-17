@@ -15,20 +15,20 @@ Microservices backend for a freelance marketplace, using Spring Boot + PostgreSQ
 
 ### M2 database stack (§6)
 
-Six databases run in Docker Compose alongside the five Spring services. PostgreSQL is the **hard** dependency; MongoDB, Redis, Elasticsearch, Neo4j, and Cassandra are **soft** dependencies (features degrade gracefully when unavailable).
+Six databases run in Docker Compose alongside the five Spring services. PostgreSQL is required by each service. Compose also waits for Elasticsearch before starting job-service and for Cassandra plus its keyspace before starting contract-service, because these services initialize their clients during startup.
 
 | Database | Port | Image | Role |
 |----------|------|-------|------|
 | PostgreSQL | 5432 | `postgres:17` | Primary relational data (M1) |
 | MongoDB | 27017 | `mongo:latest` | Event logs / audit (`freelancemongo`) |
 | Redis | 6379 | `redis:latest` | Read-endpoint caching (256 MB, `allkeys-lru`) |
-| Elasticsearch | 9200 | `elasticsearch:8.19.12` | Job full-text search (job-service) |
+| Elasticsearch | 9200 | `elasticsearch:9.2.6` | Job full-text search (job-service) |
 | Neo4j | 7687 | `neo4j:latest` | Proposal recommendation graph |
 | Cassandra | 9042 | `cassandra:latest` | Contract milestone time-series (`freelanceks`) |
 
 Optional GUIs (extra RAM, not in the §6.2 ~4.5 GB estimate): start with `docker compose --profile gui up -d` for Mongo Express (`http://localhost:8888`), Redis Insight (`http://localhost:5540`), and Kibana (`http://localhost:5601`). Neo4j Browser is at `http://localhost:7474`.
 
-**Memory budget (§6.2):** Compose enforces the ACL caps — Redis `--maxmemory 256mb`, Elasticsearch `ES_JAVA_OPTS=-Xms512m -Xmx512m`, Cassandra `MAX_HEAP_SIZE=512M`, Neo4j heap `512m`, Spring apps `-Xmx300m` — plus optional Docker `mem_limit` ceilings so the graded stack stays near **~4.5 GB** and under **5 GB** (CC-5). Check after `docker compose up -d`:
+**Memory budget:** Compose caps Java heaps (Elasticsearch and Cassandra at 512 MB, Spring services at 300 MB) separately from container memory. Cassandra has a 1536 MB container limit and bounded direct memory to allow for native overhead; the previous 768 MB limit caused startup OOM kills. Measure total usage on your machine instead of assuming the stack fits under 5 GB.
 
 ```bash
 docker stats --no-stream
@@ -102,6 +102,8 @@ docker compose down
 docker volume rm 01-freedance-freelance_pgdata
 docker compose up -d --build
 ```
+
+Compose uses console logging through `docker/logback-console.xml`; Loki logging remains configured for Kubernetes. Elasticsearch 9.2.6 matches the Java client bundled by Spring Boot. Database volumes are preserved when containers are recreated.
 
 Local hot reload: run `./mvnw spring-boot:run -pl <service>` on the host with `.env` loaded, or use your IDE with DevTools.
 
