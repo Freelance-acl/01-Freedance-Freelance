@@ -16,7 +16,7 @@ const NAV_ITEMS = [
   { href: '/contracts',     label: 'Contracts',    icon: FileSignature,   roles: ['ADMIN', 'CLIENT', 'FREELANCER'] },
   { href: '/wallet',        label: 'Wallet',       icon: Wallet,          roles: ['ADMIN', 'FREELANCER'] },
   { href: '/users',         label: 'Users',        icon: Users,           roles: ['ADMIN'] },
-  { href: '/saga',          label: 'Saga Flow',    icon: GitBranch,       roles: ['ADMIN', 'CLIENT', 'FREELANCER'] },
+  { href: '/saga',          label: 'Live Workflow',    icon: GitBranch,       roles: ['ADMIN', 'CLIENT', 'FREELANCER'] },
   { href: '/observability', label: 'Observability',icon: Activity,        roles: ['ADMIN'] },
   { href: '/settings',      label: 'Settings',     icon: Settings,        roles: ['ADMIN', 'CLIENT', 'FREELANCER'] },
 ] as const

@@ -17,7 +17,7 @@ export default function WalletPage() {
   const { user } = useAuthContext()
   const qc       = useQueryClient()
 
-  const { data: payouts, isLoading: payoutsLoading } = useQuery({
+  const { data: allPayouts, isLoading: payoutsLoading } = useQuery({
     queryKey: ['payouts'],
     queryFn:  walletApi.getPayouts,
   })
@@ -36,6 +36,8 @@ export default function WalletPage() {
     queryFn:  walletApi.getPromoCodes,
     enabled:  user?.role === 'ADMIN',
   })
+
+  const payouts = allPayouts?.filter(p => user?.role === 'ADMIN' || p.freelancerId === user?.id)
 
   const retryMutation = useMutation({
     mutationFn: (id: number) => walletApi.retryPayout(id),
@@ -59,7 +61,7 @@ export default function WalletPage() {
 
         {/* Payouts table */}
         <Card>
-          <CardHeader><CardTitle>Payout History</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Payout History</CardTitle><p className="text-sm text-gray-500">Local demo ledger. No real money is transferred.</p></CardHeader>
           {payouts?.length === 0 ? (
             <CardContent><EmptyState title="No payouts yet" /></CardContent>
           ) : (
@@ -67,7 +69,7 @@ export default function WalletPage() {
               <table className="w-full text-sm">
                 <thead className="border-b border-gray-100 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/50">
                   <tr>
-                    {['ID', 'Contract', 'Amount', 'Platform Fee', 'Status', 'Date', ''].map((h) => (
+                    {['ID', 'Contract', 'Gross Amount', 'Platform Fee', 'Net Amount', 'Status', 'Date', ''].map((h) => (
                       <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">{h}</th>
                     ))}
                   </tr>
@@ -78,7 +80,8 @@ export default function WalletPage() {
                       <td className="px-4 py-3 text-gray-500">#{p.id}</td>
                       <td className="px-4 py-3 text-gray-500">#{p.contractId}</td>
                       <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">{formatCurrency(p.amount)}</td>
-                      <td className="px-4 py-3 text-gray-500">{formatCurrency(p.platformFee)}</td>
+                      <td className="px-4 py-3 text-gray-500">{p.processedAt ? formatCurrency(p.platformFee) : 'Not processed'}</td>
+                      <td className="px-4 py-3 text-gray-500">{p.status === 'COMPLETED' ? formatCurrency(p.amount - p.platformFee) : 'Not completed'}</td>
                       <td className="px-4 py-3"><StatusBadge status={p.status} /></td>
                       <td className="px-4 py-3 text-gray-400">{formatDate(p.createdAt)}</td>
                       <td className="px-4 py-3">
@@ -143,7 +146,7 @@ export default function WalletPage() {
                   {promoCodes.map((c) => (
                     <tr key={c.id}>
                       <td className="px-4 py-3 font-mono font-semibold text-brand-600">{c.code}</td>
-                      <td className="px-4 py-3 text-gray-500">{c.discountPercent}%</td>
+                      <td className="px-4 py-3 text-gray-500">{c.discountType === 'FIXED' ? formatCurrency(c.discountPercent) : `${c.discountPercent}%`}</td>
                       <td className="px-4 py-3 text-gray-500">{c.usageCount} / {c.maxUsage}</td>
                       <td className="px-4 py-3 text-gray-500">{formatDate(c.expiresAt)}</td>
                       <td className="px-4 py-3">

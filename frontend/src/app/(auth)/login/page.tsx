@@ -16,6 +16,7 @@ const schema = z.object({
 })
 type FormData = z.infer<typeof schema>
 
+const MOCK = process.env.NEXT_PUBLIC_MOCK_MODE === 'true'
 const DEMO_ACCOUNTS = [
   { label: 'Admin',      email: 'admin@freelance.com', role: 'ADMIN' },
   { label: 'Client',     email: 'alice@example.com',   role: 'CLIENT' },
@@ -33,7 +34,7 @@ export default function LoginPage() {
       await login(data)
       toast.success('Welcome back!')
     } catch {
-      toast.error('Invalid credentials. Try a demo account below.')
+      toast.error('Sign-in failed. Check your email and password.')
     }
   }
 
@@ -42,11 +43,11 @@ export default function LoginPage() {
       <CardHeader className="text-center">
         <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-brand-600 text-white font-bold text-lg">F</div>
         <CardTitle>Sign in to Freedance</CardTitle>
-        <CardDescription>Enter your credentials or pick a demo account</CardDescription>
+        <CardDescription>Sign in with your registered account</CardDescription>
       </CardHeader>
       <CardContent>
         {/* Demo shortcuts */}
-        <div className="mb-6 grid grid-cols-3 gap-2">
+        {MOCK && <div className="mb-6 grid grid-cols-3 gap-2">
           {DEMO_ACCOUNTS.map((acc) => (
             <button
               key={acc.email}
@@ -58,7 +59,7 @@ export default function LoginPage() {
               <span className="text-gray-400">{acc.role}</span>
             </button>
           ))}
-        </div>
+        </div>}
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <Input

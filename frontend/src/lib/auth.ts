@@ -6,7 +6,7 @@ const USER_KEY  = 'freelance_user'
 
 interface JwtPayload {
   sub: string
-  id: number
+  uid: number
   name: string
   email: string
   role: UserRole
@@ -43,9 +43,9 @@ export function decodeToken(token: string): AuthUser | null {
     const payload = jwtDecode<JwtPayload>(token)
     if (payload.exp * 1000 < Date.now()) return null
     return {
-      id:    payload.id,
-      name:  payload.name,
-      email: payload.email,
+      id:    payload.uid,
+      name:  payload.name ?? payload.sub,
+      email: payload.email ?? payload.sub,
       role:  payload.role,
     }
   } catch {

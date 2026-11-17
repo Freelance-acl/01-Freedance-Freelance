@@ -10,7 +10,7 @@ export interface AuthUser {
 }
 
 export interface LoginRequest  { email: string; password: string }
-export interface RegisterRequest { name: string; email: string; password: string; role: UserRole }
+export interface RegisterRequest { name: string; email: string; password: string; role: UserRole; phone: string }
 export interface AuthResponse  { token: string; user: AuthUser }
 
 // ─── User ────────────────────────────────────────────────────────────────────
@@ -24,6 +24,7 @@ export interface User {
   skills?: string[]
   rating?: number
   active: boolean
+  phone?: string
   preferences?: Record<string, unknown>
   createdAt: string
 }
@@ -61,7 +62,7 @@ export interface Job {
   category: string
   requirements?: string
   createdAt: string
-  updatedAt: string
+  updatedAt?: string
   rating?: number
 }
 
@@ -110,6 +111,8 @@ export type ProposalStatus =
   | 'REJECTED'
 
 export interface Proposal {
+  contractId?: number
+  acceptedAt?: string
   id: number
   jobId: number
   freelancerId: number
@@ -231,6 +234,7 @@ export interface PromoCode {
   id: number
   code: string
   discountPercent: number
+  discountType?: string
   usageCount: number
   maxUsage: number
   expiresAt: string

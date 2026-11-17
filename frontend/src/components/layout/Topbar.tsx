@@ -3,10 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
-import {
-  Bell, ChevronRight, FileText, FileSignature, DollarSign,
-  CheckCircle2, XCircle, AlertTriangle, UserPlus, TrendingUp, Star,
-} from 'lucide-react'
+import { Bell, ChevronRight } from 'lucide-react'
 import { useAuthContext } from '@/providers/AuthProvider'
 import { getInitials } from '@/lib/utils'
 import type { UserRole } from '@/lib/types'
@@ -20,7 +17,7 @@ const SEGMENT_LABELS: Record<string, string> = {
   contracts:     'Contracts',
   wallet:        'Wallet',
   users:         'Users',
-  saga:          'Saga Flow',
+  saga:          'Live Workflow',
   observability: 'Observability',
   settings:      'Settings',
   create:        'Create',
@@ -52,37 +49,7 @@ interface Notification {
   time: string
 }
 
-const NOTIFICATIONS: Record<UserRole, Notification[]> = {
-  ADMIN: [
-    { id: 1, icon: UserPlus,      iconColor: 'text-brand-500 bg-brand-50 dark:bg-brand-900/30',    text: 'New user registered: Sofia Nguyen (FREELANCER)',          time: '2m ago' },
-    { id: 2, icon: AlertTriangle, iconColor: 'text-red-500 bg-red-50 dark:bg-red-900/30',          text: 'Contract #324 terminated — compensation refund issued',    time: '18m ago' },
-    { id: 3, icon: DollarSign,    iconColor: 'text-amber-500 bg-amber-50 dark:bg-amber-900/30',    text: 'Payout #422 refund of $3,400 processed successfully',      time: '1h ago' },
-    { id: 4, icon: AlertTriangle, iconColor: 'text-red-500 bg-red-50 dark:bg-red-900/30',          text: 'Retry requested for failed payout on Contract #308',       time: '3h ago' },
-    { id: 5, icon: UserPlus,      iconColor: 'text-brand-500 bg-brand-50 dark:bg-brand-900/30',    text: '4 new freelancers joined the platform this week',          time: '1d ago' },
-    { id: 6, icon: TrendingUp,    iconColor: 'text-emerald-500 bg-emerald-50 dark:bg-emerald-900/30', text: 'Monthly revenue hit $147,500 — best month on record',   time: '2d ago' },
-    { id: 7, icon: FileSignature, iconColor: 'text-violet-500 bg-violet-50 dark:bg-violet-900/30', text: '12 new contracts created in the last 24 hours',            time: '2d ago' },
-  ],
-  CLIENT: [
-    { id: 1, icon: FileText,      iconColor: 'text-brand-500 bg-brand-50 dark:bg-brand-900/30',    text: 'Bob submitted a proposal for "Video Streaming Backend"',   time: '5m ago' },
-    { id: 2, icon: CheckCircle2,  iconColor: 'text-emerald-500 bg-emerald-50 dark:bg-emerald-900/30', text: 'Contract #303 — Bob has marked the DevOps work complete', time: '2h ago' },
-    { id: 3, icon: FileText,      iconColor: 'text-brand-500 bg-brand-50 dark:bg-brand-900/30',    text: 'Carol submitted a proposal for "SaaS Landing Page Redesign"', time: '4h ago' },
-    { id: 4, icon: CheckCircle2,  iconColor: 'text-emerald-500 bg-emerald-50 dark:bg-emerald-900/30', text: 'Contract #316 — CMS project completed by Priya Sharma',  time: '1d ago' },
-    { id: 5, icon: FileText,      iconColor: 'text-brand-500 bg-brand-50 dark:bg-brand-900/30',    text: 'Lena Schmidt submitted a proposal for "SaaS Landing Page"', time: '1d ago' },
-    { id: 6, icon: CheckCircle2,  iconColor: 'text-emerald-500 bg-emerald-50 dark:bg-emerald-900/30', text: 'Contract #314 — iOS Fitness App completed by Lena Schmidt', time: '2d ago' },
-    { id: 7, icon: FileSignature, iconColor: 'text-violet-500 bg-violet-50 dark:bg-violet-900/30', text: 'Contract #313 created for ML Pricing Engine with Karim',   time: '3d ago' },
-  ],
-  FREELANCER: [
-    { id: 1, icon: CheckCircle2,  iconColor: 'text-emerald-500 bg-emerald-50 dark:bg-emerald-900/30', text: 'Your proposal for "Real-Time Chat App" was accepted!',    time: '1h ago' },
-    { id: 2, icon: DollarSign,    iconColor: 'text-emerald-500 bg-emerald-50 dark:bg-emerald-900/30', text: 'Payment of $7,380 received — Contract #306 completed',    time: '6h ago' },
-    { id: 3, icon: Star,          iconColor: 'text-amber-500 bg-amber-50 dark:bg-amber-900/30',    text: 'Your proposal for "GraphQL API Gateway" was shortlisted',  time: '1d ago' },
-    { id: 4, icon: DollarSign,    iconColor: 'text-emerald-500 bg-emerald-50 dark:bg-emerald-900/30', text: 'Payment of $4,950 received — Contract #307 completed',    time: '3d ago' },
-    { id: 5, icon: XCircle,       iconColor: 'text-red-500 bg-red-50 dark:bg-red-900/30',          text: 'Your proposal for "AI Chatbot Integration" was not selected', time: '4d ago' },
-    { id: 6, icon: DollarSign,    iconColor: 'text-emerald-500 bg-emerald-50 dark:bg-emerald-900/30', text: 'Payment of $6,750 received — Contract #305 completed',    time: '5d ago' },
-    { id: 7, icon: FileSignature, iconColor: 'text-violet-500 bg-violet-50 dark:bg-violet-900/30', text: 'Contract #308 created for Mobile App Redesign with Grace', time: '6d ago' },
-  ],
-}
-
-// ─── Topbar ───────────────────────────────────────────────────────────────────
+const NOTIFICATIONS: Record<UserRole, Notification[]> = { ADMIN: [], CLIENT: [], FREELANCER: [] }
 
 export function Topbar({ title }: { title?: string }) {
   const { user }   = useAuthContext()
@@ -141,6 +108,7 @@ export function Topbar({ title }: { title?: string }) {
 
       {/* Right: notifications + user */}
       <div className="flex items-center gap-2 ml-4">
+        <span className="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-600 dark:bg-gray-800 dark:text-gray-300">{process.env.NEXT_PUBLIC_MOCK_MODE === 'true' ? 'Mock data' : 'Live API'}</span>
 
         {/* Bell + dropdown */}
         <div className="relative" ref={panelRef}>
@@ -155,7 +123,7 @@ export function Topbar({ title }: { title?: string }) {
                 {unread > 9 ? '9+' : unread}
               </span>
             ) : (
-              <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-brand-400 ring-1 ring-white dark:ring-gray-900" />
+              null
             )}
           </button>
 
@@ -181,6 +149,7 @@ export function Topbar({ title }: { title?: string }) {
                 )}
               </div>
 
+              {notifications.length === 0 && <p className="px-4 py-6 text-sm text-gray-500">No live notification feed is configured.</p>}
               {/* List */}
               <ul className="max-h-80 overflow-y-auto divide-y divide-gray-50 dark:divide-gray-800">
                 {notifications.map((n) => {
@@ -212,7 +181,7 @@ export function Topbar({ title }: { title?: string }) {
               {/* Footer */}
               <div className="border-t border-gray-100 px-4 py-2.5 dark:border-gray-700">
                 <p className="text-center text-xs text-gray-400 dark:text-gray-500">
-                  Showing {notifications.length} most recent notifications
+                  Notifications are not connected. View current records on the Workflow page.
                 </p>
               </div>
             </div>

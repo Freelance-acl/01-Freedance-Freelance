@@ -9,7 +9,7 @@ import { Pagination } from '@/components/ui/pagination'
 import { StatusBadge } from '@/components/StatusBadge'
 import { LoadingState, EmptyState } from '@/components/LoadingState'
 import { useAuthContext } from '@/providers/AuthProvider'
-import { proposalsApi } from '@/lib/api'
+import { proposalsApi, jobsApi } from '@/lib/api'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import type { ProposalStatus } from '@/lib/types'
 
@@ -36,7 +36,8 @@ export default function ProposalsPage() {
       if (!user) return Promise.resolve([])
       if (user.role === 'ADMIN') return proposalsApi.getAll()
       if (user.role === 'FREELANCER') return proposalsApi.getByFreelancer(user.id)
-      return proposalsApi.getAll()
+      return Promise.all([proposalsApi.getAll(), jobsApi.getByClient(user.id)])
+        .then(([proposals, jobs]) => proposals.filter(p => jobs.some(j => j.id === p.jobId)))
     },
     enabled: !!user,
   })

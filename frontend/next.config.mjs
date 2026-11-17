@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  distDir: process.env.NEXT_DIST_DIR || '.next',
   async rewrites() {
     const gatewayUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:30080'
     return [

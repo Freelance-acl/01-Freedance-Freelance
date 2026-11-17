@@ -13,6 +13,7 @@ import { useAuthContext } from '@/providers/AuthProvider'
 
 const schema = z.object({
   name:     z.string().min(2, 'Name must be at least 2 characters'),
+  phone:    z.string().regex(/^\+?[0-9]{10,15}$/, 'Enter 10 to 15 digits'),
   email:    z.string().email('Invalid email'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
   role:     z.enum(['CLIENT', 'FREELANCER']),
@@ -48,6 +49,8 @@ export default function RegisterPage() {
             id="name" label="Full name" placeholder="John Smith"
             error={errors.name?.message} {...register('name')}
           />
+          <Input id="phone" label="Phone" type="tel" placeholder="+201000000001"
+            error={errors.phone?.message} {...register('phone')} />
           <Input
             id="email" label="Email" type="email" placeholder="you@example.com"
             error={errors.email?.message} {...register('email')}

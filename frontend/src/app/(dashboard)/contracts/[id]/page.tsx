@@ -9,10 +9,9 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { BackButton } from '@/components/ui/back-button'
-import { StatusBadge } from '@/components/StatusBadge'
 import { LoadingState } from '@/components/LoadingState'
 import { useAuthContext } from '@/providers/AuthProvider'
-import { contractsApi } from '@/lib/api'
+import { contractsApi, walletApi } from '@/lib/api'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import {
   DollarSign, Calendar, User, FileSignature, AlertTriangle,
@@ -37,7 +36,7 @@ const STATUS_CONFIG = {
   TERMINATED: {
     icon: AlertTriangle,
     label: 'Terminated',
-    desc: 'This contract was terminated before completion. Any escrow funds were refunded.',
+    desc: 'This contract was terminated before completion. See the payout record for any refund status.',
     bannerClass: 'from-red-600 to-rose-700',
     pillClass: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
   },
@@ -55,6 +54,14 @@ export default function ContractDetailPage() {
     queryFn:  () => contractsApi.getById(Number(id)),
   })
 
+  const { data: payouts } = useQuery({ queryKey: ['payouts'], queryFn: walletApi.getPayouts })
+  const payout = payouts?.find(p => p.contractId === Number(id))
+
+  const releaseMutation = useMutation({
+    mutationFn: () => walletApi.processContract(Number(id)),
+    onSuccess: () => { qc.invalidateQueries(); toast.success('Demo payout processed in the local ledger.') },
+  })
+
   const terminateMutation = useMutation({
     mutationFn: () => contractsApi.terminate(Number(id), reason),
     onSuccess:  () => {
@@ -69,7 +76,8 @@ export default function ContractDetailPage() {
   if (isLoading) return <DashboardLayout title="Contract Details"><LoadingState message="Loading contract…" /></DashboardLayout>
   if (!contract) return <DashboardLayout title="Contract Details"><p className="text-gray-500">Contract not found.</p></DashboardLayout>
 
-  const canTerminate = (user?.role === 'ADMIN' || user?.role === 'CLIENT') && contract.status === 'ACTIVE'
+  const isClient = user?.role === 'ADMIN' || (user?.role === 'CLIENT' && contract.clientId === user.id)
+  const canTerminate = isClient && contract.status === 'ACTIVE'
   const cfg = STATUS_CONFIG[contract.status] ?? STATUS_CONFIG.ACTIVE
   const StatusIcon = cfg.icon
 
@@ -157,6 +165,14 @@ export default function ContractDetailPage() {
               </CardContent>
             </Card>
 
+            {isClient && contract.status === 'COMPLETED' && payout?.status === 'PENDING' && (
+              <Card><CardHeader><CardTitle>Release Demo Payout</CardTitle></CardHeader>
+                <CardContent className="space-y-3">
+                  <p className="text-sm text-gray-500">Process the pending payout through the wallet service. This is a local simulated bank transfer; no real money moves.</p>
+                  <Button isLoading={releaseMutation.isPending} onClick={() => releaseMutation.mutate()}>Process Demo Payout</Button>
+                </CardContent>
+              </Card>
+            )}
             {/* Financial summary */}
             <Card>
               <CardHeader><CardTitle className="flex items-center gap-2"><DollarSign className="h-4 w-4 text-emerald-500" /> Financial Summary</CardTitle></CardHeader>
@@ -164,8 +180,8 @@ export default function ContractDetailPage() {
                 <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
                   {[
                     { label: 'Agreed Amount', value: formatCurrency(contract.agreedAmount), color: 'text-gray-900 dark:text-white' },
-                    { label: 'Platform Fee (10%)', value: formatCurrency(contract.agreedAmount * 0.10), color: 'text-gray-500' },
-                    { label: 'Freelancer Payout', value: formatCurrency(contract.agreedAmount * 0.90), color: 'text-emerald-600 dark:text-emerald-400 font-bold' },
+                    { label: 'Recorded Platform Fee', value: payout?.processedAt ? formatCurrency(payout.platformFee) : 'Not processed', color: 'text-gray-500' },
+                    { label: 'Net Freelancer Payout', value: payout?.status === 'COMPLETED' ? formatCurrency(payout.amount - payout.platformFee) : 'Not completed', color: 'text-emerald-600 dark:text-emerald-400 font-bold' },
                   ].map(({ label, value, color }) => (
                     <div key={label} className="rounded-xl bg-gray-50 p-4 dark:bg-gray-800/50">
                       <p className="text-xs text-gray-400 uppercase tracking-wide">{label}</p>
@@ -207,7 +223,7 @@ export default function ContractDetailPage() {
                 {showTerminate && (
                   <CardContent className="space-y-4">
                     <p className="text-sm text-gray-600 dark:text-gray-400">
-                      Terminating a contract will trigger the saga compensation flow — any held funds will be refunded to the client.
+                      Terminating updates the contract status. It does not automatically refund payouts.
                     </p>
                     <textarea
                       value={reason} onChange={(e) => setReason(e.target.value)}

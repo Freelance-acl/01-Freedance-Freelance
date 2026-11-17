@@ -41,7 +41,7 @@ export default function ClientDashboardPage() {
           <MetricCard isLoading={isLoading} label="Total Jobs Posted"  value={jobs?.length ?? 0}         icon={Briefcase}     color="brand" />
           <MetricCard isLoading={isLoading} label="Open Jobs"          value={openJobs}                  icon={Briefcase}     color="emerald" />
           <MetricCard isLoading={isLoading} label="Active Contracts"   value={activeConts}               icon={FileSignature} color="amber" />
-          <MetricCard isLoading={isLoading} label="Total Spent"        value={formatCurrency(totalSpent)} icon={DollarSign}   color="emerald" />
+          <MetricCard isLoading={isLoading} label="Completed Contract Value"        value={formatCurrency(totalSpent)} icon={DollarSign}   color="emerald" />
         </div>
 
         <div className="grid gap-6 lg:grid-cols-2">

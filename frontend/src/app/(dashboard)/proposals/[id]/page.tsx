@@ -11,7 +11,7 @@ import { BackButton } from '@/components/ui/back-button'
 import { StatusBadge } from '@/components/StatusBadge'
 import { LoadingState } from '@/components/LoadingState'
 import { useAuthContext } from '@/providers/AuthProvider'
-import { proposalsApi } from '@/lib/api'
+import { proposalsApi, jobsApi } from '@/lib/api'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import {
   DollarSign, Clock, Calendar, CheckCircle2,
@@ -28,6 +28,9 @@ export default function ProposalDetailPage() {
     queryKey: ['proposal', id],
     queryFn:  () => proposalsApi.getById(Number(id)),
   })
+
+  const { data: job } = useQuery({ queryKey: ['job', proposal?.jobId],
+    queryFn: () => jobsApi.getById(proposal!.jobId), enabled: !!proposal })
 
   const acceptMutation = useMutation({
     mutationFn: () => proposalsApi.accept(Number(id)),
@@ -49,11 +52,11 @@ export default function ProposalDetailPage() {
   if (isLoading) return <DashboardLayout title="Proposal Details"><LoadingState message="Loading proposal…" /></DashboardLayout>
   if (!proposal) return <DashboardLayout title="Proposal Details"><p className="text-gray-500">Proposal not found.</p></DashboardLayout>
 
-  const isClient     = user?.role === 'CLIENT' || user?.role === 'ADMIN'
-  const isFreelancer = user?.role === 'FREELANCER'
+  const isClient     = user?.role === 'ADMIN' || (user?.role === 'CLIENT' && job?.clientId === user.id)
+  const isFreelancer = user?.role === 'FREELANCER' && proposal.freelancerId === user.id
   const canAccept    = isClient && proposal.status === 'SUBMITTED'
   const canReject    = isClient && (proposal.status === 'SUBMITTED' || proposal.status === 'SHORTLISTED')
-  const canComplete  = isFreelancer && proposal.status === 'ACCEPTED'
+  const canComplete  = isFreelancer && proposal.status === 'ACCEPTED' && !!proposal.contractId
   const canWithdraw  = isFreelancer && proposal.status === 'SUBMITTED'
   const hasActions   = canAccept || canReject || canComplete || canWithdraw
 
@@ -104,21 +107,21 @@ export default function ProposalDetailPage() {
           <div className="flex items-start gap-3 rounded-xl border border-brand-200 bg-brand-50 p-4 dark:border-brand-800 dark:bg-brand-900/20">
             <CheckCircle2 className="h-5 w-5 text-brand-600 dark:text-brand-400 shrink-0 mt-0.5" />
             <div>
-              <p className="text-sm font-semibold text-brand-700 dark:text-brand-300">Contract Created via Saga</p>
+              <p className="text-sm font-semibold text-brand-700 dark:text-brand-300">{proposal.contractId ? `Contract #${proposal.contractId} Created` : 'Waiting for Contract Creation'}</p>
               <p className="mt-0.5 text-sm text-brand-600/80 dark:text-brand-400/80">
-                The choreography saga has automatically created a contract. Check the{' '}
+                Acceptance requests automatic contract creation. Check its current status below. Check the{' '}
                 <Link href="/contracts" className="underline font-medium">Contracts</Link> page for details.
               </p>
             </div>
           </div>
         )}
-        {proposal.status === 'COMPLETING' && (
+        {(proposal.status === 'COMPLETING' || proposal.status === 'PAYMENT_PENDING') && (
           <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-900/20">
             <Clock className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
             <div>
-              <p className="text-sm font-semibold text-amber-700 dark:text-amber-300">Payment Processing</p>
+              <p className="text-sm font-semibold text-amber-700 dark:text-amber-300">Awaiting Payout Release</p>
               <p className="mt-0.5 text-sm text-amber-600/80 dark:text-amber-400/80">
-                Work is marked complete. The wallet service is initiating the payout. Check your{' '}
+                Work completion requests a payout. The client releases the demo payment from the contract page. Check your{' '}
                 <Link href="/wallet" className="underline font-medium">Wallet</Link> for status.
               </p>
             </div>
@@ -177,7 +180,7 @@ export default function ProposalDetailPage() {
                   </div>
                   {canAccept && (
                     <p className="mt-3 text-xs text-gray-400">
-                      Accepting will trigger the saga: a contract will be created automatically and other proposals will be rejected.
+                      Accepting will trigger the saga: a contract will be created automatically via RabbitMQ.
                     </p>
                   )}
                 </CardContent>

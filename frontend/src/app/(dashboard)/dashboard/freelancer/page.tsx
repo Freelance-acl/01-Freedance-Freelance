@@ -34,7 +34,7 @@ export default function FreelancerDashboardPage() {
   const isLoading = pLoading || cLoading
 
   const activeConts     = contracts?.filter((c) => c.status === 'ACTIVE').length ?? 0
-  const acceptedProps   = proposals?.filter((p) => p.status === 'ACCEPTED' || p.status === 'COMPLETING').length ?? 0
+  const acceptedProps   = proposals?.filter((p) => ['ACCEPTED', 'COMPLETING', 'PAYMENT_PENDING'].includes(p.status)).length ?? 0
   const completionCount = contracts?.filter((c) => c.status === 'COMPLETED').length ?? 0
   const totalConts      = contracts?.length ?? 1
   const rate            = totalConts > 0 ? Math.round((completionCount / totalConts) * 100) : 0

@@ -16,7 +16,7 @@ npm run dev                         # http://localhost:3000
 | Variable | Default | Description |
 |---|---|---|
 | `NEXT_PUBLIC_API_URL` | `http://localhost:30080` | API Gateway URL (K8s NodePort) |
-| `NEXT_PUBLIC_MOCK_MODE` | `true` | Use mock data without a running backend |
+| `NEXT_PUBLIC_MOCK_MODE` | `false` in example | Use mock data without a running backend |
 | `NEXT_PUBLIC_GRAFANA_URL` | `http://localhost:3001` | Grafana dashboard URL |
 | `NEXT_PUBLIC_PROMETHEUS_URL` | `http://localhost:9090` | Prometheus URL |
 | `NEXT_PUBLIC_KIBANA_URL` | `http://localhost:5601` | Kibana URL |
@@ -24,7 +24,7 @@ npm run dev                         # http://localhost:3000
 
 ## Demo Accounts (Mock Mode)
 
-On the login page, click a shortcut to auto-fill credentials:
+Only when `NEXT_PUBLIC_MOCK_MODE=true`, the login page shows mock account shortcuts:
 
 | Role | Email | Password |
 |---|---|---|
@@ -53,9 +53,22 @@ On the login page, click a shortcut to auto-fill credentials:
 | `/wallet` | FREELANCER, ADMIN | Payouts, platform fees, promo codes |
 | `/users` | ADMIN | User management table with deactivate |
 | `/users/[id]` | ADMIN | User profile with earnings summary |
-| `/saga` | All | Choreography saga timeline + architecture |
+| `/saga` | All | Live proposal, contract, and payout state (polls every 5 seconds) |
 | `/observability` | ADMIN | Links to Grafana, Prometheus, Kibana, RabbitMQ |
 | `/settings` | All | Update profile, view account info |
+
+## Recording a real backend demo
+
+Use [the recording guide](../docs/RECORDING-DEMO.md). In live mode, all operational data and dashboard charts come from the backend. The workflow page shows current persisted states, not an event history. Notifications are explicitly marked unconnected instead of showing fabricated activity.
+
+```bash
+# From the repository root, with Docker and the frontend running:
+python scripts/verify-demo.py
+# From frontend/, with Google Chrome installed:
+npm run test:demo
+```
+
+The first script creates clearly named local demo accounts and exercises the real HTTP/RabbitMQ/database flow. It leaves the test records for inspection. Browser tests additionally verify forms and session reload. Wallet payouts are simulated by the backend and never transfer real money.
 
 ## Switching to Live Backend
 

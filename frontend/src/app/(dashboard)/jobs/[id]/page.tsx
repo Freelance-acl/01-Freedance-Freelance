@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import Link from 'next/link'
@@ -19,7 +19,6 @@ import { DollarSign, Calendar, Tag, Users, Send, X, Briefcase, Clock } from 'luc
 export default function JobDetailPage() {
   const { id }    = useParams<{ id: string }>()
   const { user }  = useAuthContext()
-  const router    = useRouter()
   const qc        = useQueryClient()
   const [bid, setBid]           = useState('')
   const [letter, setLetter]     = useState('')
@@ -61,7 +60,7 @@ export default function JobDetailPage() {
   if (!job) return <DashboardLayout title="Job Details"><p className="text-gray-500">Job not found.</p></DashboardLayout>
 
   const canSubmit = user?.role === 'FREELANCER' && job.status === 'OPEN'
-  const canClose  = (user?.role === 'CLIENT' || user?.role === 'ADMIN') && job.status === 'OPEN'
+  const canClose  = (user?.role === 'ADMIN' || (user?.role === 'CLIENT' && job.clientId === user.id)) && job.status === 'OPEN'
 
   return (
     <DashboardLayout title="Job Details">

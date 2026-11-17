@@ -4,16 +4,14 @@ import { useQuery } from '@tanstack/react-query'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { MetricCard } from '@/components/MetricCard'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { contractsApi } from '@/lib/api'
+import { contractsApi, usersApi, proposalsApi } from '@/lib/api'
 import { walletApi } from '@/lib/api'
 import { formatCurrency } from '@/lib/utils'
-import { mockRevenueChart, mockTopFreelancers } from '@/lib/mock-data'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
 } from 'recharts'
 import { Users, Briefcase, FileSignature, DollarSign } from 'lucide-react'
-import { mockProposalStatusData } from '@/lib/mock-data'
 
 export default function AdminDashboardPage() {
   const { data: dashboard, isLoading } = useQuery({
@@ -25,24 +23,47 @@ export default function AdminDashboardPage() {
     queryFn:  walletApi.getPlatformFees,
   })
 
+  const { data: payouts = [] } = useQuery({ queryKey: ['payouts'], queryFn: walletApi.getPayouts })
+  const { data: proposals = [] } = useQuery({ queryKey: ['proposals'], queryFn: proposalsApi.getAll })
+  const { data: users = [] } = useQuery({ queryKey: ['users'], queryFn: usersApi.getAll })
+  const { data: contracts = [] } = useQuery({ queryKey: ['contracts'], queryFn: contractsApi.getAll })
+  const monthlyFees: Record<string, number> = {}
+  payouts.filter(p => p.status === 'COMPLETED').forEach(p => {
+    const month = (p.processedAt ?? p.createdAt).slice(0, 7)
+    monthlyFees[month] = (monthlyFees[month] ?? 0) + p.platformFee
+  })
+  const revenueChart = Object.entries(monthlyFees).sort(([a], [b]) => a.localeCompare(b))
+    .map(([month, revenue]) => ({ month, revenue }))
+  const counts: Record<string, number> = {}
+  proposals.forEach(p => { counts[p.status] = (counts[p.status] ?? 0) + 1 })
+  const colors = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6']
+  const proposalStatusData = Object.entries(counts).map(([name, value], i) => ({ name, value, fill: colors[i % colors.length] }))
+  const topFreelancers = users.filter(u => u.role === 'FREELANCER').map(u => {
+    const own = contracts.filter(c => c.freelancerId === u.id)
+    return { freelancerId: u.id, name: u.name, completedContracts: own.filter(c => c.status === 'COMPLETED').length,
+      completionRate: own.length ? own.filter(c => c.status === 'COMPLETED').length / own.length : 0,
+      totalEarnings: payouts.filter(p => p.freelancerId === u.id && p.status === 'COMPLETED').reduce((sum, p) => sum + p.amount - p.platformFee, 0) }
+  }).sort((a, b) => b.totalEarnings - a.totalEarnings).slice(0, 5)
+
   return (
     <DashboardLayout title="Admin Overview">
       <div className="space-y-6">
+        <p className="text-sm text-gray-500">Live totals from persisted backend records. Refreshes every 5 seconds.</p>
         {/* Metrics row */}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <MetricCard isLoading={isLoading} label="Total Users"        value={dashboard?.totalUsers ?? 0}                     icon={Users}         color="brand"   trend={{ value: 12, label: 'vs last month' }} />
-          <MetricCard isLoading={isLoading} label="Total Jobs"         value={dashboard?.totalJobs ?? 0}                      icon={Briefcase}     color="emerald" trend={{ value: 8,  label: 'vs last month' }} />
+          <MetricCard isLoading={isLoading} label="Total Users"        value={dashboard?.totalUsers ?? 0}                     icon={Users}         color="brand" />
+          <MetricCard isLoading={isLoading} label="Total Jobs"         value={dashboard?.totalJobs ?? 0}                      icon={Briefcase}     color="emerald" />
           <MetricCard isLoading={isLoading} label="Active Contracts"   value={dashboard?.activeContracts ?? 0}                icon={FileSignature} color="amber" />
-          <MetricCard isLoading={isLoading} label="Platform Revenue"   value={formatCurrency(dashboard?.totalRevenue ?? 0)}   icon={DollarSign}    color="emerald" trend={{ value: 22, label: 'vs last month' }} />
+          <MetricCard isLoading={isLoading} label="Platform Revenue"   value={formatCurrency(dashboard?.totalRevenue ?? 0)}   icon={DollarSign}    color="emerald" />
         </div>
 
         <div className="grid gap-6 lg:grid-cols-2">
           {/* Revenue Chart */}
           <Card>
-            <CardHeader><CardTitle>Monthly Revenue</CardTitle></CardHeader>
+            <CardHeader><CardTitle>Monthly Platform Fees</CardTitle></CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={mockRevenueChart}>
+                <BarChart data={revenueChart}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                   <XAxis dataKey="month" tick={{ fontSize: 12 }} />
                   <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
@@ -59,8 +80,8 @@ export default function AdminDashboardPage() {
             <CardContent>
               <ResponsiveContainer width="100%" height={220}>
                 <PieChart>
-                  <Pie data={mockProposalStatusData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
-                    {mockProposalStatusData.map((entry, i) => (
+                  <Pie data={proposalStatusData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
+                    {proposalStatusData.map((entry, i) => (
                       <Cell key={i} fill={entry.fill} />
                     ))}
                   </Pie>
@@ -85,7 +106,7 @@ export default function AdminDashboardPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                {mockTopFreelancers.map((f) => (
+                {topFreelancers.map((f) => (
                   <tr key={f.freelancerId} className="hover:bg-gray-50 dark:hover:bg-gray-800/30">
                     <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">{f.name}</td>
                     <td className="px-6 py-4 text-gray-500">{f.completedContracts}</td>

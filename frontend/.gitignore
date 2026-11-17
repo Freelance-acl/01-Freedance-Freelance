@@ -14,3 +14,8 @@ out/
 # Build info
 tsconfig.tsbuildinfo
 next-env.d.ts
+
+# Automated browser checks
+/test-results/
+/playwright-report/
+.next-production/

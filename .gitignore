@@ -37,6 +37,12 @@ build/
 
 .env
 
+# Python demo verification artifacts
+scripts/__pycache__/
+
+# Generated live demo recordings
+artifacts/demo-video/
+
 ### run.bash background gateway port-forward ###
 .gateway-portforward.pid
 .gateway-portforward.log

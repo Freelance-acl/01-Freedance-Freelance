@@ -1,5 +1,7 @@
 import axios from 'axios'
 import { getToken } from './auth'
+import { jwtDecode } from 'jwt-decode'
+import { normalizeUser, normalizeJob, normalizeProposal, normalizePayout, normalizePromo, jobPayload } from './backend'
 import type {
   AuthResponse, LoginRequest, RegisterRequest,
   User, Job, Proposal, Contract, Payout,
@@ -23,12 +25,25 @@ export const apiClient = axios.create({
 
 apiClient.interceptors.request.use((config) => {
   const token = getToken()
-  if (token) config.headers.Authorization = `Bearer ${token}`
+  if (token && !config.headers.Authorization) config.headers.Authorization = `Bearer ${token}`
   return config
 })
 
 apiClient.interceptors.response.use(
-  (r) => r,
+  (r) => {
+    // Adapt the backend wire models once, including list and detail responses.
+    const path = r.config.url?.split('?')[0] ?? ''
+    const adapt = <T,>(fn: (_value: T) => unknown) => {
+      if (Array.isArray(r.data)) r.data = r.data.map(value => fn(value as T))
+      else if (r.data && typeof r.data === 'object' && 'id' in r.data) r.data = fn(r.data as T)
+    }
+    if (/^\/users(?:\/\d+)?$/.test(path)) adapt(normalizeUser)
+    if (/^\/jobs(?:\/\d+)?$/.test(path)) adapt(normalizeJob)
+    if (/^\/proposals(?:\/\d+(?:\/(?:accept|complete|withdraw))?)?$/.test(path)) adapt(normalizeProposal)
+    if (/^\/payouts(?:\/\d+(?:\/retry)?|\/contract\/\d+)?$/.test(path)) adapt(normalizePayout)
+    if (/^\/promo-codes(?:\/\d+)?$/.test(path)) adapt(normalizePromo)
+    return r
+  },
   (err) => {
     if (err.response?.status === 401 && typeof window !== 'undefined') {
       window.dispatchEvent(new Event('auth:expired'))
@@ -39,6 +54,15 @@ apiClient.interceptors.response.use(
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
+async function authenticate(path: string, body: LoginRequest | RegisterRequest): Promise<AuthResponse> {
+  const { data } = await apiClient.post<{ token: string; expiresIn: number }>(path, body)
+  const { uid } = jwtDecode<{ uid: number }>(data.token)
+  const profile = await apiClient.get<User>(`/users/${uid}`, {
+    headers: { Authorization: `Bearer ${data.token}` },
+  })
+  return { token: data.token, user: profile.data }
+}
+
 export const authApi = {
   login: async (req: LoginRequest): Promise<AuthResponse> => {
     if (MOCK) {
@@ -48,8 +72,7 @@ export const authApi = {
       if (!user) throw new Error('Invalid credentials')
       return delay({ token: 'mock.jwt.token', user })
     }
-    const { data } = await apiClient.post<AuthResponse>('/users/auth/login', req)
-    return data
+    return authenticate('/auth/login', req)
   },
 
   register: async (req: RegisterRequest): Promise<AuthResponse> => {
@@ -60,8 +83,7 @@ export const authApi = {
       }
       return delay({ token: 'mock.jwt.token', user })
     }
-    const { data } = await apiClient.post<AuthResponse>('/users/auth/register', req)
-    return data
+    return authenticate('/auth/register', req)
   },
 }
 
@@ -89,19 +111,27 @@ export const usersApi = {
       const u = mock.mockUsers.find((u) => u.id === id)!
       return delay({ ...u, ...body })
     }
-    const { data } = await apiClient.put<User>(`/users/${id}`, body)
+    const { bio, ...fields } = body
+    const current = bio === undefined ? undefined : await usersApi.getById(id)
+    const { data } = await apiClient.put<User>(`/users/${id}`, { ...fields,
+      ...(bio !== undefined ? { preferences: { ...current?.preferences, bio } } : {}) })
     return data
   },
 
   deactivate: async (id: number): Promise<void> => {
     if (MOCK) return delay(undefined)
-    await apiClient.post(`/users/${id}/deactivate`)
+    await apiClient.put(`/users/${id}/deactivate`)
   },
 
   getTopFreelancers: async (limit = 5): Promise<TopFreelancer[]> => {
     if (MOCK) return delay(mock.mockTopFreelancers.slice(0, limit))
-    const { data } = await apiClient.get<TopFreelancer[]>(`/users/top-freelancers?limit=${limit}`)
-    return data
+    const [users, contracts, payouts] = await Promise.all([usersApi.getAll(), contractsApi.getAll(), walletApi.getPayouts()])
+    return users.filter(u => u.role === 'FREELANCER').map(u => {
+      const own = contracts.filter(c => c.freelancerId === u.id)
+      const completed = own.filter(c => c.status === 'COMPLETED').length
+      return { freelancerId: u.id, name: u.name, completedContracts: completed, completionRate: own.length ? completed / own.length : 0,
+        totalEarnings: payouts.filter(p => p.freelancerId === u.id && p.status === 'COMPLETED').reduce((sum, p) => sum + p.amount - p.platformFee, 0), rating: u.rating ?? 0 }
+    }).sort((a, b) => b.totalEarnings - a.totalEarnings).slice(0, limit)
   },
 }
 
@@ -115,9 +145,8 @@ export const jobsApi = {
         : mock.mockJobs
       return delay(jobs)
     }
-    const params = status ? `?status=${status}` : ''
-    const { data } = await apiClient.get<Job[]>(`/jobs${params}`)
-    return data
+    const { data } = await apiClient.get<Job[]>('/jobs')
+    return status ? data.filter(j => j.status === status) : data
   },
 
   getById: async (id: number): Promise<Job> => {
@@ -140,7 +169,7 @@ export const jobsApi = {
       }
       return delay(job)
     }
-    const { data } = await apiClient.post<Job>('/jobs', body)
+    const { data } = await apiClient.post<Job>('/jobs', jobPayload(body))
     return data
   },
 
@@ -149,19 +178,19 @@ export const jobsApi = {
       const j = mock.mockJobs.find((j) => j.id === id)!
       return delay({ ...j, ...body })
     }
-    const { data } = await apiClient.put<Job>(`/jobs/${id}`, body)
+    const { data } = await apiClient.put<Job>(`/jobs/${id}`, jobPayload(body))
     return data
   },
 
   close: async (id: number): Promise<void> => {
     if (MOCK) return delay(undefined)
-    await apiClient.post(`/jobs/${id}/close`)
+    await apiClient.put(`/jobs/${id}/close`, { status: 'CLOSED' })
   },
 
   getByClient: async (clientId: number): Promise<Job[]> => {
     if (MOCK) return delay(mock.mockJobs.filter((j) => j.clientId === clientId))
-    const { data } = await apiClient.get<Job[]>(`/jobs?clientId=${clientId}`)
-    return data
+    const { data } = await apiClient.get<Job[]>('/jobs')
+    return data.filter(j => j.clientId === clientId)
   },
 
   search: async (keyword: string): Promise<Job[]> => {
@@ -171,8 +200,8 @@ export const jobsApi = {
         (j) => j.title.toLowerCase().includes(kw) || j.description.toLowerCase().includes(kw),
       ))
     }
-    const { data } = await apiClient.get<Job[]>(`/jobs/search?keyword=${encodeURIComponent(keyword)}`)
-    return data
+    const { data } = await apiClient.get<{ content: { id: number }[] }>(`/jobs/search/full-text?query=${encodeURIComponent(keyword)}&size=100`)
+    return Promise.all(data.content.map(j => jobsApi.getById(j.id)))
   },
 }
 
@@ -197,14 +226,14 @@ export const proposalsApi = {
 
   getByJob: async (jobId: number): Promise<Proposal[]> => {
     if (MOCK) return delay(mock.mockProposals.filter((p) => p.jobId === jobId))
-    const { data } = await apiClient.get<Proposal[]>(`/proposals?jobId=${jobId}`)
-    return data
+    const { data } = await apiClient.get<Proposal[]>('/proposals')
+    return data.filter(p => p.jobId === jobId)
   },
 
   getByFreelancer: async (freelancerId: number): Promise<Proposal[]> => {
     if (MOCK) return delay(mock.mockProposals.filter((p) => p.freelancerId === freelancerId))
-    const { data } = await apiClient.get<Proposal[]>(`/proposals?freelancerId=${freelancerId}`)
-    return data
+    const { data } = await apiClient.get<Proposal[]>('/proposals')
+    return data.filter(p => p.freelancerId === freelancerId)
   },
 
   submit: async (body: Partial<Proposal>): Promise<Proposal> => {
@@ -226,13 +255,13 @@ export const proposalsApi = {
       const p = mock.mockProposals.find((p) => p.id === id)!
       return delay({ ...p, status: 'ACCEPTED' })
     }
-    const { data } = await apiClient.post<Proposal>(`/proposals/${id}/accept`)
+    const { data } = await apiClient.put<Proposal>(`/proposals/${id}/accept`)
     return data
   },
 
   reject: async (id: number): Promise<void> => {
     if (MOCK) return delay(undefined)
-    await apiClient.post(`/proposals/${id}/reject`)
+    await apiClient.put(`/proposals/${id}`, { status: 'REJECTED' })
   },
 
   markCompleting: async (id: number): Promise<Proposal> => {
@@ -240,13 +269,13 @@ export const proposalsApi = {
       const p = mock.mockProposals.find((p) => p.id === id)!
       return delay({ ...p, status: 'COMPLETING' })
     }
-    const { data } = await apiClient.post<Proposal>(`/proposals/${id}/completing`)
+    const { data } = await apiClient.put<Proposal>(`/proposals/${id}/complete`)
     return data
   },
 
   withdraw: async (id: number): Promise<void> => {
     if (MOCK) return delay(undefined)
-    await apiClient.post(`/proposals/${id}/withdraw`)
+    await apiClient.put(`/proposals/${id}/withdraw`)
   },
 }
 
@@ -271,19 +300,20 @@ export const contractsApi = {
 
   getByFreelancer: async (freelancerId: number): Promise<Contract[]> => {
     if (MOCK) return delay(mock.mockContracts.filter((c) => c.freelancerId === freelancerId))
-    const { data } = await apiClient.get<Contract[]>(`/contracts/freelancer/${freelancerId}`)
-    return data
+    const { data } = await apiClient.get<Contract[]>('/contracts')
+    return data.filter(c => c.freelancerId === freelancerId)
   },
 
   getByClient: async (clientId: number): Promise<Contract[]> => {
     if (MOCK) return delay(mock.mockContracts.filter((c) => c.clientId === clientId))
-    const { data } = await apiClient.get<Contract[]>(`/contracts/client/${clientId}`)
-    return data
+    const { data } = await apiClient.get<Contract[]>('/contracts')
+    return data.filter(c => c.clientId === clientId)
   },
 
   terminate: async (id: number, reason: string): Promise<void> => {
     if (MOCK) return delay(undefined)
-    await apiClient.post(`/contracts/${id}/terminate`, { reason })
+    const contract = await contractsApi.getById(id)
+    await apiClient.put(`/contracts/${id}`, { status: 'TERMINATED', metadata: { ...contract.metadata, terminationReason: reason } })
   },
 
   getAnalytics: async (): Promise<ContractAnalytics> => {
@@ -294,8 +324,13 @@ export const contractsApi = {
 
   getAdminDashboard: async (): Promise<AdminDashboard> => {
     if (MOCK) return delay(mock.mockAdminDashboard)
-    const { data } = await apiClient.get<AdminDashboard>('/contracts/admin/dashboard')
-    return data
+    const [users, jobs, contracts, payouts] = await Promise.all([
+      usersApi.getAll(), jobsApi.getAll(), contractsApi.getAll(), walletApi.getPayouts(),
+    ])
+    const fees = payouts.filter(p => p.status === 'COMPLETED').reduce((sum, p) => sum + p.platformFee, 0)
+    return { totalUsers: users.length, totalJobs: jobs.length, totalContracts: contracts.length,
+      totalRevenue: fees, platformFeeCollected: fees, activeContracts: contracts.filter(c => c.status === 'ACTIVE').length,
+      openJobs: jobs.filter(j => j.status === 'OPEN').length, pendingPayouts: payouts.filter(p => p.status === 'PENDING').length }
   },
 }
 
@@ -304,7 +339,7 @@ export const contractsApi = {
 export const walletApi = {
   getPayouts: async (): Promise<Payout[]> => {
     if (MOCK) return delay(mock.mockPayouts)
-    const { data } = await apiClient.get<Payout[]>('/wallet/payouts')
+    const { data } = await apiClient.get<Payout[]>('/payouts')
     return data
   },
 
@@ -313,32 +348,40 @@ export const walletApi = {
       const p = mock.mockPayouts.find((p) => p.id === id)!
       return delay(p)
     }
-    const { data } = await apiClient.get<Payout>(`/wallet/payouts/${id}`)
+    const { data } = await apiClient.get<Payout>(`/payouts/${id}`)
     return data
   },
 
   getFreelancerSummary: async (freelancerId: number): Promise<FreelancerPayoutSummary> => {
     if (MOCK) return delay({ ...mock.mockPayoutSummary, freelancerId })
-    const { data } = await apiClient.get<FreelancerPayoutSummary>(
-      `/wallet/freelancer/${freelancerId}/summary`,
-    )
-    return data
+    const payouts = (await walletApi.getPayouts()).filter(p => p.freelancerId === freelancerId)
+    const total = (status: Payout['status']) => payouts.filter(p => p.status === status).reduce((sum, p) => sum + p.amount, 0)
+    return { freelancerId, totalPaid: total('COMPLETED') - payouts.filter(p => p.status === 'COMPLETED').reduce((sum, p) => sum + p.platformFee, 0), totalPending: total('PENDING'), totalFailed: total('FAILED'),
+      totalRefunded: total('REFUNDED'), payoutCount: payouts.length,
+      totalPlatformFees: payouts.filter(p => p.status === 'COMPLETED').reduce((sum, p) => sum + p.platformFee, 0) }
   },
 
   getPlatformFees: async (): Promise<PlatformFeeAnalytics[]> => {
     if (MOCK) return delay(mock.mockPlatformFees)
-    const { data } = await apiClient.get<PlatformFeeAnalytics[]>('/wallet/admin/platform-fees')
-    return data
+    const { data } = await apiClient.get<{ category: string; platformFeeRevenue: number; totalRevenue: number; payoutCount: number }[]>(
+      `/payouts/analytics/category?startDate=2000-01-01&endDate=${new Date().toISOString().slice(0, 10)}`)
+    return data.map(f => ({ category: f.category, totalFees: f.platformFeeRevenue, totalVolume: f.totalRevenue,
+      payoutCount: f.payoutCount, averageFeeRate: f.totalRevenue ? f.platformFeeRevenue / f.totalRevenue : 0 }))
   },
 
   retryPayout: async (payoutId: number): Promise<void> => {
     if (MOCK) return delay(undefined)
-    await apiClient.post(`/wallet/payouts/${payoutId}/retry`)
+    await apiClient.put(`/payouts/${payoutId}/retry`)
+  },
+
+  processContract: async (contractId: number): Promise<Payout> => {
+    const { data } = await apiClient.post<Payout>(`/payouts/contract/${contractId}`, { method: 'BANK_TRANSFER', accountLastFour: '0000' })
+    return data
   },
 
   getPromoCodes: async (): Promise<PromoCode[]> => {
     if (MOCK) return delay(mock.mockPromoCodes)
-    const { data } = await apiClient.get<PromoCode[]>('/wallet/admin/promo-codes')
+    const { data } = await apiClient.get<PromoCode[]>('/promo-codes')
     return data
   },
 
@@ -350,7 +393,7 @@ export const walletApi = {
         active: true,
       })
     }
-    const { data } = await apiClient.post<PromoCode>('/wallet/admin/promo-codes', body)
+    const { data } = await apiClient.post<PromoCode>('/promo-codes', { code: body.code, discountType: 'PERCENTAGE', discountValue: body.discountPercent, maxUses: body.maxUsage, expiryDate: body.expiresAt, active: body.active ?? true })
     return data
   },
 }

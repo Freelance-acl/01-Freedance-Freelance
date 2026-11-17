@@ -24,7 +24,7 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>
 
 const CATEGORIES = [
-  'Frontend', 'Backend', 'Mobile', 'Design', 'DevOps', 'Data Science', 'QA', 'Other',
+  'WEB_DEV', 'MOBILE', 'DESIGN', 'WRITING',
 ].map((c) => ({ value: c, label: c }))
 
 export default function CreateJobPage() {

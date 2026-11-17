@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import {
-  ArrowRight, Zap, Shield, BarChart3, Globe,
+  ArrowRight, Shield, BarChart3, Globe,
   CheckCircle, GitBranch, Database, Users, DollarSign, Star,
   ChevronRight, Code2, Layers, Activity,
 } from 'lucide-react'
@@ -8,8 +8,8 @@ import {
 const STATS = [
   { value: '5',    label: 'Microservices' },
   { value: '6',    label: 'Database backends' },
-  { value: '99.9%',label: 'Uptime SLA' },
-  { value: '100%', label: 'Saga Pattern Live' },
+  { value: 'JWT', label: 'Authenticated APIs' },
+  { value: 'RabbitMQ', label: 'Saga Messaging' },
 ]
 
 const FEATURES = [
@@ -23,8 +23,8 @@ const FEATURES = [
   },
   {
     icon: Shield,
-    title: 'Escrow Payments',
-    desc: 'Wallet service holds funds in escrow and releases them only when both parties confirm delivery. Automatic refund on failure.',
+    title: 'Demo Payment Ledger',
+    desc: 'Work completion creates a pending payout. The client releases it through the wallet service. Payments are simulated; no real money moves.',
     color: 'from-emerald-500 to-teal-600',
     bg: 'bg-emerald-50 dark:bg-emerald-900/20',
     text: 'text-emerald-600 dark:text-emerald-400',
@@ -49,14 +49,14 @@ const FEATURES = [
 
 const HOW_IT_WORKS_CLIENT = [
   { step: '01', title: 'Post a Job',         desc: 'Describe your project, set a budget, and publish it to the marketplace.' },
-  { step: '02', title: 'Review Proposals',   desc: 'Receive bids from verified freelancers. Accept the best fit.' },
-  { step: '03', title: 'Pay on Completion',  desc: 'The saga handles the payout automatically when work is confirmed.' },
+  { step: '02', title: 'Review Proposals',   desc: 'Receive bids from registered freelancers. Accept the best fit.' },
+  { step: '03', title: 'Pay on Completion',  desc: 'Work completion creates a pending payout. Release the demo payment from the contract page.' },
 ]
 
 const HOW_IT_WORKS_FREELANCER = [
   { step: '01', title: 'Browse Open Jobs',   desc: 'Search and filter by category, budget, or skills required.' },
   { step: '02', title: 'Submit a Proposal',  desc: 'Write your cover letter and set your bid. Get shortlisted.' },
-  { step: '03', title: 'Get Paid Instantly', desc: 'Mark work complete — funds are released to your wallet via the saga.' },
+  { step: '03', title: 'Track Your Payout', desc: 'Mark work complete, then track the payout after the client releases it.' },
 ]
 
 const TECH_STACK = [
@@ -141,7 +141,7 @@ export default function LandingPage() {
 
           <p className="mx-auto mb-10 max-w-2xl text-lg sm:text-xl text-gray-600 dark:text-gray-400 leading-relaxed">
             Freedance is a cloud-native microservices marketplace with event-driven payment sagas,
-            full observability, and multi-database architecture — running on Kubernetes.
+            full observability, and multi-database architecture with Docker and Kubernetes deployment support.
           </p>
 
           {/* CTAs */}

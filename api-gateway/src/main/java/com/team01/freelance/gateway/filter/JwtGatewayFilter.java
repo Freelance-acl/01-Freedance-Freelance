@@ -53,7 +53,9 @@ public class JwtGatewayFilter implements GlobalFilter, Ordered {
 
         try {
             Claims claims = parseToken(authHeader.substring(7));
-            String userId = claims.getSubject();
+            Object uid = claims.get("uid");
+            if (uid == null) throw new IllegalArgumentException("Missing user id");
+            String userId = uid.toString();
             String role = claims.get("role", String.class);
 
             return chain.filter(exchange.mutate()
