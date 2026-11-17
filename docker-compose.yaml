@@ -1,4 +1,6 @@
 x-nosql-env: &nosql-env
+  # Spring Boot 4 binds Mongo auto-configuration under spring.mongodb.
+  SPRING_MONGODB_URI: mongodb://root:rootpass@mongo:27017/freelancemongo?authSource=admin
   SPRING_DATA_MONGODB_URI: mongodb://root:rootpass@mongo:27017/freelancemongo?authSource=admin
   SPRING_DATA_REDIS_HOST: redis
   SPRING_DATA_REDIS_PORT: "6379"
@@ -10,6 +12,9 @@ x-job-nosql-env: &job-nosql-env
 
 x-proposal-nosql-env: &proposal-nosql-env
   <<: *nosql-env
+  SPRING_NEO4J_URI: bolt://neo4j:7687
+  SPRING_NEO4J_AUTHENTICATION_USERNAME: neo4j
+  SPRING_NEO4J_AUTHENTICATION_PASSWORD: neo4jpass
   SPRING_DATA_NEO4J_URI: bolt://neo4j:7687
   SPRING_DATA_NEO4J_USERNAME: neo4j
   SPRING_DATA_NEO4J_PASSWORD: neo4jpass
@@ -28,6 +33,7 @@ x-rabbitmq-env: &rabbitmq-env
   SPRING_RABBITMQ_PASSWORD: guest
 
 x-spring-mem: &spring-mem
+  LOGGING_CONFIG: /app/logback-console.xml
   JAVA_TOOL_OPTIONS: >-
     -XX:+UseContainerSupport
     -Xms128m -Xmx300m
@@ -202,8 +208,8 @@ services:
       CASSANDRA_CLUSTER_NAME: freelancecluster
       CASSANDRA_DC: datacenter1
       MAX_HEAP_SIZE: 512M
-      HEAP_NEWSIZE: 128M
-    mem_limit: 768m
+      JVM_EXTRA_OPTS: "-XX:ActiveProcessorCount=2 -XX:MaxDirectMemorySize=256m"
+    mem_limit: 1536m
     volumes:
       - cassandra-data:/var/lib/cassandra
     networks:
@@ -211,12 +217,16 @@ services:
     command: >
       bash -c "
         docker-entrypoint.sh cassandra -f &
-        until cqlsh -e 'DESCRIBE KEYSPACES' 2>/dev/null; do sleep 5; done;
+        cassandra_pid=$$!;
+        until cqlsh -e 'DESCRIBE KEYSPACES' 2>/dev/null; do
+          kill -0 $$cassandra_pid 2>/dev/null || { wait $$cassandra_pid; exit $$?; };
+          sleep 5;
+        done;
         cqlsh -e \"CREATE KEYSPACE IF NOT EXISTS freelanceks WITH replication = {'class':'SimpleStrategy','replication_factor':1};\";
-        wait
+        wait $$cassandra_pid
       "
     healthcheck:
-      test: ["CMD-SHELL", "cqlsh -e 'DESCRIBE KEYSPACES'"]
+      test: ["CMD-SHELL", "cqlsh -e 'DESCRIBE KEYSPACE freelanceks'"]
       interval: 15s
       timeout: 10s
       retries: 10
@@ -246,7 +256,7 @@ services:
       start_period: 30s
 
   elasticsearch:
-    image: elasticsearch:8.19.12
+    image: elasticsearch:9.2.6
     container_name: freelance-elasticsearch
     ports:
       - "9200:9200"
@@ -282,6 +292,8 @@ services:
       SPRING_DATASOURCE_PASSWORD: postgres
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
       <<: [*nosql-env, *rabbitmq-env, *spring-mem]
+    volumes:
+      - ./docker/logback-console.xml:/app/logback-console.xml:ro
     mem_limit: 384m
     depends_on:
       postgres-users:
@@ -306,8 +318,12 @@ services:
       SPRING_DATASOURCE_PASSWORD: postgres
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
       <<: [*job-nosql-env, *rabbitmq-env, *spring-mem]
+    volumes:
+      - ./docker/logback-console.xml:/app/logback-console.xml:ro
     mem_limit: 384m
     depends_on:
+      elasticsearch:
+        condition: service_healthy
       postgres-jobs:
         condition: service_healthy
       rabbitmq:
@@ -332,6 +348,8 @@ services:
       SPRING_DATASOURCE_PASSWORD: postgres
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
       <<: [*proposal-nosql-env, *rabbitmq-env, *spring-mem]
+    volumes:
+      - ./docker/logback-console.xml:/app/logback-console.xml:ro
     mem_limit: 384m
     depends_on:
       postgres-proposals:
@@ -360,8 +378,12 @@ services:
       SPRING_DATASOURCE_PASSWORD: postgres
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
       <<: [*contract-nosql-env, *rabbitmq-env, *spring-mem]
+    volumes:
+      - ./docker/logback-console.xml:/app/logback-console.xml:ro
     mem_limit: 384m
     depends_on:
+      cassandra:
+        condition: service_healthy
       postgres-contracts:
         condition: service_healthy
       rabbitmq:
@@ -386,6 +408,8 @@ services:
       SPRING_DATASOURCE_PASSWORD: postgres
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
       <<: [*nosql-env, *rabbitmq-env, *spring-mem]
+    volumes:
+      - ./docker/logback-console.xml:/app/logback-console.xml:ro
     mem_limit: 384m
     depends_on:
       postgres-wallet:
@@ -409,6 +433,8 @@ services:
       SERVER_PORT: 8080
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
       <<: *spring-mem
+    volumes:
+      - ./docker/logback-console.xml:/app/logback-console.xml:ro
     mem_limit: 256m
     depends_on:
       - user-service

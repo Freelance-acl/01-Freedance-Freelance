@@ -101,6 +101,7 @@ public class RabbitMQConfig {
         mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
         DefaultJackson2JavaTypeMapper typeMapper = new DefaultJackson2JavaTypeMapper();
+        typeMapper.setTypePrecedence(org.springframework.amqp.support.converter.Jackson2JavaTypeMapper.TypePrecedence.TYPE_ID);
         typeMapper.setTrustedPackages(trustedEventPackage);
         typeMapper.setIdClassMapping(proposalEventTypeMapping());
 

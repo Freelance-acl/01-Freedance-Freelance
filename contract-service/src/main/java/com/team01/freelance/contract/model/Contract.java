@@ -2,6 +2,8 @@ package com.team01.freelance.contract.model;
 
 import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import java.time.LocalDateTime;
 import java.util.Map;
 
@@ -45,7 +47,7 @@ public class Contract {
     private LocalDateTime endDate;
 
     @Column(name = "metadata", columnDefinition = "jsonb")
-    @Convert(converter = JsonMapConverter.class)
+    @JdbcTypeCode(SqlTypes.JSON)
     private Map<String, Object> metadata;
 
     @Column(name = "created_at", nullable = false)

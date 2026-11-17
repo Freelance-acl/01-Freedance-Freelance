@@ -37,7 +37,8 @@ public class RedisConfig {
     public RedisTemplate<String, Object> redisTemplate(
             RedisConnectionFactory connectionFactory,
             @Qualifier("redisObjectMapper") ObjectMapper redisObjectMapper) {
-        GenericJackson2JsonRedisSerializer serializer = new GenericJackson2JsonRedisSerializer(redisObjectMapper);
+        GenericJackson2JsonRedisSerializer serializer = new GenericJackson2JsonRedisSerializer(
+                com.team01.freelance.common.cache.TypedCacheMapper.copyOf(redisObjectMapper));
         RedisTemplate<String, Object> template = new RedisTemplate<>();
         template.setConnectionFactory(connectionFactory);
         template.setKeySerializer(new StringRedisSerializer());
@@ -51,8 +52,10 @@ public class RedisConfig {
     public CacheManager cacheManager(
             RedisConnectionFactory connectionFactory,
             @Qualifier("redisObjectMapper") ObjectMapper redisObjectMapper) {
-        GenericJackson2JsonRedisSerializer serializer = new GenericJackson2JsonRedisSerializer(redisObjectMapper);
+        GenericJackson2JsonRedisSerializer serializer = new GenericJackson2JsonRedisSerializer(
+                com.team01.freelance.common.cache.TypedCacheMapper.copyOf(redisObjectMapper));
         RedisCacheConfiguration fiveMinutes = RedisCacheConfiguration.defaultCacheConfig()
+                .computePrefixWith(name -> "user-service:v2:" + name + "::")
                 .entryTtl(Duration.ofMinutes(5))
                 .serializeKeysWith(RedisSerializationContext.SerializationPair
                         .fromSerializer(new StringRedisSerializer()))

@@ -14,7 +14,7 @@ public class JwtTokenService {
 
     private final SecretKey signingKey;
 
-    public JwtTokenService(@Value("${jwt.secret:freelance-platform-secret-key-at-least-32-bytes}") String secret) {
+    public JwtTokenService(@Value("${jwt.secret}") String secret) {
         byte[] raw = Decoders.BASE64.decode(secret);
         if (raw.length < 32) {
             throw new IllegalArgumentException("JWT secret must decode to at least 32 bytes");
